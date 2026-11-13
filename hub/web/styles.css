@@ -78,16 +78,28 @@ h2 { font-size: 15px; font-weight: 600; }
 .library-row > p:empty { display: none; }
 .design-library { container-type: inline-size; }
 @container (max-width: 520px) { .library-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .library-row > input { grid-column: 1 / -1; } }
-.library-tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--line); }
+.library-tabbar { display: flex; align-items: flex-end; gap: 8px; border-bottom: 1px solid var(--line); }
+.library-tabs { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; }
+.library-star { min-height: 44px; min-width: 44px; margin-bottom: 4px; border-color: transparent; font-size: 18px; color: var(--muted); }
+.library-star[aria-pressed=true] { color: #e8a200; border-color: var(--line); }
 .library-tabs [role=tab] { min-height: 44px; border-color: transparent; border-radius: 6px 6px 0 0; }
 .library-tabs [role=tab][aria-selected=true] { border-color: var(--line); border-bottom-color: var(--ink); font-weight: 600; }
-.library-tabs + .library-row { margin-top: 12px; }
+.library-tabbar + .library-row { margin-top: 12px; }
 #library-results { margin-top: 8px; }
 .library-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 12px; }
 .library-card-preview { position: relative; aspect-ratio: 16 / 10; overflow: hidden; margin-bottom: 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); }
 .library-card-preview iframe { position: absolute; inset: 0 auto auto 0; width: 1280px; height: 800px; border: 0; transform: scale(var(--scale, 0.25)); transform-origin: 0 0; pointer-events: none; }
 .library-card-preview > p { margin: 12px; }
-.library-list article { border: 1px solid var(--line); border-radius: 6px; padding: 12px; overflow-wrap: anywhere; }
+.library-list article { border: 1px solid var(--line); border-radius: 6px; padding: 12px; overflow-wrap: anywhere; position: relative; cursor: pointer; }
+/* Card corner icons: shown on hover or keyboard focus, always on touch screens (no hover there). */
+.library-card-actions { position: absolute; top: 18px; right: 18px; z-index: 1; display: flex; gap: 4px; opacity: 0; transition: opacity .12s; }
+.library-list article:is(:hover, :focus-within) .library-card-actions { opacity: 1; }
+@media (hover: none) { .library-card-actions { opacity: 1; } }
+.library-list .library-card-actions button { min-height: 36px; min-width: 36px; padding: 0; border-radius: 50%; background: var(--panel); box-shadow: 0 1px 4px rgb(0 0 0 / .25); font-size: 18px; line-height: 1; }
+.library-card-actions [data-star][aria-pressed=true] { color: #e8a200; }
+.library-list .library-open { all: unset; cursor: pointer; overflow-wrap: anywhere; }
+.library-list .library-open:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.library-list .library-open:disabled { cursor: default; }
 .library-list h3 { margin: 0 0 8px; font-size: 15px; }
 .library-list small, .library-list p { color: var(--muted); font-size: 12px; }
 .library-list p { margin-top: 8px; }

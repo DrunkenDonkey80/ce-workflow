@@ -56,7 +56,6 @@ let noticeTimer: ReturnType<typeof setTimeout> | undefined, noticeVersion = 0;
 // Confirmations (brief) fade after ~1.5 s; errors and hints stay until replaced.
 function showNotice(text, brief = false) { noticeVersion++; clearTimeout(noticeTimer); $("notice").textContent = text; $("notice").hidden = !text; if (text) noticeTimer = setTimeout(() => showNotice(""), brief ? 1500 : 10_000); }
 let sessionStates: string[] = [], ownTone = "", iconKey = "", appleFor = "";
-let navRequest: { n: number; dir: number; ctrl: boolean } | null = null; // a back/forward press for the app (see piHubGo)
 // D5: inside the desktop app (user agent marker) the title is a machine line the app reads for its tab, taskbar and tray.
 const inApp = () => navigator.userAgent.includes("PiHubApp/");
 // Small line icons for the header buttons; each has its own colour in styles.css (.ui-icon[data-icon]).
@@ -1373,12 +1372,17 @@ $("message-input").addEventListener("keydown", event => {
 // Terminal parity: Enter sends, Shift+Enter adds a line, Escape stops a running agent.
 // Touch keyboards have no Shift+Enter, so there Enter adds a line and only Send sends.
 const touchKeyboard = matchMedia("(pointer: coarse)");
+// Next / previous session on this hub that is not parked (wraps).
+function stepSession(dir: number) {
+ if (!lastSessions) return false;
+ const order = lastSessions[0].filter(group => !group.archived).flatMap(group => group.sessions.filter(session => session.tone !== "parked" || session.id === sessionId).map(session => session.id));
+ if (order.length < 2) return false;
+ jumpTo(order[(order.indexOf(sessionId) + dir + order.length) % order.length]); return true;
+}
 $("message-input").addEventListener("keydown", event => {
  // Tab / Shift+Tab in the chat box: next / previous session on this hub that is not parked (wraps; the @ and / menus take Tab first).
  if (event.key === "Tab" && !event.ctrlKey && !event.altKey && !event.metaKey && lastSessions && $("slash-menu").hidden) {
-  const order = lastSessions[0].filter(group => !group.archived).flatMap(group => group.sessions.filter(session => session.tone !== "parked" || session.id === sessionId).map(session => session.id));
-  const at = order.indexOf(sessionId);
-  if (order.length > 1) { event.preventDefault(); jumpTo(order[(at + (event.shiftKey ? -1 : 1) + order.length) % order.length]); }
+  if (stepSession(event.shiftKey ? -1 : 1)) event.preventDefault();
   return;
  }
  if (event.key === "Enter" && !event.shiftKey && !event.isComposing && !touchKeyboard.matches) { event.preventDefault(); $("composer").requestSubmit(); }
@@ -1762,7 +1766,7 @@ function renderIcon() {
   const tones = [...states, ...own ? [] : [ownTone]].filter(tone => ["waiting", "working", "unseen", "scheduled"].includes(tone)); // the app has no page in front: own unseen counts
   // attention: how many things need you, for the app's badge on a pinned button.
   // session/nav: the session on screen and a back/forward button press, for the app's visit trail (hub/app/ui).
-  const line = "pi-hub-state " + JSON.stringify({ icon: iconName(), name: hubSettings.hostname ?? "", version: hubSettings.version ?? "", states: tones, attention: tones.filter(tone => tone === "waiting" || tone === "unseen").length, session: sessionId, nav: navRequest,
+  const line = "pi-hub-state " + JSON.stringify({ icon: iconName(), name: hubSettings.hostname ?? "", version: hubSettings.version ?? "", states: tones, attention: tones.filter(tone => tone === "waiting" || tone === "unseen").length, session: sessionId,
    // latest: the newest session needing you, asks: it is a question (beats any hub's finished run), so the app's attention key picks this hub; key: that hotkey (this PC's hub sets it).
    latest: attentionList[0]?.attention ?? 0, asks: attentionList[0]?.tone === "waiting", key: hubSettings.attentionKey ?? "", remote: hubSettings.remote ?? "",
    // side: where the strip starts (frameless app); gear: the settings badge the strip's gear repeats ("!" ce-workflow, else a count).
@@ -1814,13 +1818,19 @@ async function loadSessions() {
  void checkPairing();
  sessionsTimer = window.setTimeout(loadSessions, visible || inApp() ? 5000 : 15000); // the app's hidden tabs still feed its icon
 }
-// Desktop app: the mouse back/forward buttons walk the sessions visited across every hub tab (with Ctrl, this hub only).
-// The app's tab strip keeps that trail; the press goes to it in the title line, and piHubGo opens the session it picks.
+// The mouse Back button steps out of Explore or a library detail; sessions switch with Ctrl+Tab instead.
+// In the desktop app the webview's own history step is blocked, so Back/Forward never leave the session.
 for (const type of ["mousedown", "mouseup", "auxclick"]) window.addEventListener(type, event => {
- const press = event as MouseEvent; if ((press.button !== 3 && press.button !== 4) || !inApp()) return;
- press.preventDefault(); // the webview's own history step would fight the app's
- if (press.button === 3 && filesView.exploring) { if (type === "mouseup") closeExplore(); return; } // Back leaves Explore first
- if (type === "mouseup") { navRequest = { n: Date.now(), dir: press.button === 3 ? -1 : 1, ctrl: press.ctrlKey }; renderIcon(); }
+ const press = event as MouseEvent; if (press.button !== 3 && press.button !== 4) return;
+ const inner = press.button === 3 && (filesView.exploring || libraryView.inside());
+ if (!inner && !inApp()) return;
+ press.preventDefault();
+ if (inner && type === "mouseup") { if (filesView.exploring) closeExplore(); else libraryView.back(); }
+}, true);
+// Ctrl+Tab / Ctrl+Shift+Tab: next / previous session, like browser tabs (a normal browser keeps Ctrl+Tab for itself; the desktop app passes it on).
+window.addEventListener("keydown", event => {
+ if (event.key !== "Tab" || !event.ctrlKey || event.altKey || event.metaKey) return;
+ if (stepSession(event.shiftKey ? -1 : 1)) event.preventDefault();
 }, true);
 (window as unknown as { piHubGo: (id: string) => void }).piHubGo = jumpTo;
 // The app's attention key (hub/app): open the newest session that needs you; this page being in front counts as seen.

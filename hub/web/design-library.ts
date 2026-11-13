@@ -24,6 +24,13 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
   const next = tabButtons[(kinds.findIndex(([value]) => value === tab) + step + kinds.length) % kinds.length]; event.preventDefault(); next.click(); next.focus();
  });
  tabs.append(...tabButtons);
+ // Favorites are kept in this browser for every session; the star beside the tabs shows only them.
+ const favoriteKey = "design-library:favorites", favorites = new Set<string>(), starFilter = make("button", "★"), bar = make("div");
+ try { for (const id of JSON.parse(localStorage.getItem(favoriteKey) ?? "[]")) if (typeof id === "string") favorites.add(id); } catch { /* private mode: stars last for this page */ }
+ let favoritesOnly = false;
+ starFilter.type = "button"; starFilter.className = "library-star"; starFilter.title = "Show favorites only"; starFilter.setAttribute("aria-label", "Show favorites only");
+ starFilter.addEventListener("click", () => { favoritesOnly = !favoritesOnly; filter(); });
+ bar.className = "library-tabbar"; bar.append(tabs, starFilter);
  tools.className = "library-row"; list.className = "library-list"; list.setAttribute("role", "tabpanel"); detail.className = "library-detail"; detail.hidden = true;
  // V-05: in the Image search tab, Enter or Search runs the session's image_search; elsewhere the box only filters.
  const searchButton = make("button", "Search"), results = make("div");
@@ -40,16 +47,20 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
  }
  searchButton.addEventListener("click", () => void webSearch());
  search.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); void webSearch(); } });
+ // Card corner: the icon buttons that used to be a row of text buttons.
+ function cornerButton(text: string, label: string, title: string) { const button = make("button", text); button.type = "button"; button.title = title; button.setAttribute("aria-label", label); return button; }
  function result(item: Found, set: string) {
-  const tile = make("article"), title = make("h3", item.title || "(no title)"), open = make("button", "Open " + (item.title || "result " + item.n)), feedback = make("p");
-  tile.dataset.result = String(item.n); open.type = "button"; open.dataset.open = ""; feedback.setAttribute("role", "status");
+  const tile = make("article"), title = make("h3"), open = make("button", item.title || "(no title)"), feedback = make("p"), actions = make("div");
+  const keep = cornerButton("+", `Add ${item.title || "result " + item.n} as a reference`, "Add reference"); keep.dataset.pick = "";
+  tile.dataset.result = String(item.n); open.type = "button"; open.dataset.open = ""; open.className = "library-open"; open.title = "Open the original"; title.append(open); feedback.setAttribute("role", "status");
+  actions.className = "library-card-actions"; actions.append(keep); tile.append(actions);
   if (item.thumb) { const img = make("img"); img.src = item.thumb; img.alt = item.title || "Search result " + item.n; img.className = "library-result-thumb"; tile.append(img); }
   tile.append(title, make("small", [item.site, item.width ? `${item.width}×${item.height}` : ""].filter(Boolean).join(" · ")));
-  const keep = make("button", "Add reference"); keep.type = "button"; keep.dataset.pick = "";
   open.disabled = keep.disabled = !item.original;
   open.addEventListener("click", () => void showResult(item, set, open, feedback));
   keep.addEventListener("click", () => void pickResult(item, set, keep, feedback));
-  tile.append(open, keep, feedback); return tile;
+  gestures(tile, () => { if (!keep.disabled) void pickResult(item, set, keep, feedback); }, () => { if (!open.disabled) void showResult(item, set, open, feedback); });
+  tile.append(feedback); return tile;
  }
  // V-06: the original becomes a saved pick (outlives later searches), then attaches like any other card.
  async function pickResult(item: Found, set: string, button: HTMLButtonElement, feedback: HTMLElement) {
@@ -70,10 +81,10 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
    const got = await post("designoriginal", { set, n: item.n });
    cancelSample(); gridScroll = root.scrollTop;
    const back = make("button", "Back to results"), img = make("img"); back.type = "button"; img.src = got.image; img.alt = item.title || "Search result " + item.n; img.className = "library-image";
-   back.addEventListener("click", () => { detail.replaceChildren(); detail.hidden = true; tabs.hidden = tools.hidden = page.hidden = list.hidden = status.hidden = false; results.hidden = tab !== "image"; root.scrollTop = gridScroll; button.focus({ preventScroll: true }); });
+   back.addEventListener("click", () => { detail.replaceChildren(); detail.hidden = true; bar.hidden = tools.hidden = page.hidden = list.hidden = status.hidden = false; results.hidden = tab !== "image"; root.scrollTop = gridScroll; button.focus({ preventScroll: true }); });
    detail.replaceChildren(back, make("h3", item.title || "Search result " + item.n), img);
    if (item.page) { const link = make("a", "Open source page"); link.href = item.page; link.target = "_blank"; link.rel = "noopener noreferrer"; detail.append(link); }
-   tabs.hidden = tools.hidden = page.hidden = list.hidden = status.hidden = results.hidden = true; detail.hidden = false; root.scrollTop = 0; back.focus(); feedback.textContent = "";
+   bar.hidden = tools.hidden = page.hidden = list.hidden = status.hidden = results.hidden = true; detail.hidden = false; root.scrollTop = 0; back.focus(); feedback.textContent = "";
   } catch (error) { feedback.textContent = "Could not open the original: " + error.message; }
   finally { button.disabled = !item.original; }
  }
@@ -90,7 +101,7 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
  }
  page.addEventListener("submit", async event => { event.preventDefault(); if (await capture(address.value, pageAspect.value, pageAdd, pageStatus)) address.value = ""; });
  page.append(address, pageAspect, pageAdd, pageStatus);
- root.append(head, purpose, tabs, tools, page, status, results, list, detail);
+ root.append(head, purpose, bar, tools, page, status, results, list, detail);
  let entries: CatalogEntry[] = [], offline = "", loaded: Promise<void> | undefined, selected = "", gridScroll = 0, viewport = "", inspection = 0, viewed: string | undefined, abandoned: string | undefined;
  const key = "design-library:" + location.pathname;
  try {
@@ -101,11 +112,12 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
   const results = JSON.parse(sessionStorage.getItem(key + ":found") ?? "null");
   if (typeof results?.set === "string" && typeof results.query === "string" && Array.isArray(results.results)) found = results;
   if (typeof saved?.selected === "string") selected = saved.selected;
+  if (typeof saved?.favoritesOnly === "boolean") favoritesOnly = saved.favoritesOnly;
   if (typeof saved?.previewKey === "string" && /^[a-f0-9]{32}$/.test(saved.previewKey)) abandoned = saved.previewKey;
   if (["", "390", "768", "1280"].includes(saved?.viewport)) viewport = saved.viewport;
   if (Number.isFinite(saved?.scroll) && saved.scroll >= 0) gridScroll = saved.scroll;
  } catch { /* private mode: browsing still works without persistence */ }
- const remember = () => { try { queries[tab] = search.value; sessionStorage.setItem(key, JSON.stringify({ queries, tab, selected, scroll: gridScroll, viewport, previewKey: viewed })); if (found) sessionStorage.setItem(key + ":found", JSON.stringify(found)); } catch { /* private mode or full: results stay in memory */ } };
+ const remember = () => { try { queries[tab] = search.value; sessionStorage.setItem(key, JSON.stringify({ queries, tab, favoritesOnly, selected, scroll: gridScroll, viewport, previewKey: viewed })); if (found) sessionStorage.setItem(key + ":found", JSON.stringify(found)); } catch { /* private mode or full: results stay in memory */ } };
  const release = (id: string) => { void post("unview", { key: id }).catch(() => {}); };
  if (abandoned) release(abandoned);
  const cancelSample = () => { inspection++; if (viewed) { release(viewed); viewed = undefined; } };
@@ -116,11 +128,12 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
   img.addEventListener("error", () => img.replaceWith(make("p", "Image unavailable on this host. Metadata is still available.")), { once: true });
   return img;
  }
- // V-04: big card previews load when a card scrolls into view and unload when it leaves, so few frames stay live.
- const frames = new Map<HTMLElement, string | undefined>(), cardItems = new WeakMap<HTMLElement, CatalogEntry>(), waiting: (() => void)[] = [];
+ // V-04: big card previews load when a card scrolls into view and stay until the cap needs room for another.
+ // Only cards out of view make room: unloading a visible one left it blank, since it never scrolls in again.
+ const frames = new Map<HTMLElement, string | undefined>(), visible = new Set<HTMLElement>(), cardItems = new WeakMap<HTMLElement, CatalogEntry>(), waiting: (() => void)[] = [];
  let downloads = 0;
  const unload = (wrap: HTMLElement) => { const id = frames.get(wrap); frames.delete(wrap); if (id) release(id); wrap.querySelector("iframe")?.remove(); };
- const seen = new IntersectionObserver(changes => { for (const change of changes) { const wrap = change.target as HTMLElement; if (change.isIntersecting) void preview(wrap); else if (frames.has(wrap)) unload(wrap); } }, { root, rootMargin: "200px 0px" });
+ const seen = new IntersectionObserver(changes => { for (const change of changes) { const wrap = change.target as HTMLElement; if (change.isIntersecting) { visible.add(wrap); void preview(wrap); } else visible.delete(wrap); } }, { root, rootMargin: "200px 0px" });
  const fit = new ResizeObserver(changes => { for (const change of changes) (change.target as HTMLElement).style.setProperty("--scale", String((change.target as HTMLElement).clientWidth / 1280)); });
  async function fetched(item: CatalogEntry) {
   if (downloads >= 3) await new Promise<void>(go => waiting.push(go));
@@ -129,8 +142,8 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
   finally { downloads--; waiting.shift()?.(); }
  }
  async function preview(wrap: HTMLElement) {
-  if (frames.has(wrap)) return;
-  if (frames.size >= 12) unload(frames.keys().next().value!);
+  if (frames.has(wrap)) { const key = frames.get(wrap); frames.delete(wrap); frames.set(wrap, key); return; } // newest use last
+  if (frames.size >= 24) { const old = [...frames.keys()].find(other => !visible.has(other)); if (old) unload(old); }
   frames.set(wrap, undefined); wrap.setAttribute("aria-busy", "true");
   const item = cardItems.get(wrap)!;
   try {
@@ -179,16 +192,22 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
   finally { button.disabled = false; }
  }
  // Never cancel native scrolling or text selection. Shortcuts apply only to non-interactive card content.
- function gestures(node: HTMLElement, pick: () => void) {
+ // A plain click on the card opens it (the picture leads); Ctrl-click, right-click and a touch hold add it.
+ function gestures(node: HTMLElement, pick: () => void, open: () => void) {
   const safe = (event: Event) => !(event.target as HTMLElement).closest("button, a, input, textarea, select, iframe") && getSelection()?.isCollapsed !== false;
-  node.addEventListener("click", event => { if ((event.ctrlKey || event.metaKey) && safe(event)) { event.preventDefault(); pick(); } });
+  let held = false;
+  node.addEventListener("click", event => {
+   if (held) { held = false; return; } // the hold already picked it
+   if (!safe(event)) return;
+   if (event.ctrlKey || event.metaKey) { event.preventDefault(); pick(); } else if (event.button === 0) open();
+  });
   node.addEventListener("contextmenu", event => { if (safe(event)) { event.preventDefault(); pick(); } });
   let timer: ReturnType<typeof setTimeout>, x = 0, y = 0;
   const cancel = () => clearTimeout(timer);
   node.addEventListener("pointerdown", event => {
    cancel(); if (event.pointerType !== "touch" || !event.isPrimary || !safe(event)) return;
    x = event.clientX; y = event.clientY;
-   timer = setTimeout(() => { if (node.isConnected && !node.closest("[hidden]") && getSelection()?.isCollapsed !== false) pick(); }, 650);
+   held = false; timer = setTimeout(() => { if (node.isConnected && !node.closest("[hidden]") && getSelection()?.isCollapsed !== false) { held = true; pick(); } }, 650);
   });
   node.addEventListener("pointermove", event => { if (Math.hypot(event.clientX - x, event.clientY - y) > 8) cancel(); }, { passive: true });
   for (const event of ["pointerup", "pointercancel", "pointerleave"]) node.addEventListener(event, cancel, { passive: true });
@@ -198,8 +217,8 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
   const back = make("button", "Back to library"), title = make("h3", item.name), provenance = make("p", item.provenance);
   back.type = "button";
   back.addEventListener("click", () => {
-   cancelSample(); detail.replaceChildren(); detail.hidden = true; tabs.hidden = tools.hidden = page.hidden = list.hidden = status.hidden = false; results.hidden = tab !== "image"; selected = ""; remember();
-   list.querySelector<HTMLButtonElement>(`[data-entry="${CSS.escape(item.id)}"] button`)?.focus({ preventScroll: true }); root.scrollTop = gridScroll;
+   cancelSample(); detail.replaceChildren(); detail.hidden = true; bar.hidden = tools.hidden = page.hidden = list.hidden = status.hidden = false; results.hidden = tab !== "image"; selected = ""; remember();
+   list.querySelector<HTMLButtonElement>(`[data-entry="${CSS.escape(item.id)}"] [data-inspect]`)?.focus({ preventScroll: true }); root.scrollTop = gridScroll;
   });
   detail.replaceChildren(back, title, provenance, make("p", `${item.license}; catalog revision ${item.revision}`));
   if (item.description) detail.append(make("p", item.description));
@@ -231,7 +250,7 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
   else detail.append(make("p", item.preview === "sample" ? "This source sample is not cached for viewing on this host yet. No download was started." : "No supplied visual sample. This entry is metadata only; nothing was generated."));
   if (item.kind === "component") void docs(item);
   if (item.url) { const link = make("a", "View original source"); link.href = item.url; link.target = "_blank"; link.rel = "noopener noreferrer"; detail.append(link); }
-  tabs.hidden = tools.hidden = page.hidden = list.hidden = status.hidden = results.hidden = true; detail.hidden = false; root.scrollTop = 0; back.focus(); remember();
+  bar.hidden = tools.hidden = page.hidden = list.hidden = status.hidden = results.hidden = true; detail.hidden = false; root.scrollTop = 0; back.focus(); remember();
  }
  // V-10: usage and props ship with the hub, so Inspect needs no runtime install.
  async function docs(item: CatalogEntry) {
@@ -253,33 +272,36 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
  }
  const draw = () => {
   for (const button of tabButtons) { const on = button.dataset.tab === tab; button.setAttribute("aria-selected", String(on)); button.tabIndex = on ? 0 : -1; }
+  starFilter.setAttribute("aria-pressed", String(favoritesOnly));
   const imaging = tab === "image";
   search.placeholder = imaging ? "Search Google Images, then press Enter" : `Search ${kinds.find(([value]) => value === tab)![1].toLowerCase()}`;
   searchButton.hidden = results.hidden = !imaging; tools.classList.toggle("searching", imaging);
   results.replaceChildren(...imaging && found ? [make("h3", `Results for "${found.query}"`), ...found.results.map(item => result(item, found!.set))] : []);
-  const query = imaging ? "" : search.value.toLowerCase().trim(), matches = entries.filter(item => tabOf(item) === tab && (!query || [item.name, item.category, item.description, item.status].some(text => text?.toLowerCase().includes(query))));
+  const query = imaging ? "" : search.value.toLowerCase().trim(), matches = entries.filter(item => tabOf(item) === tab && (!favoritesOnly || favorites.has(item.id)) && (!query || [item.name, item.category, item.description, item.status].some(text => text?.toLowerCase().includes(query))));
   status.textContent = `${matches.length} ${matches.length === 1 ? "reference" : "references"}.${offline ? " " + offline : ""}`;
   const card = (item: CatalogEntry) => {
-   const row = make("article"), title = make("h3", item.name), provenance = make("p", item.provenance), details = make("small", `${item.source} / ${item.kind} · ${item.revision.slice(0, 12)} · ${item.license}`), open = make("button", "Inspect " + item.name);
-   row.dataset.entry = item.id; open.type = "button"; open.dataset.inspect = "";
-   const addButton = make("button", "Add reference"), feedback = make("p"); addButton.type = "button"; addButton.dataset.add = ""; feedback.setAttribute("role", "status");
+   const row = make("article"), title = make("h3"), provenance = make("p", item.provenance), details = make("small", `${item.source} / ${item.kind} · ${item.revision.slice(0, 12)} · ${item.license}`), open = make("button", item.name);
+   row.dataset.entry = item.id; open.type = "button"; open.dataset.inspect = ""; open.className = "library-open"; open.title = "Inspect " + item.name; title.append(open);
+   const addButton = cornerButton("+", `Add ${item.name} as a reference`, "Add reference"), star = cornerButton("", "Favorite " + item.name, ""), actions = make("div"), feedback = make("p"); addButton.dataset.add = ""; star.dataset.star = ""; feedback.setAttribute("role", "status");
+   const starred = () => { const on = favorites.has(item.id); star.textContent = on ? "★" : "☆"; star.title = on ? "Remove from favorites" : "Add to favorites"; star.setAttribute("aria-pressed", String(on)); };
+   star.addEventListener("click", () => { if (!favorites.delete(item.id)) favorites.add(item.id); try { localStorage.setItem(favoriteKey, JSON.stringify([...favorites])); } catch { /* private mode */ } starred(); });
+   starred(); actions.className = "library-card-actions"; actions.append(addButton, star); row.append(actions);
    const pick = () => void add(item, addButton, feedback, item.kind === "component" ? "component" : "whole");
    addButton.disabled = (item.preview === "sample" || item.source === "od") && item.availability !== "cached"; // OpenDesign is added only as its cached page
    addButton.addEventListener("click", pick); open.addEventListener("click", event => { if (event.ctrlKey || event.metaKey) pick(); else inspect(item); });
-   gestures(row, () => { if (!addButton.disabled) pick(); });
+   gestures(row, () => { if (!addButton.disabled) pick(); }, () => inspect(item));
    if (item.preview === "image" && item.imageRevision) { const thumb = image(item, true); if (item.kind === "component") thumb.classList.add("library-thumb-whole"); row.append(thumb); }
    if (item.colors) { const swatches = make("ul"); swatches.className = "library-swatches"; swatches.setAttribute("aria-label", item.name + " colors"); for (const [name, hex] of Object.entries(item.colors)) { const swatch = make("li", name); swatch.style.setProperty("--swatch", hex); swatch.title = `${name} ${hex}`; swatches.append(swatch); } row.append(swatches); }
    else if (item.preview === "sample" && (item.availability === "cached" || item.source === "od")) row.append(cardPreview(item));
    if (item.status) row.append(make("p", item.status));
    row.append(title, details, provenance);
    if (item.description) row.append(make("p", item.description));
-   row.append(open, addButton);
    const url = item.source === "web" ? item.url : undefined;
    if (url) { const page = make("button", "Capture page"); page.type = "button"; page.dataset.capture = ""; page.title = url; page.addEventListener("click", () => void capture(url, "whole", page, feedback)); row.append(page); }
    row.append(feedback); return row;
   };
   for (const wrap of [...frames.keys()]) unload(wrap);
-  seen.disconnect(); fit.disconnect();
+  seen.disconnect(); fit.disconnect(); visible.clear();
   const groups = new Map<string, CatalogEntry[]>();
   for (const item of matches) { const group = item.availability === "cached" && item.designRevision ? item.designRevision : item.id; if (!groups.has(group)) groups.set(group, []); groups.get(group)!.push(item); }
   list.replaceChildren(...[...groups.values()].map(items => {
@@ -288,13 +310,13 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
    rows.append(...items.map(card)); group.append(make("h3", "Same authored files · separate source snapshots"), rows); return group;
   }));
   if (imaging) list.prepend(make("h3", "Saved picks"));
-  if (!matches.length) list.append(make("p", imaging ? "No saved picks yet. Search, then add a result." : entries.length ? "No matches. Clear your search or filters." : "No cached references yet. Reopen the library when the host is online."));
+  if (!matches.length) list.append(make("p", favoritesOnly ? "No favorites in this tab yet. Star a card, or press ★ again to show everything." : imaging ? "No saved picks yet. Search, then add a result." : entries.length ? "No matches. Clear your search or filters." : "No cached references yet. Reopen the library when the host is online."));
   root.scrollTop = gridScroll;
  };
  const filter = () => { gridScroll = 0; draw(); remember(); };
  search.addEventListener("input", () => { if (tab !== "image") filter(); else remember(); });
  root.addEventListener("scroll", () => { if (detail.hidden) { gridScroll = root.scrollTop; remember(); } }, { passive: true });
- refresh.addEventListener("click", () => { cancelSample(); selected = ""; detail.replaceChildren(); detail.hidden = true; tabs.hidden = tools.hidden = page.hidden = list.hidden = status.hidden = false; results.hidden = tab !== "image"; loaded = undefined; void open(); remember(); });
+ refresh.addEventListener("click", () => { cancelSample(); selected = ""; detail.replaceChildren(); detail.hidden = true; bar.hidden = tools.hidden = page.hidden = list.hidden = status.hidden = false; results.hidden = tab !== "image"; loaded = undefined; void open(); remember(); });
  function open() {
   return loaded ??= (async () => {
    status.textContent = "Loading reference metadata…";
@@ -302,5 +324,6 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
    catch (error) { status.textContent = "Could not load the library. Refresh to retry: " + error.message; loaded = undefined; }
   })();
  }
- return { open };
+ // The mouse Back button (app.ts) leaves an open card or search result, like its Back button.
+ return { open, inside: () => !detail.hidden, back: () => detail.querySelector<HTMLButtonElement>("button")?.click() };
 }

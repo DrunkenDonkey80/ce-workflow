@@ -6,9 +6,16 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ### Added
 - Runaway-run guard: after 150 model turns with no edit, write, plan update or file change since your last message, the agent gets one reminder at 140 and then cannot use tools until you write. Night mode pauses with "run budget reached". Set `runBudget.turns` in `.pi/settings.json` (0 turns it off).
+- Design library: click a card to open it; Back (or the mouse Back button) returns to the same spot. Hovering a card shows a + icon to add it as a reference and a star to keep it as a favorite; the ★ beside the tabs shows only favorites.
+- Hub: Ctrl+Tab / Ctrl+Shift+Tab switch to the next / previous session, like browser tabs (in the desktop app; a normal browser keeps Ctrl+Tab for itself).
 - `node scripts/compare-benchmark-runs.mjs <baseline> <candidate>` compares two benchmark `results.json` files run by run. Failed or missing runs show as incomplete and stay out of the totals.
 
+### Changed
+- Design library cards lost their "Inspect" and "Add reference" text buttons; the picture opens the card and the corner icons add or star it.
+- The mouse Back/Forward buttons no longer switch sessions in the hub; Back now leaves an open design-library card or Explore.
+
 ### Fixed
+- Design and theme previews no longer go blank when you scroll back to them; up to 24 stay loaded.
 - Remembered facts written in Bulgarian (or any non-Latin script) are now recalled; a Bulgarian-only message used to match nothing.
 - `npm run verify` now also runs the compaction-audit test.
 

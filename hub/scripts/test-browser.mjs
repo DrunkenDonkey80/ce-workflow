@@ -173,13 +173,14 @@ try {
   assert.equal(total, 215);
   assert.deepEqual(await evaluate("(() => { const a = document.querySelector('#library input[type=search]').getBoundingClientRect(), right = Math.max(a.right, document.querySelector('#library input[type=search] + button').getBoundingClientRect().right), b = document.querySelector('#library input[type=url]').getBoundingClientRect(), c = document.querySelector('#library form button').getBoundingClientRect(), d = document.querySelector('#library form select').getBoundingClientRect(); return [a.left === b.left, right === c.right, a.height === b.height && b.height === c.height && c.height === d.height]; })()"), [true, true, true], "the input rows line up");
  }
- { // V-04: Designs cards frame their cached page only near the view; scrolling away unloads them and back reloads them.
-  const framed = "[...document.querySelectorAll('#library .library-card-preview')].map(node => { const box = document.getElementById('library').getBoundingClientRect(), r = node.getBoundingClientRect(); return [!!node.querySelector('iframe[src]'), r.bottom > box.top - 260 && r.top < box.bottom + 260]; })";
-  const settled = `(states => states.every(([frame, near]) => !frame || near) && states.some(([frame]) => frame))(${framed})`;
+ { // V-04: Designs cards frame their cached page as they come into view and keep it, so a card in view is never blank; the page keeps at most 24.
+  const framed = "[...document.querySelectorAll('#library .library-card-preview')].map(node => { const box = document.getElementById('library').getBoundingClientRect(), r = node.getBoundingClientRect(); return [!!node.querySelector('iframe[src]'), r.bottom > box.top - 260 && r.top < box.bottom + 260, r.bottom > box.top && r.top < box.bottom]; })";
+  const settled = `(states => states.every(([frame, near, shown]) => frame || !shown) && states.some(([frame]) => frame))(${framed})`; // a card in view always has its frame
   await browser("click", "#library [data-tab=designs]"); await browser("wait", "--fn", settled);
   const states = await evaluate(framed);
-  assert(states.some(([, near]) => !near), `the fixture has cards far below the view: ${JSON.stringify(states)}`);
+  assert(states.some(([frame, near]) => !near && !frame), `cards far below the view load no frame: ${JSON.stringify(states)}`);
   for (const top of ["1e6", "0"]) { await evaluate(`document.getElementById('library').scrollTop = ${top}`); await browser("wait", "--fn", settled); }
+  assert((await evaluate(framed)).filter(([frame]) => frame).length <= 24, "at most 24 live card frames");
  }
  { // V-10: every component card is a picture; Inspect shows bundled usage and props (no runtime involved).
   await browser("click", "#library [data-tab=components]");
@@ -192,7 +193,7 @@ try {
  }
  await browser("click", "#library [data-tab=themes]"); await browser("fill", "#library input[type=search]", "neutral");
  assert.equal(await evaluate("document.querySelectorAll('#library [data-entry]').length"), 1);
- await clickShown("#library [data-entry='astryx:theme:neutral'] button");
+ await clickShown("#library [data-entry='astryx:theme:neutral'] [data-inspect]");
  await browser("wait", "--fn", "document.querySelector('.library-detail img')?.naturalWidth > 0");
  assert.match(await evaluate("document.querySelector('.library-detail').textContent"), /Static source image, not a generated preview/);
  await browser("click", ".library-detail [data-add]"); await browser("wait", "#reference-draft [data-reference=ref1] img");
@@ -246,13 +247,23 @@ try {
  assert.deepEqual(await evaluate("[document.querySelector('#library input[type=url]').value, document.querySelectorAll('#reference-draft article').length]"), ["https://denied.test/page", 0], "a refused page keeps the typed address and adds nothing");
  await clickShown("#library [data-entry='astryx:theme:neutral'] [data-inspect]");
  await browser("click", ".library-detail button");
- assert.deepEqual(await evaluate("[document.querySelectorAll('#library [data-entry]').length, document.querySelector('.library-detail').hidden, document.activeElement.textContent]"), [1, true, "Inspect Neutral"], "Back preserves filtered results and keyboard focus");
+ assert.deepEqual(await evaluate("[document.querySelectorAll('#library [data-entry]').length, document.querySelector('.library-detail').hidden, document.activeElement.textContent]"), [1, true, "Neutral"], "Back preserves filtered results and keyboard focus");
+ // A plain click on the card opens it, the mouse Back button returns, and the bar's star shows only starred cards.
+ await evaluate("document.querySelector(\"#library [data-entry='astryx:theme:neutral']\").click()");
+ await browser("wait", "--fn", "!document.querySelector('.library-detail').hidden");
+ await evaluate("window.dispatchEvent(new MouseEvent('mouseup', { button: 3 }))");
+ await browser("wait", "--fn", "document.querySelector('.library-detail').hidden");
+ await evaluate("document.querySelector(\"#library [data-entry='astryx:theme:neutral'] [data-star]\").click()");
+ await browser("fill", "#library input[type=search]", ""); await browser("click", "#library .library-star");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#library [data-entry]')].map(card => card.dataset.entry)"), ["astryx:theme:neutral"], "favorites only");
+ await browser("click", "#library .library-star"); await evaluate("document.querySelector(\"#library [data-entry='astryx:theme:neutral'] [data-star]\").click()");
+ assert.equal(await evaluate("localStorage.getItem('design-library:favorites')"), "[]");
  { // V-12: OpenDesign color pages are Themes cards, framed only near the view; Add reference attaches the page with its tokens.
   await browser("fill", "#library input[type=search]", "fixture");
-  const framed = "[...document.querySelectorAll('#library .library-card-preview')].map(node => { const box = document.getElementById('library').getBoundingClientRect(), r = node.getBoundingClientRect(); return [!!node.querySelector('iframe[src]'), r.bottom > box.top - 260 && r.top < box.bottom + 260]; })";
-  const settled = `(states => states.every(([frame, near]) => !frame || near) && states.some(([frame]) => frame))(${framed})`;
+  const framed = "[...document.querySelectorAll('#library .library-card-preview')].map(node => { const box = document.getElementById('library').getBoundingClientRect(), r = node.getBoundingClientRect(); return [!!node.querySelector('iframe[src]'), r.bottom > box.top - 260 && r.top < box.bottom + 260, r.bottom > box.top && r.top < box.bottom]; })";
+  const settled = `(states => states.every(([frame, near, shown]) => frame || !shown) && states.some(([frame]) => frame))(${framed})`; // a card in view always has its frame
   await browser("wait", "--fn", settled);
-  assert((await evaluate(framed)).some(([, near]) => !near), "some color cards start far below the view");
+  assert((await evaluate(framed)).some(([frame, near]) => !near && !frame), "color cards far below the view load no frame");
   assert.equal(await evaluate("document.querySelector(\"#library [data-entry='od-colors:fixture-style']\").querySelector('.library-card-preview, [data-add]:not([disabled])')"), null, "a package without a colors page shows no frame and cannot be added");
   for (const top of ["1e6", "0"]) { await evaluate(`document.getElementById('library').scrollTop = ${top}`); await browser("wait", "--fn", settled); }
   await clickShown("#library [data-entry='od-colors:fixture-10'] [data-add]"); await browser("wait", "#reference-draft article");

@@ -136,13 +136,13 @@ export async function referencePage(project: string, id: unknown, revision: unkn
 	finally { referencePending.delete(owner); }
 }
 
-/** V-04: a library card's preview serves the cached folder in place (no copy), with the sample CSP; a session keeps its newest 16. */
+/** V-04: a library card's preview serves the cached folder in place (no copy), with the sample CSP; a session keeps its newest 32 (the page keeps 24). */
 export async function cardPage(project: string, id: unknown, revision: unknown, owner: string, remote: boolean) {
 	const { item, directory } = await catalogFolder(project, id, revision);
 	const key = randomBytes(16).toString("hex");
 	folders.set(key, directory); live.set(key, { project, remote, own: true, owner, reference: true, card: true, served: new Set() });
 	const cards = [...live].filter(([, view]) => view.owner === owner && view.card);
-	for (const [old] of cards.slice(0, Math.max(0, cards.length - 16))) unview(old);
+	for (const [old] of cards.slice(0, Math.max(0, cards.length - 32))) unview(old);
 	return { key, open: item.page };
 }
 
