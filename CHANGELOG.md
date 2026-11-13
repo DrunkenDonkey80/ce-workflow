@@ -4,6 +4,9 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+### Fixed
+- Hub: tables in replies no longer squeeze a column to one letter per line on phones; words stay whole, and a table too wide for the screen scrolls sideways.
+
 ## 0.9.0 — 2026-11-13
 
 ### Added

@@ -569,7 +569,8 @@ dialog.annotate { width: min(1400px, 96vw); max-height: 96dvh; padding: 12px 14p
 .message code, .md-code { font: 12.5px/1.4 ui-monospace, Consolas, monospace; background: var(--tool-pending); border-radius: 3px; padding: 0 3px; }
 .md-code { display: block; padding: 6px 8px; margin: 4px 0; white-space: pre-wrap; overflow-x: auto; }
 .md-table { display: block; overflow-x: auto; border-collapse: collapse; white-space: normal; margin: 6px 0; font-size: 13px; }
-.md-table th, .md-table td { border: 1px solid var(--line); padding: 3px 8px; text-align: left; vertical-align: top; }
+/* break-word, not the message's anywhere: anywhere lets narrow screens squeeze a column to one letter per line; the table scrolls instead */
+.md-table th, .md-table td { border: 1px solid var(--line); padding: 3px 8px; text-align: left; vertical-align: top; overflow-wrap: break-word; }
 .md-table th { background: var(--tool-pending); }
 .message > small { font-size: 13px; color: var(--muted); }
 .message.user { background: var(--user-bg); padding: 8px 12px; border-radius: 6px; }
