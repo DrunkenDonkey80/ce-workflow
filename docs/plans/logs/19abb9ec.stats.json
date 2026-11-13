@@ -3,34 +3,34 @@
  "activeMs": 0,
  "runs": 0,
  "waitingMs": 0,
- "toolWallMs": 10099,
+ "toolWallMs": 15974,
  "compactions": {
   "count": 0,
   "ms": 0
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
-   "replies": 11,
-   "thinkingMs": 17292,
-   "actingMs": 38961,
-   "input": 24,
-   "output": 5886,
-   "cacheRead": 850066,
-   "cacheWrite": 50003,
-   "cost": 0.5378442000000001,
+   "replies": 23,
+   "thinkingMs": 72779,
+   "actingMs": 70525,
+   "input": 48,
+   "output": 14610,
+   "cacheRead": 1978814,
+   "cacheWrite": 70727,
+   "cost": 1.0417898,
    "errors": 0
   }
  },
  "tools": {
   "bash": {
-   "count": 7,
-   "ms": 3592,
+   "count": 17,
+   "ms": 5098,
    "maxMs": 1150,
    "failures": 0
   },
   "write": {
-   "count": 1,
-   "ms": 3,
+   "count": 2,
+   "ms": 6,
    "maxMs": 3,
    "failures": 0
   },
@@ -53,16 +53,16 @@
    "failures": 0
   },
   "plan3": {
-   "count": 1,
-   "ms": 115,
+   "count": 2,
+   "ms": 181,
    "maxMs": 115,
    "failures": 0
   }
  },
  "categories": {
   "shell": {
-   "count": 7,
-   "ms": 3592,
+   "count": 17,
+   "ms": 5098,
    "maxMs": 1150,
    "failures": 0
   }
@@ -109,6 +109,66 @@
    "ms": 866,
    "maxMs": 866,
    "failures": 0
+  },
+  "bash\u0000cd \".\" && git add \"docs/plans/2026-11-13-wider-haystack-review-the-parts-the-first-pass-skipped-19abb9ec-plan3.md\" docs/plans/logs/19abb9ec* docs/proposals/haystack-review/astra-brief-wider.md 2>/dev/": {
+   "count": 1,
+   "ms": 345,
+   "maxMs": 345,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack/haystack\" && grep -n \"def \\|class \\|k1\\|b =\\|bm25\\|BM25\" document_stores/in_memory/document_store.py | grep -in \"bm25\\|k1\\|delta\\|tokeniz\\|def _score\" | head -": {
+   "count": 1,
+   "ms": 105,
+   "maxMs": 105,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack/haystack\" && grep -n \"def \\|timeout\\|except\\|failed\\|successful_chat_generator\\|total_attempts\" components/generators/chat/fallback.py | head -40": {
+   "count": 1,
+   "ms": 80,
+   "maxMs": 80,
+   "failures": 0
+  },
+  "bash\u0000cd \"./extensions\" && grep -n \"catch\\|fallback\\|retry\\|candidates\\|throw\" advisor-model.ts work-vision.ts | head -30": {
+   "count": 1,
+   "ms": 65,
+   "maxMs": 65,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack/haystack\" && grep -n \"trafilatura\\|extract(\\|def \\|extraction_kwargs\" components/converters/html.py | head; echo ---; grep -n \"def \\|remove_repeated\\|header\\|f": {
+   "count": 1,
+   "ms": 116,
+   "maxMs": 116,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack/haystack\" && cat utils/url_validation.py | tail -6; grep -n \"class \\|def \\|raise\\|serializ\" utils/auth.py | head -25; grep -n \"def \\|ALLOW\\|allowlist\\|class \" ": {
+   "count": 1,
+   "ms": 119,
+   "maxMs": 119,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack\" && ls .github/workflows | tr \"\\n\" \" \"; echo; find . -name AGENTS.md -not -path \"./node_modules/*\" | head; grep -n \"markers\\|integration\\|slow\" pyproject.toml ": {
+   "count": 1,
+   "ms": 241,
+   "maxMs": 241,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack\" && cat test/AGENTS.md | head -60; echo ----; cat releasenotes/notes/AGENTS.md | head -30; echo ---; cat test/test_release_note_backticks.py | head -30": {
+   "count": 1,
+   "ms": 94,
+   "maxMs": 94,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"A16\\|A14\" docs/proposals/2026-11-12-haystack-review.md | head -8; wc -c AGENTS.md; grep -c \"\" CHANGELOG.md": {
+   "count": 1,
+   "ms": 75,
+   "maxMs": 75,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack/haystack\" && for f in components/rankers/lost_in_the_middle.py components/query/query_expander.py components/retrievers/sentence_window_retriever.py components": {
+   "count": 1,
+   "ms": 266,
+   "maxMs": 266,
+   "failures": 0
   }
  },
  "steps": {
@@ -118,6 +178,14 @@
    "replies": 11,
    "models": {
     "anthropic/claude-opus-5-5:high": 11
+   }
+  },
+  "HW-02": {
+   "ms": 88626,
+   "testMs": 0,
+   "replies": 12,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 12
    }
   }
  },

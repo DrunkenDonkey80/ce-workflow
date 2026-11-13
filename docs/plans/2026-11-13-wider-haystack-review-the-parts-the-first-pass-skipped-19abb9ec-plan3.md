@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-13
-updated: 2026-11-13T07:10:09.640Z
+updated: 2026-11-13T07:11:48.004Z
 started: 2026-11-13T07:10:09.640Z
 ---
 
@@ -100,8 +100,8 @@ Commands:
 ### Phase 1: Review [think]
 
 - [x] **HW-01** Astra brief docs/proposals/haystack-review/astra-brief-wider.md written (B1-B6 table, counterpart summaries, gap-measure ask); Astra run a6b7b88f launched async.
-- [wip] **HW-02** Write the desk review of B1 to B6 into the review doc without reading Astra's file, and list candidate ideas.
-- [ ] **HW-03** For each candidate, measure the gap it would fix with a local scan or code count; drop or flag candidates with no gap (D-04).
+- [x] **HW-02** Desk review written: B4 Already covered, B1/B2/B3/B5/B6 Test first; 5 candidates K1 recall, W1 main-content fetch, M1 side-model fallback, E1 checkpoint faithfulness, T1 fast tests.
+- [wip] **HW-03** For each candidate, measure the gap it would fix with a local scan or code count; drop or flag candidates with no gap (D-04).
   - B1: recall misses (turns that re-read or re-ask a fact the knowledge store already had).
   - B2: provider errors and retries in session logs.
   - B3: browser_fetch page sizes and the share of boilerplate.
