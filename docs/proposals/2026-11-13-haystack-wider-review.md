@@ -34,3 +34,21 @@ Session logs `~/.pi/agent/sessions/**/*.jsonl` modified since 2026-10-25 (727 fi
 - **K1 knowledge recall: real gap (precision, not recall).** Replaying `buildKnowledgeQuery` + `queryKnowledge` over every user prompt since 2026-11-01 (688 sessions, 1,897 prompts, only claims recorded before the prompt) injects recall on 1,800 prompts (95%), 2.67 claims on average (4,276 lexical, 531 path matches). Jev judged a spread sample of 29 turns: 14 had no useful claim; I spot-checked 6 and agree. Three noise sources: user-scope environment claims (the `/tmp` mapping, `aapt` path) match common words in any project; scheduled-timer messages (211 of 1,824 user messages, "⏰ Scheduled …") are not treated as machine text and get recall; 19 mostly-Cyrillic prompts lose all their words in the ASCII-only tokenizer (`tokens()`, line 655; Astra's finding). The 12 explicit `knowledge` searches all returned hits, so missing claims are not the problem.
 - **E1 checkpoint faithfulness: no visible gap.** 711 compactions; a keyword screen ("forgot", "lost", "I said", "remember", …) of the 3 user messages after each found 16, none about a fact lost or changed by compaction (one is a Plan3 checkpoint overwriting a file edit, a different bug).
 - **T1 fast tests: small gap.** 72 `npm run verify*` runs; 20 were full runs over a minute, 96 minutes in total over 19 days (about 5 minutes each, 7 failed). The Test Scope Rule already keeps the full suite to pushes; a faster set would save at most about 5 minutes a day.
+
+## Astra merge (HW-04)
+
+Astra's independent verdicts: `docs/proposals/haystack-review/astra-verdicts-wider.md` (gpt-6-astra, high). Agreement on 4 of 6 areas (B2 and B4 differ only in wording: our Test first became no gap after measuring, Astra's Already covered; our Already covered vs its Skip).
+
+| Area | Ours | Astra | Settled |
+|---|---|---|---|
+| B1 Retrieval | Test first | Adopt (Unicode tokenizer) | **Adopt, wider.** Repro confirmed: with a Bulgarian claim stored, `queryKnowledge` for "цветова схема на хъба" returns 0, the English twin returns 1. But Cyrillic prompts are 1% (19 of 1,824); the measured gap is precision (14 of 29 recall turns carried nothing useful), so the idea covers the tokenizer, timer messages and user-scope noise together. |
+| B2 Model calls | Test first | Already covered | **Drop.** M1 found 4 capacity stops in 19 days; compaction already falls back. |
+| B3 Web | Test first | Test first | **Drop.** W1: about 86k tokens of fetched pages in 19 days, Readability would cut about a quarter. |
+| B4 Security | Already covered | Skip | **Drop.** Both found our URL checks stronger than Haystack's. |
+| B5 Evaluators | Test first | Test first (summary audit) | **Drop the audit.** E1 found no compaction-caused loss in 711 compactions. Keep the judge recipe for measuring K1 (replay + Jev relevance, as done in HW-03). |
+| B6 Process | Test first | Adopt (CI + verifier list) | **Fix the omission, drop CI.** Confirmed: `scripts/test-audit-compaction.mjs` is offline, passes, and is missing from `verify-package.mjs`'s list (the only other unlisted root tests are the live `test-compaction-resume-idle.mjs`). CI for one Windows committer with 5 minutes of full runs a day is not worth a workflow. |
+
+## Shortlist
+
+1. **K1 recall precision.** Gap: recall fires on 95% of prompts and about half of those turns carry no useful claim. Change: Unicode/NFC tokenizer for queries, scheduled-timer messages counted as machine text (the query then uses the last human request), and a stricter match for user-scope claims outside their recorded project. Measure with the HW-03 replay before and after; keep only what lowers the no-useful share without losing the 12 known-good searches.
+2. **Verifier omission.** Add `test-audit-compaction.mjs` to the `verify-package.mjs` list. One line.
