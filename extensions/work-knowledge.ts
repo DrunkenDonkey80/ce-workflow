@@ -32,7 +32,7 @@ export const KNOWLEDGE_CUSTOM_TYPE = "work-knowledge";
 export const KNOWLEDGE_MAX_CLAIM_CHARS = 280;
 
 const STOP_WORDS = new Set(
-	"a an and are as at be before but by can did do does for from had has have how i if in into is it its me must no not now of on or our so still that the then this to use was we were what when where which who why will with you your again".split(
+	"a an and are as at be before but by can did do does for from had has have how i if in into is it its me must no not now of on or our so still that the then this to use was we were what when where which who why will with you your again и в на за да се от е с по не че ще са съм си ли като това как какво или но ако ми ме го им там".split(
 		" ",
 	),
 );
@@ -107,7 +107,7 @@ function stringList(values, label) {
 
 function validateSource(source) {
 	if (!source) return undefined;
-	const result = {};
+	const result: any = {};
 	for (const key of ["sessionId", "gitRevision", "writeBucket"]) {
 		const value = normalizeText(source[key]);
 		if (!value) continue;
@@ -656,8 +656,10 @@ function tokens(value) {
 	return [
 		...new Set(
 			String(value ?? "")
+				.normalize("NFC")
 				.toLowerCase()
-				.match(/[a-z0-9]+/g)
+				// Any script, not just ASCII: a Bulgarian-only query used to yield no tokens.
+				.match(/[\p{L}\p{M}\p{N}]+/gu)
 				?.map((token) => {
 					if (token.length > 3 && token.endsWith("s")) return token.slice(0, -1);
 					return token;

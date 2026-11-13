@@ -96,6 +96,22 @@ try {
 		unrelatedRate <= 0.1,
 		`unrelated retrieval rate was ${unrelatedRate.toFixed(3)}: ${JSON.stringify(traces)}`,
 	);
+	// Non-ASCII queries: a Bulgarian-only query once tokenized to nothing; decomposed accents must match composed ones.
+	const { cwd: bgCwd, options: bgOptions } = optionsFor("bulgarian");
+	const { record: bg } = recordKnowledge(
+		bgCwd,
+		{ claim: "Цветовата схема на хъба е тъмна по подразбиране", kind: "fact", scope: "project", authority: "observed" },
+		bgOptions,
+	);
+	const { record: café } = recordKnowledge(
+		bgCwd,
+		{ claim: "The café kiosk build signs with the résumé certificate", kind: "fact", scope: "project", authority: "observed" },
+		bgOptions,
+	);
+	const ids = (text) => searchKnowledge(bgCwd, text, bgOptions).map((record) => record.id);
+	assert.deepEqual(ids("цветовата схема на хъба"), [bg.id]);
+	assert.deepEqual(ids("cafe\u0301 kiosk build".normalize("NFD")), [café.id]);
+	assert.deepEqual(ids("тъмна тема за редактора на код"), []);
 	process.stdout.write(
 		`knowledge held-out retrieval: recall=${recall.toFixed(3)} mrr=${mrr.toFixed(3)} unrelated=${unrelatedRate.toFixed(3)}\n`,
 	);
