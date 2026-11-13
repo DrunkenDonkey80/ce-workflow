@@ -1,13 +1,13 @@
 // Files named in chat (any path with an extension): the page asks which exist, then opens, reveals, downloads or copies them.
 // Never hidden dot-folders (.ssh, .pi, .git) or secret-shaped names. On this PC any other file works; a remote device
 // (a phone over the tailnet) gets images from anywhere, other files only from the session's project, plus temp (/tmp too) and
-// Downloads files changed in the last 5 days.
+// home-folder files (release builds, logs) changed in the last 5 days.
 import type http from "node:http";
 import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
 import { realpath, stat } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
-import { basename, dirname, extname, join, relative, resolve, isAbsolute } from "node:path";
+import { basename, dirname, extname, relative, resolve, isAbsolute } from "node:path";
 import { forbiddenPath } from "../../extensions/jev-tools.ts";
 import { fromWindowsPath, isWsl, toWindowsPath } from "./platform.ts";
 
@@ -26,7 +26,7 @@ export async function linkedFile(path: unknown, project: string, remote = false,
 	if (!remote || IMAGE.test(real) || await inside(real, project)) return real;
 	const recent = Date.now() - info.mtimeMs < RECENT_MS;
 	if (!recent) return undefined;
-	for (const folder of [...TEMP_FOLDERS, join(homedir(), "Downloads")]) if (await inside(real, folder)) return real;
+	for (const folder of [...TEMP_FOLDERS, homedir()]) if (await inside(real, folder)) return real;
 	return undefined;
 }
 // macOS gives Node a per-user /var/folders/…/T, but tools and agents write to /tmp too, so both count as temp.
