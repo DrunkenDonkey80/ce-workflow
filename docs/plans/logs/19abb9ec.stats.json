@@ -1,30 +1,30 @@
 {
  "version": 1,
- "activeMs": 0,
- "runs": 0,
+ "activeMs": 2365775,
+ "runs": 2,
  "waitingMs": 943679,
- "toolWallMs": 1476956,
+ "toolWallMs": 1502011,
  "compactions": {
-  "count": 0,
-  "ms": 0
+  "count": 1,
+  "ms": 27051
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
-   "replies": 111,
-   "thinkingMs": 351567,
-   "actingMs": 316581,
-   "input": 252,
-   "output": 67946,
-   "cacheRead": 12445382,
-   "cacheWrite": 246665,
-   "cost": 5.082329399999999,
+   "replies": 115,
+   "thinkingMs": 374659,
+   "actingMs": 325347,
+   "input": 262,
+   "output": 71024,
+   "cacheRead": 13030374,
+   "cacheWrite": 249551,
+   "cost": 5.275357799999999,
    "errors": 0
   }
  },
  "tools": {
   "bash": {
-   "count": 97,
-   "ms": 425135,
+   "count": 99,
+   "ms": 449803,
    "maxMs": 41180,
    "failures": 6
   },
@@ -91,8 +91,8 @@
  },
  "categories": {
   "shell": {
-   "count": 88,
-   "ms": 324772,
+   "count": 90,
+   "ms": 349440,
    "maxMs": 41180,
    "failures": 4
   },
@@ -649,6 +649,18 @@
    "ms": 175,
    "maxMs": 175,
    "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -A docs/plans/ \":!docs/plans/logs/f5d9dae1.stats.json\" && git commit -qm \"Plan 19abb9ec complete: wider Haystack review\" && git status --short && git log --oneline -1": {
+   "count": 1,
+   "ms": 206,
+   "maxMs": 206,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/hs\" && cat > size.mjs <<'EOF' import { readdirSync, readFileSync, statSync } from \"node:fs\"; import { join } from \"node:path\"; import { homedir } from \"node:os\"; const K = await import(\"file": {
+   "count": 1,
+   "ms": 24462,
+   "maxMs": 24462,
+   "failures": 0
   }
  },
  "steps": {
@@ -703,14 +715,23 @@
    "failures": 6
   },
   "(none)": {
-   "ms": 6680,
+   "ms": 63206,
    "testMs": 0,
-   "replies": 2,
+   "replies": 6,
    "models": {
-    "anthropic/claude-opus-5-5:high": 2
+    "anthropic/claude-opus-5-5:high": 6
    }
   }
  },
- "spans": [],
+ "spans": [
+  {
+   "start": "2026-11-13T07:09:02.480Z",
+   "ms": 2292786
+  },
+  {
+   "start": "2026-11-13T07:50:40.031Z",
+   "ms": 45938
+  }
+ ],
  "hints": []
 }

@@ -4,6 +4,8 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+## 0.9.0 — 2026-11-13
+
 ### Added
 - Runaway-run guard: after 150 model turns with no edit, write, plan update or file change since your last message, the agent gets one reminder at 140 and then cannot use tools until you write. Night mode pauses with "run budget reached". Set `runBudget.turns` in `.pi/settings.json` (0 turns it off).
 - Design library: click a card to open it; Back (or the mouse Back button) returns to the same spot. Hovering a card shows a + icon to add it as a reference and a star to keep it as a favorite; the ★ beside the tabs shows only favorites.

@@ -1,47 +1,47 @@
 {
  "version": 1,
- "activeMs": 1231287,
- "runs": 1,
+ "activeMs": 1590112,
+ "runs": 3,
  "waitingMs": 0,
- "toolWallMs": 356004,
+ "toolWallMs": 1308757,
  "compactions": {
-  "count": 1,
-  "ms": 35245
+  "count": 2,
+  "ms": 57004
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
-   "replies": 78,
-   "thinkingMs": 453988,
-   "actingMs": 249602,
-   "input": 212,
-   "output": 75880,
-   "cacheRead": 9327685,
-   "cacheWrite": 330211,
-   "cost": 5.03504,
+   "replies": 135,
+   "thinkingMs": 619171,
+   "actingMs": 326749,
+   "input": 350,
+   "output": 99179,
+   "cacheRead": 14801989,
+   "cacheWrite": 563218,
+   "cost": 7.7614678,
    "errors": 0
   }
  },
  "tools": {
   "bash": {
-   "count": 53,
-   "ms": 227199,
-   "maxMs": 63297,
-   "failures": 1
+   "count": 94,
+   "ms": 1140713,
+   "maxMs": 600151,
+   "failures": 3
   },
   "read": {
-   "count": 13,
-   "ms": 223,
-   "maxMs": 101,
+   "count": 28,
+   "ms": 878,
+   "maxMs": 558,
    "failures": 0
   },
   "edit": {
-   "count": 15,
-   "ms": 1194,
+   "count": 27,
+   "ms": 1526,
    "maxMs": 1048,
-   "failures": 1
+   "failures": 2
   },
   "compaction_note": {
-   "count": 1,
+   "count": 2,
    "ms": 0,
    "maxMs": 0,
    "failures": 0
@@ -59,24 +59,24 @@
    "failures": 0
   },
   "lens_diagnostics": {
-   "count": 1,
-   "ms": 5463,
-   "maxMs": 5463,
+   "count": 3,
+   "ms": 48025,
+   "maxMs": 35928,
    "failures": 0
   }
  },
  "categories": {
   "shell": {
-   "count": 46,
-   "ms": 74690,
+   "count": 79,
+   "ms": 80464,
    "maxMs": 63297,
-   "failures": 1
+   "failures": 2
   },
   "test": {
-   "count": 7,
-   "ms": 152509,
-   "maxMs": 61029,
-   "failures": 0
+   "count": 15,
+   "ms": 1060249,
+   "maxMs": 600151,
+   "failures": 1
   }
  },
  "commands": {
@@ -391,6 +391,252 @@
    "ms": 258,
    "maxMs": 258,
    "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"linked: |standins|linksOf\" src web/app.ts | cut -c1-260": {
+   "count": 1,
+   "ms": 77,
+   "maxMs": 77,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"createLinks\\(\" -A6 src/hub.ts | cut -c1-300; rg -n \"cleanSessions|inFolder|sessions: inFolder|live\" src/link.ts | cut -c1-260": {
+   "count": 1,
+   "ms": 124,
+   "maxMs": 124,
+   "failures": 0
+  },
+  "bash\u0000hostname; cd \".\" && git log --oneline -3; ls \"$LOCALAPPDATA/../Roaming\" >/dev/null; find \"$HOME/.pi/agent\" -maxdepth 3 -name \"links.json\" 2>/dev/null | head": {
+   "count": 1,
+   "ms": 182,
+   "maxMs": 182,
+   "failures": 0
+  },
+  "bash\u0000cd \"$HOME/.pi/agent/pi-control-hub\" && node -e \"const l=JSON.parse(require('fs').readFileSync('links.json','utf8'));console.log(JSON.stringify(l,null,1).slice(0,3000))\"; ls": {
+   "count": 1,
+   "ms": 92,
+   "maxMs": 92,
+   "failures": 0
+  },
+  "bash\u0000cd \"$HOME/.pi/agent/pi-control-hub\" && node -e \"const s=JSON.parse(require('fs').readFileSync('sessions.json','utf8'));const list=Array.isArray(s)?s:(s.sessions??s.records??Object.values(s));console.l": {
+   "count": 1,
+   "ms": 146,
+   "maxMs": 146,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"live = false|live: false|woken|resuming\" scripts/test-link.mjs | cut -c1-240; sed -n \"333,340p\" src/link.ts": {
+   "count": 1,
+   "ms": 96,
+   "maxMs": 96,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node --test \"scripts/test-link.mjs\" 2>&1 | rg -v \"^ℹ\" | tail -20": {
+   "count": 1,
+   "ms": 13107,
+   "maxMs": 13107,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"D-10\" \"docs/plans/done/2026-11-12-hub-project-links-and-file-transfer-58d5c14f-plan3.md\" | cut -c1-300; rg -n \"every live session\" CHANGELOG.md | cut -c1-80; git diff --stat -- hub/we": {
+   "count": 1,
+   "ms": 803,
+   "maxMs": 803,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"^## |^### \" CHANGELOG.md | head -8; git diff --stat -- CHANGELOG.md": {
+   "count": 1,
+   "ms": 92,
+   "maxMs": 92,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff -- hub/web/app.ts | rg \"^[-+]\" | cut -c1-140": {
+   "count": 1,
+   "ms": 191,
+   "maxMs": 191,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff --stat -- CHANGELOG.md docs/plans/done && git add hub/src/link.ts hub/web/app.ts hub/scripts/test-link.mjs CHANGELOG.md \"docs/plans/done/2026-11-12-hub-project-links-and-file-transf": {
+   "count": 1,
+   "ms": 301,
+   "maxMs": 301,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n -i \"parked\" web/app.ts src/api.ts src/hub.ts | rg -i \"plan|question|review|finish|disabled|hidden|live\" | cut -c1-260 | head -40": {
+   "count": 1,
+   "ms": 92,
+   "maxMs": 92,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"published\\b|function published|const published\" hub/src/api.ts | cut -c1-220 | head; rg -n \"finishable\" --glob \"!**/node_modules/**\" --glob \"!docs/**\" -l . | head -20": {
+   "count": 1,
+   "ms": 134,
+   "maxMs": 134,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"finishable|bias\" extensions/plan3.ts | cut -c1-260 | head -30": {
+   "count": 1,
+   "ms": 101,
+   "maxMs": 101,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"isPlanning|finishProblems\" extensions --glob \"*.ts\" | rg \"export|import|function|const isPlanning|const finishProblems\" | cut -c1-220; sed -n \"1,12p;40,75p\" hub/src/api.ts | cut -c1-2": {
+   "count": 1,
+   "ms": 113,
+   "maxMs": 113,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"listPlans|currentPlan\" hub/src/api.ts | head -3 | cut -c1-200; sed -n \"600,660p\" extensions/plan3.ts; sed -n \"1,38p\" extensions/plan3.ts | rg -n \"^import\" | cut -c1-200": {
+   "count": 1,
+   "ms": 192,
+   "maxMs": 192,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"finishable|planning\\b|state.plan\\b|state\\.plan\\?\" web/app.ts | cut -c1-260 | head -30": {
+   "count": 1,
+   "ms": 69,
+   "maxMs": 69,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"\\\"plans\\\"|case \\\"plans\\\"|/api/plans|api/command\\b|\\\"command\\\"\" src/api.ts src/hub.ts | cut -c1-260 | head": {
+   "count": 1,
+   "ms": 73,
+   "maxMs": 73,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"extras\\(\" hub/src/*.ts | cut -c1-200; rg -n \"open:|started\" extensions/plan3.ts | rg -n \"listPlans|parsePlan|open:|started:\" | head | cut -c1-220; rg -n \"^export (async )?function (li": {
+   "count": 1,
+   "ms": 146,
+   "maxMs": 146,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"modes\" src/host.ts src/registry.ts src/hub.ts 2>/dev/null | cut -c1-240 | head": {
+   "count": 1,
+   "ms": 71,
+   "maxMs": 71,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"modes\" src --glob \"*.ts\" | rg -v \"^src/api.ts:(55|118)\" | cut -c1-240 | head": {
+   "count": 1,
+   "ms": 88,
+   "maxMs": 88,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"hubBias\" extensions/plan3.ts | cut -c1-220": {
+   "count": 1,
+   "ms": 96,
+   "maxMs": 96,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"publish\\(\\\"plan\\\"|\\\"plan\\\", |snapshot\\b.*park|on\\(\\\"exit\\\"|parked\\b.*publish\" src --glob \"*.ts\" | cut -c1-240 | head": {
+   "count": 1,
+   "ms": 74,
+   "maxMs": 74,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n \"144,160p\" src/hub.ts | cut -c1-260; sed -n \"655,675p\" src/api.ts | cut -c1-260": {
+   "count": 1,
+   "ms": 86,
+   "maxMs": 86,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"finishable|parked\" hub/scripts/test-api.mjs | cut -c1-260 | head -20; sed -n \"286,300p\" extensions/plan3.ts | cut -c1-200": {
+   "count": 1,
+   "ms": 116,
+   "maxMs": 116,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"plan3.md|docs/plans|snapshot = |const snapshot\" scripts/test-api.mjs | cut -c1-220 | head; sed -n \"274,280p\" scripts/test-api.mjs | cut -c1-260": {
+   "count": 1,
+   "ms": 110,
+   "maxMs": 110,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n \"25,40p\" scripts/test-api.mjs | cut -c1-260; rg -n \"writePlan\\(|plan\\(\\\"\" scripts/test-api.mjs | head -5 | cut -c1-200": {
+   "count": 1,
+   "ms": 115,
+   "maxMs": 115,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node --test \"scripts/test-api.mjs\" 2>&1 | rg -v \"^ℹ|Experimental|trace-warnings\" | tail -25": {
+   "count": 1,
+   "ms": 24671,
+   "maxMs": 24671,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node --test \"scripts/test-api.mjs\" 2>&1 | rg -v \"^ℹ|Experimental|trace-warnings|^usage|timer \" | tail -25": {
+   "count": 1,
+   "ms": 23562,
+   "maxMs": 23562,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --test \"scripts/test-work-plan3.mjs\" 2>&1 | rg -v \"^ℹ|Experimental|trace-warnings\" | tail -15": {
+   "count": 1,
+   "ms": 9212,
+   "maxMs": 9212,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short && git diff --stat -- extensions/plan3.ts hub/src/api.ts hub/scripts/test-api.mjs CHANGELOG.md": {
+   "count": 1,
+   "ms": 96,
+   "maxMs": 96,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add extensions/plan3.ts hub/src/api.ts hub/scripts/test-api.mjs CHANGELOG.md && git commit -q -m \"Hub: parked sessions keep the plan action row; a click wakes them\" && git log --oneline ": {
+   "count": 1,
+   "ms": 206,
+   "maxMs": 206,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short && git diff --stat && git branch --show-current && git fetch -q && git status -sb | head -1 && node -p \"require('./package.json').version\" && git ls-files package-lock.jso": {
+   "count": 1,
+   "ms": 827,
+   "maxMs": 827,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git log --oneline origin/master..HEAD | tail -5 && git diff --stat origin/master HEAD | tail -3 && git diff --name-status origin/master HEAD | rg \"^A\" | rg -v \"docs/\" ; git log -1 --format=%": {
+   "count": 1,
+   "ms": 239,
+   "maxMs": 239,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff --name-only origin/master HEAD | rg -v \"^docs/\"; sed -n \"5,23p\" CHANGELOG.md | cut -c1-120": {
+   "count": 1,
+   "ms": 105,
+   "maxMs": 105,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls scripts hub/scripts | rg -i \"night|design-render|design|explore|compaction-audit|typecheck\" ; rg -n \"\\\"(typecheck|check|lint)[^\\\"]*\\\":\" package.json hub/package.json": {
+   "count": 1,
+   "ms": 108,
+   "maxMs": 108,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && for t in scripts/test-run-budget.mjs scripts/test-compare-benchmark-runs.mjs scripts/test-work-knowledge-retrieval.mjs scripts/test-work-plan3-night.mjs scripts/test-work-design.mjs scripts/": {
+   "count": 1,
+   "ms": 600151,
+   "maxMs": 600151,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && sed -n \"1,30p\" scripts/verify-package.mjs | cut -c1-160; git diff origin/master HEAD -- scripts/verify-package.mjs; ps -ef 2>/dev/null | rg \"verify-package|test-\" | head": {
+   "count": 1,
+   "ms": 149,
+   "maxMs": 149,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && printf \"audit-compaction: \"; node scripts/test-audit-compaction.mjs > /tmp/t.log 2>&1 && echo ok || { echo FAIL; tail -15 /tmp/t.log; }; cd hub && for t in scripts/test-link.mjs scripts/test": {
+   "count": 1,
+   "ms": 21915,
+   "maxMs": 21915,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && timeout 600 node scripts/test-browser.mjs > /tmp/tb.log 2>&1 && echo ok || { echo FAIL; tail -25 /tmp/tb.log; }": {
+   "count": 1,
+   "ms": 214976,
+   "maxMs": 214976,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npm version 0.9.0 --no-git-tag-version --ignore-scripts > /dev/null && node -p \"require('./package.json').version + ' ' + require('./package-lock.json').version + ' ' + require('./package-lo": {
+   "count": 1,
+   "ms": 410,
+   "maxMs": 410,
+   "failures": 0
   }
  },
  "steps": {
@@ -430,18 +676,27 @@
    "failures": 1
   },
   "(none)": {
-   "ms": 15837,
-   "testMs": 0,
-   "replies": 3,
+   "ms": 1215230,
+   "testMs": 907740,
+   "replies": 60,
    "models": {
-    "anthropic/claude-opus-5-5:high": 3
-   }
+    "anthropic/claude-opus-5-5:high": 60
+   },
+   "failures": 3
   }
  },
  "spans": [
   {
    "start": "2026-11-12T14:05:20.717Z",
    "ms": 1196042
+  },
+  {
+   "start": "2026-11-13T09:26:57.677Z",
+   "ms": 119656
+  },
+  {
+   "start": "2026-11-13T09:30:40.636Z",
+   "ms": 217410
   }
  ],
  "hints": []
