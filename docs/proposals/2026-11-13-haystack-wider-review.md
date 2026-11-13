@@ -24,3 +24,10 @@ Out of scope at this pass as before: embedders and vector stores (no evidence ye
 3. **M1 Fallback chain for side models** (B2). `process_image` and the advisor try a second configured model on failure, as compaction does.
 4. **E1 Faithfulness audit for compaction checkpoints** (B5). A script that judges each checkpoint claim against its cited records with a cheap classifier, reported next to `audit-compaction.mjs`.
 5. **T1 Fast test set** (B6). A `verify:fast` that skips slow and live checks.
+
+## Gap measurements (HW-03)
+
+Session logs `~/.pi/agent/sessions/**/*.jsonl` modified since 2026-10-25 (727 files, about 50,700 assistant messages), entries deduplicated by id. Throwaway scripts in `%TEMP%/hs/`.
+
+- **M1 side-model fallback: no gap.** `process_image` ran 50 times with 0 errors. Main-model errors: 80 `stopReason: "error"` messages; 55 were followed by more assistant work (Pi's own retry, `retry.maxRetries` 3, recovered them). 25 ended a run until the user wrote again: 14 network aborts, 7 Bad Request or expired token (a second model would not help), 4 usage-limit stops (one waited 171 minutes). A capacity fallback for the main model is possible through a Pi virtual model (`docs/virtual-models.md`: `route()` sees `reason: "retry"` and `failed.message.errorMessage`), but the gap is 4 stops in 19 days and switching provider loses the prompt cache.
+- **W1 main-content extraction: small gap.** `browser_fetch` succeeded 15 times in 19 days (9 more failed on bot checks or refusals); real sizes from the "more characters trimmed" markers: median 19,900 characters, 90th percentile 37,600, total 343,000 (about 86k tokens over 19 days). Readability on 5 of those public pages kept 76% (Zephyr docs), 75% (Waveshare), 82% (blog), 27% (GitHub issue) of the body text; two pages returned no server HTML. Saving about a quarter of 86k tokens over 19 days is not material. `fetch_content` (pi-web-access, 56 calls, median 1,500 characters) already extracts main content for public pages.
