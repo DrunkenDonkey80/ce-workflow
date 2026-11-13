@@ -99,7 +99,7 @@ function stub(endpoint, body) {
  if (endpoint === "/api/designsearch") { imageSearches.push(body.query); return { set: "s1", results: [{ n: 1, title: "Kiosk grid", site: "pos.test", page: "https://pos.test/a", width: 400, height: 300, original: true, thumb: svg(40, 30) }, { n: 2, title: "No original", site: "", page: "", width: 0, height: 0, original: false, thumb: "" }] }; }
  if (endpoint === "/api/designpick") return onPick(body);
  if (endpoint === "/api/designoriginal") return { n: body.n, url: "https://img.pos.test/a.png", image: svg(400, 300) };
- if (!(endpoint === "/api/message" && [null, "product"].includes(body.target))) assert.equal(body.target, "12345678"); // a chat message may be sent from the Project tab, or with no diagram in view
+ if (!(endpoint === "/api/message" && [undefined, "product"].includes(body.target))) assert.equal(body.target, "12345678"); // a chat message may be sent from the Project tab, or with no diagram in view
  if (endpoint === "/api/command") { commands.push(body.command); return { ok: true }; }
  if (endpoint === "/api/message" && body.text.startsWith("/")) { commands.push(body.text); return { accepted: true }; }
  if (endpoint === "/api/message") {
@@ -398,7 +398,7 @@ try {
  assert.equal(await evaluate("localStorage.getItem(\"plan3-left\")"), "collapsed");
  // No diagram in view: plain chat carries no target, so the session never reads the plan or diagram for it.
  const chatSend = async text => { const before = messages.length; await browser("fill", "#message-input", text); await evaluate("document.getElementById('composer').requestSubmit()"); await browser("wait", "--fn", "!document.getElementById('message-input').value"); assert.equal(messages.length, before + 1); return messages.at(-1); };
- assert.equal((await chatSend("plain while collapsed")).target, null, "collapsed panel: no diagram target");
+ assert.equal((await chatSend("plain while collapsed")).target, undefined, "collapsed panel: no diagram target");
  await browser("click", "#expand-left"); assert.equal(await width("chat"), 640);
  assert.equal((await chatSend("beside the diagram")).target, await evaluate("document.getElementById('tab-project').getAttribute('aria-selected') === 'true' ? 'product' : '12345678'"), "diagram tab in view: its target rides along");
  { // V-02: per session, each tab keeps its own pane mode and chat width; the library opens with a narrow chat.

@@ -878,13 +878,15 @@ export default function plan3(pi) {
 		}
 		if (endpoint !== "/api/message") throw new WebError(501, "This session endpoint is not attached yet.");
 		if (Object.keys(data).some(key => !["target", "text", "comments", "diagrams", "bundle"].includes(key))) throw new WebError(400, "Invalid message fields.");
-		// The page sends a target only while a diagram tab is in view; plain chat never reads the plan or diagram files.
+		// The page sends a target only while a diagram tab is in view, and only an @mention or comment uses it:
+		// any other message never reads the plan or diagram files.
 		// A diagram that fails to load costs its context, never the message.
 		const forChat = (shown: Parameters<typeof emptyDiagram>[0]) => {
 			try { return loadDiagram(webCtx.cwd, shown) ?? emptyDiagram(shown); }
 			catch (error) { notifyWeb("error", { message: `${error.message} The message was sent without that diagram's context.` }); return emptyDiagram(shown); }
 		};
-		const target = data.target == null && data.diagrams === undefined ? undefined : await resolveWebTarget(await displayedWebTarget(data.target ?? undefined));
+		const usesDiagram = data.diagrams !== undefined || data.target != null && (Array.isArray(data.comments) && data.comments.length > 0 || /(?<![\w@])@[a-z]/.test(String(data.text ?? "")));
+		const target = !usesDiagram ? undefined : await resolveWebTarget(await displayedWebTarget(data.target ?? undefined));
 		const diagram = target ? forChat(target) : emptyDiagram({ kind: "product" });
 		const send = (context) => {
 			if (data.bundle === undefined) return forwardDiagramChat(pi, ctx, context, data.text, data.comments, notifyWeb);

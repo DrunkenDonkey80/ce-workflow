@@ -97,7 +97,7 @@ try {
 	assert(tools.has("test_sensitivity") && tools.get("test_sensitivity").promptSnippet, "sensitivity tool is available without starting a plan");
 	const sensitivitySections = {};
 	const sensitivityLegacy = hooks.get("before_agent_start")({ systemPrompt: "BASE" }).systemPrompt;
-	assert.match(sensitivityLegacy, /\*\*Test sensitivity \(every project\)\*\*/);
+	assert.match(sensitivityLegacy, /\*\*Test sensitivity \(every project\)\*\*[\s\S]*\*\*Verify it yourself \(every session\)\*\*/, "every session carries the self-verify rule");
 	hooks.get("before_agent_start")({ systemPromptOptions: { sections: sensitivitySections } });
 	assert.match(sensitivitySections["test-sensitivity"], /failing-before-fix[\s\S]*test_sensitivity[\s\S]*unrelated failures/);
 	hooks.get("before_agent_start")({ systemPromptOptions: { sections: sensitivitySections } });
@@ -1043,7 +1043,7 @@ try {
 			// A plan grown past 1 MB of history must not block hub chat, with or without its diagram in view.
 			const planB = await readFile(bFile, "utf8");
 			await writeFile(bFile, planB + "\n## Notes\n" + "history line\n".repeat(90_000));
-			for (const [id, data] of [["c7", { text: "plain chat" }], ["c8", { target: "b0b0b0b0", text: "chat beside the diagram" }]]) {
+			for (const [id, data] of [["c7", { text: "plain chat" }], ["c8", { target: "b0b0b0b0", text: "chat beside the diagram about @api" }]]) {
 				await run("pi-hub", JSON.stringify({ id, endpoint: "/api/message", data }));
 				assert.equal(results.at(-1).ok, true, `${id} with a 1.1 MB plan: ${JSON.stringify(results.at(-1))}`);
 				assert(JSON.stringify(messages.at(-1)).includes(data.text));
@@ -1052,7 +1052,7 @@ try {
 			// A diagram that cannot load costs only its context; the message still goes, and the user is told.
 			const bDiagram = bFile.replace(/\.md$/, ".diagram.json");
 			await writeFile(bDiagram, "{ not json");
-			await run("pi-hub", JSON.stringify({ id: "c9", endpoint: "/api/message", data: { target: "b0b0b0b0", text: "broken diagram" } }));
+			await run("pi-hub", JSON.stringify({ id: "c9", endpoint: "/api/message", data: { target: "b0b0b0b0", text: "broken diagram @api" } }));
 			assert.equal(results.at(-1).ok, true, JSON.stringify(results.at(-1)));
 			assert(JSON.stringify(messages.at(-1)).includes("broken diagram"));
 			assert.match(notices.at(-1).message, /Cannot load diagram[\s\S]*sent without that diagram's context/);
@@ -1060,6 +1060,9 @@ try {
 			await run("pi-hub", JSON.stringify({ id: "c10", endpoint: "/api/message", data: { target: null, text: "no diagram in view" } }));
 			assert.equal(results.at(-1).ok, true, JSON.stringify(results.at(-1)));
 			assert.equal(notices.length, noticeCount, "plain chat (no diagram tab in view) never reads the plan or diagram files");
+			await run("pi-hub", JSON.stringify({ id: "c11", endpoint: "/api/message", data: { target: "b0b0b0b0", text: "no mention, mail me at a@b.c" } }));
+			assert.equal(results.at(-1).ok, true, JSON.stringify(results.at(-1)));
+			assert.equal(notices.length, noticeCount, "a message without @mentions or comments never reads the diagram, even with its tab in view");
 			await rm(bDiagram);
 			await writeFile(bFile, planB);
 			// The actual message allowlist and dispatcher, not only the hub relay.
