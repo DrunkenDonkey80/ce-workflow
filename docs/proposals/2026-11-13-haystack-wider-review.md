@@ -50,5 +50,5 @@ Astra's independent verdicts: `docs/proposals/haystack-review/astra-verdicts-wid
 
 ## Shortlist
 
-1. **K1 recall precision.** Gap: recall fires on 95% of prompts and about half of those turns carry no useful claim. Change: Unicode/NFC tokenizer for queries, scheduled-timer messages counted as machine text (the query then uses the last human request), and a stricter match for user-scope claims outside their recorded project. Measure with the HW-03 replay before and after; keep only what lowers the no-useful share without losing the 12 known-good searches.
+1. **K1 recall precision.** Gap: recall fires on 95% of prompts and about half of those turns carry no useful claim. Change: Unicode/NFC tokenizer for queries, scheduled-timer messages counted as machine text (the query then uses the last human request), and a higher match threshold for user-scope claims (they carry no project, so today a shared common word recalls them anywhere). Measure with the HW-03 replay before and after; keep only what lowers the no-useful share without losing the 12 known-good searches.
 2. **Verifier omission.** Add `test-audit-compaction.mjs` to the `verify-package.mjs` list. One line.
