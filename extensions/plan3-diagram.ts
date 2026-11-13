@@ -1,6 +1,6 @@
 import path from "node:path";
 import { existsSync } from "node:fs";
-import { confined, read, atomic, withPlanLock } from "./plan3-files.ts";
+import { confined, head, read, atomic, withPlanLock } from "./plan3-files.ts";
 
 export type DiagramStatus = "new" | "changed" | "removed" | "existing";
 // User edits not yet taken in by the agent (D3); separate from the plan-only status.
@@ -92,7 +92,8 @@ export function diagramPath(cwd: string, target: DiagramTarget) {
 	const relative = path.relative(path.resolve(cwd), path.resolve(target.plan.file)).replaceAll("\\", "/");
 	if (!/^docs\/plans\/(?:done\/)?[^/]+\.md$/.test(relative) || !/^[a-f0-9]{8}$/.test(target.plan.id)) throw new Error("Diagram owner must be a stable Plan3 plan in docs/plans.");
 	const owner = confined(cwd, relative);
-	const ownerText = read(owner, DIAGRAM_BYTES), header = ownerText.split(/^---\s*$/m)[1];
+	// Only the front matter is checked: a plan with a long history must not lock its diagram (or the hub chat) out.
+	const ownerText = head(owner), header = ownerText.split(/^---\s*$/m)[1];
 	if (!ownerText.startsWith("---") || !header || !/^plan3: true\r?$/m.test(header)) throw new Error("Diagram owner is not a Plan3 plan.");
 	return confined(cwd, relative.replace(/\.md$/, ".diagram.json"));
 }

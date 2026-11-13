@@ -878,8 +878,14 @@ export default function plan3(pi) {
 		}
 		if (endpoint !== "/api/message") throw new WebError(501, "This session endpoint is not attached yet.");
 		if (Object.keys(data).some(key => !["target", "text", "comments", "diagrams", "bundle"].includes(key))) throw new WebError(400, "Invalid message fields.");
-		const target = await resolveWebTarget(await displayedWebTarget(data.target));
-		const diagram = loadDiagram(webCtx.cwd, target) ?? emptyDiagram(target);
+		// The page sends a target only while a diagram tab is in view; plain chat never reads the plan or diagram files.
+		// A diagram that fails to load costs its context, never the message.
+		const forChat = (shown: Parameters<typeof emptyDiagram>[0]) => {
+			try { return loadDiagram(webCtx.cwd, shown) ?? emptyDiagram(shown); }
+			catch (error) { notifyWeb("error", { message: `${error.message} The message was sent without that diagram's context.` }); return emptyDiagram(shown); }
+		};
+		const target = data.target == null && data.diagrams === undefined ? undefined : await resolveWebTarget(await displayedWebTarget(data.target ?? undefined));
+		const diagram = target ? forChat(target) : emptyDiagram({ kind: "product" });
 		const send = (context) => {
 			if (data.bundle === undefined) return forwardDiagramChat(pi, ctx, context, data.text, data.comments, notifyWeb);
 			// Validate diagram/comment context before granting launch permission.
@@ -894,7 +900,7 @@ export default function plan3(pi) {
 		for (const part of data.diagrams) {
 			const other = await resolveWebTarget(webTarget(part.target));
 			const same = other.kind === target.kind && (other.kind === "product" || other.plan.id === (target as typeof other).plan.id);
-			if (!same) parts.push({ diagram: loadDiagram(webCtx.cwd, other) ?? emptyDiagram(other), ids: part.ids });
+			if (!same) parts.push({ diagram: forChat(other), ids: part.ids });
 			else parts.unshift({ diagram, ids: part.ids });
 		}
 		if (!parts.length || parts[0].diagram !== diagram) parts.unshift({ diagram, ids: [] });

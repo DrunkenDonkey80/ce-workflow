@@ -54,6 +54,13 @@ export function read(file: string, max = 512_000) {
 	if (!stat.isFile() || stat.isSymbolicLink() || stat.size > max) throw new Error("Expected a bounded regular file.");
 	return fs.readFileSync(file, "utf8");
 }
+/** The start of a regular file, for header checks that must not depend on how big the file has grown. */
+export function head(file: string, bytes = 16_384) {
+	const stat = fs.lstatSync(file);
+	if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("Expected a regular file.");
+	const fd = fs.openSync(file, "r");
+	try { const buffer = Buffer.alloc(Math.min(bytes, stat.size)); return buffer.subarray(0, fs.readSync(fd, buffer, 0, buffer.length, 0)).toString("utf8"); } finally { fs.closeSync(fd); }
+}
 export function atomic(file: string, value: string | Buffer) {
 	fs.mkdirSync(path.dirname(file), { recursive: true });
 	const temp = `${file}.${crypto.randomUUID()}.tmp`;

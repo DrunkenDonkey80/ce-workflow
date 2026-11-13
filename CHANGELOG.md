@@ -23,6 +23,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - Design sessions: when you approve a design ("let's use this design"), the session now selects it right away and asks you where to implement it, instead of trying to edit the app and telling you to select it yourself.
 
 ### Fixed
+- Hub: a session whose plan grew past 1 MB no longer refuses every chat message with "Expected a bounded regular file". Chat reads the plan and its diagram only while a diagram tab is on screen, the plan check reads just its header, and a diagram that cannot load costs only its @mention context, with a notice, instead of the message.
 - Hub: tables in replies no longer squeeze a column to one letter per line on phones; words stay whole, and a table too wide for the screen scrolls sideways.
 
 ## 0.9.0 — 2026-11-13

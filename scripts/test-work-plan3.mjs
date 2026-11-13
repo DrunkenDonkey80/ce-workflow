@@ -1040,6 +1040,28 @@ try {
 			await run("pi-hub", JSON.stringify({ id: "c6", endpoint: "/api/message", data: { target: "b0b0b0b0", text: "hello from the hub" } }));
 			assert.equal(results.at(-1).ok, true, JSON.stringify(results.at(-1)));
 			assert(JSON.stringify(messages.at(-1)).includes("hello from the hub"));
+			// A plan grown past 1 MB of history must not block hub chat, with or without its diagram in view.
+			const planB = await readFile(bFile, "utf8");
+			await writeFile(bFile, planB + "\n## Notes\n" + "history line\n".repeat(90_000));
+			for (const [id, data] of [["c7", { text: "plain chat" }], ["c8", { target: "b0b0b0b0", text: "chat beside the diagram" }]]) {
+				await run("pi-hub", JSON.stringify({ id, endpoint: "/api/message", data }));
+				assert.equal(results.at(-1).ok, true, `${id} with a 1.1 MB plan: ${JSON.stringify(results.at(-1))}`);
+				assert(JSON.stringify(messages.at(-1)).includes(data.text));
+				assert(!notices.some(notice => /without that diagram/.test(notice.message)), `${id}: the diagram loads despite the plan's size`);
+			}
+			// A diagram that cannot load costs only its context; the message still goes, and the user is told.
+			const bDiagram = bFile.replace(/\.md$/, ".diagram.json");
+			await writeFile(bDiagram, "{ not json");
+			await run("pi-hub", JSON.stringify({ id: "c9", endpoint: "/api/message", data: { target: "b0b0b0b0", text: "broken diagram" } }));
+			assert.equal(results.at(-1).ok, true, JSON.stringify(results.at(-1)));
+			assert(JSON.stringify(messages.at(-1)).includes("broken diagram"));
+			assert.match(notices.at(-1).message, /Cannot load diagram[\s\S]*sent without that diagram's context/);
+			const noticeCount = notices.length;
+			await run("pi-hub", JSON.stringify({ id: "c10", endpoint: "/api/message", data: { target: null, text: "no diagram in view" } }));
+			assert.equal(results.at(-1).ok, true, JSON.stringify(results.at(-1)));
+			assert.equal(notices.length, noticeCount, "plain chat (no diagram tab in view) never reads the plan or diagram files");
+			await rm(bDiagram);
+			await writeFile(bFile, planB);
 			// The actual message allowlist and dispatcher, not only the hub relay.
 			const previousOwner = process.env.PI_HUB_SESSION, owner = randomUUID(); process.env.PI_HUB_SESSION = owner;
 			try {

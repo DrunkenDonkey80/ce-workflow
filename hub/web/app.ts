@@ -36,7 +36,7 @@ type Model = { provider: string; id: string; name: string };
 type Plan = { id: string; title: string; done?: number; total?: number; focus?: string; bias?: number; open?: number; planning?: boolean; finishable?: boolean };
 const state: { connected: boolean; diagram: Diagram | null; plan: Plan | null; status: { model: Model | null; effort: string | null; context?: number | null; tokens?: number | null; estimated?: boolean; window?: number | null; git?: GitFiles | null; folder?: string; tab?: string; parked?: boolean; commands?: ProjectCommand[] } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]> & { thinkingLength: number }>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, status: null, activity: {}, pinning: false, more: false };
 let commentPoint, hoverTimer, messageSending = false, commandSending = false;
-type ReferenceMessage = { text: string; target?: string; diagrams?: { target: string; ids: string[] }[]; references: { submission: string; refs: { ref: string; revision: number }[] } };
+type ReferenceMessage = { text: string; target?: string | null; diagrams?: { target: string; ids: string[] }[]; references: { submission: string; refs: { ref: string; revision: number }[] } };
 let pendingSubmission: { text: string; refs: string[]; at: number; request?: ReferenceMessage } | undefined, draftEdits = 0;
 let selectedReferenceIds: string[] = [];
 const referenceRows = new Map<string, DesignReference>();
@@ -1458,7 +1458,9 @@ $("composer").addEventListener("submit", async event => {
  // Toolbar lines still in the message carry their diagram's context, grouped per diagram (A2).
  const sent = editLines.filter(item => text.split("\n").includes(item.line)), parts = new Map();
  for (const item of sent) parts.set(item.target, [...new Set([...(parts.get(item.target) ?? []), ...item.ids])]);
- const message = { text, target: diagramTarget() ?? target, ...(parts.size ? { diagrams: [...parts].map(([target, ids]) => ({ target, ids })) } : {}), ...(refs.length ? { references: { submission: crypto.randomUUID(), refs: refs.map(ref => ({ ref: ref!.ref, revision: ref!.revision })) } } : {}) };
+ // A diagram's context (its @mentions) rides along only while its tab is on screen; a collapsed or hidden panel sends plain chat.
+ // null, not a missing key: post() fills a missing target from the URL, and a saved retry must hash the same.
+ const message = { text, target: ($("canvas").getClientRects().length ? diagramTarget() : undefined) ?? null, ...(parts.size ? { diagrams: [...parts].map(([target, ids]) => ({ target, ids })) } : {}), ...(refs.length ? { references: { submission: crypto.randomUUID(), refs: refs.map(ref => ({ ref: ref!.ref, revision: ref!.revision })) } } : {}) };
  pendingSubmission = { text, refs: [...selectedReferenceIds], at: Date.now(), ...message.references ? { request: message as ReferenceMessage } : {} };
  // Sending jumps to the newest message; later rows keep following from the bottom.
  toBottom();
@@ -1705,12 +1707,12 @@ function saveDraft() {
  } catch { /* private mode */ }
 }
 function savedReferenceRequest(value, text: string, ids: string[]): ReferenceMessage | undefined {
- if (!value || value.text !== text || value.target !== undefined && (typeof value.target !== "string" || !/^(?:product|[a-f0-9]{8})$/.test(value.target))) return;
+ if (!value || value.text !== text || value.target != null && (typeof value.target !== "string" || !/^(?:product|[a-f0-9]{8})$/.test(value.target))) return;
  const selection = value.references;
  if (!selection || typeof selection.submission !== "string" || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(selection.submission) || !Array.isArray(selection.refs) || !ids.length || selection.refs.length !== ids.length || selection.refs.some((ref, index) => ref?.ref !== ids[index] || !Number.isSafeInteger(ref.revision) || ref.revision < 1)) return;
  const diagrams = value.diagrams;
  if (diagrams !== undefined && (!Array.isArray(diagrams) || diagrams.length > 64 || diagrams.some(part => !part || typeof part.target !== "string" || part.target.length > 128 || !Array.isArray(part.ids) || part.ids.length > 64 || part.ids.some(id => typeof id !== "string" || id.length > 128)))) return;
- return { text, target: value.target, ...(diagrams ? { diagrams: diagrams.map(part => ({ target: part.target, ids: part.ids })) } : {}), references: { submission: selection.submission, refs: selection.refs.map(ref => ({ ref: ref.ref, revision: ref.revision })) } };
+ return { text, target: value.target ?? null, ...(diagrams ? { diagrams: diagrams.map(part => ({ target: part.target, ids: part.ids })) } : {}), references: { submission: selection.submission, refs: selection.refs.map(ref => ({ ref: ref.ref, revision: ref.revision })) } };
 }
 try {
  const raw = localStorage.getItem(draftKey) ?? "";
