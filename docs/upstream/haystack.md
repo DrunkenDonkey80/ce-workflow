@@ -33,6 +33,21 @@ A4 human in the loop (ask_user dialogs, research Git guard, browser and camera c
 
 A11 breakpoints and snapshots (we do not own Pi's execution engine; Plan3 checkpoints and sessions cover resume), A13 tracing and telemetry (compaction outcomes are already in session entries and `scripts/audit-compaction.mjs`; no tracing backend, no external telemetry), A15 caching (document dedup, not prompt caching; no safe freshness policy for coding tools).
 
-## Out of scope
+## Out of scope (first pass)
 
-RAG and integrations: document stores, retrievers, rankers, embedders, converters, preprocessors, splitters, readers, extractors, classifiers, routers, joiners, the pipeline graph engine and serialization, chat generator integrations and `docs-website/`.
+RAG and integrations: embedders, readers, extractors, classifiers, the pipeline graph engine and serialization, chat generator integrations and `docs-website/`. Retrieval, ranking, converters, preprocessors, routers, fallback, security utilities, evaluators and engineering process got the second pass below.
+
+## Second pass (B1 to B6)
+
+Same pin. Plan `docs/plans/2026-11-13-wider-haystack-review-the-parts-the-first-pass-skipped-19abb9ec-plan3.md`; review with gap measurements and the Astra merge `docs/proposals/2026-11-13-haystack-wider-review.md`; Astra's review `docs/proposals/haystack-review/astra-verdicts-wider.md` (agreement 4 of 6). Every gap was measured on 19 days of session logs before an idea was offered.
+
+| Area | Final | Why |
+|---|---|---|
+| B1 Retrieval and ranking | Adopted (small) | Unicode/NFC query tokens and Bulgarian stop words in `extensions/work-knowledge.ts` (idea source: the tokenizer in `haystack/document_stores/in_memory/document_store.py`, re-implemented). A Bulgarian-only query matched nothing. Replay of 1,294 prompts: precision unchanged (60% of recalled claims judged useful). Two precision tweaks were tried and dropped: skipping timer wake-ups lowered precision to 47%, and no score floor separates useful from noisy user-wide claims. |
+| B2 Model calls | Already covered | Compaction already falls back across models; 4 usage-limit stops in 19 days. |
+| B3 Web and ingestion | Dropped | Main-content extraction would trim about a quarter of 343k fetched characters in 19 days. |
+| B4 Security utilities | Already covered | Our URL checks are stronger than `utils/url_validation.py`; no pipeline serialization to guard. |
+| B5 Evaluators | Dropped | No compaction-caused loss found in 711 compactions; the faithfulness-judge recipe was used to measure B1. |
+| B6 Engineering process | Adopted (one line) | `scripts/test-audit-compaction.mjs` now runs in `npm run verify` (found by Astra). CI dropped: one committer, about 5 minutes of full checks a day. |
+
+No catch-up watch for the second pass either: the tokenizer is a re-implementation, not a port.
