@@ -4,7 +4,7 @@
 import type http from "node:http";
 import { execFile, execFileSync, spawn } from "node:child_process";
 import { mkdirSync, readFileSync, statSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readFile, statfs } from "node:fs/promises";
 import os from "node:os";
 import { promisify } from "node:util";
 import path from "node:path";
@@ -393,6 +393,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 			case "catchup": try { return Object.fromEntries((JSON.parse(readFileSync(path.join(folder(id), "extensions", "work-catch-up-baseline.json"), "utf8")).packages as { name: string; version: string }[]).map(item => [item.name, item.version])); } catch { return {}; }
 			case "system": return systemLoad();
 			case "processes": return topProcesses();
+			case "volumes": return volumes();
 			// D6: usage comes from the hub's own poller, so it shows with every session parked.
 			case "usage": return usage?.usage() ?? { summary: [], accounts: [] };
 			// D9: the pool is global, answered by the hub through cpool, never by a session.
@@ -695,10 +696,29 @@ const macUsed = (out: string) => Number(out) > 0 ? 100 - Number(out) : undefined
 let macMemory: number | undefined;
 if (process.platform === "darwin") try { macMemory = macUsed(execFileSync("sysctl", ["-n", "kern.memorystatus_level"], { encoding: "utf8" })); } catch { /* falls back to os.freemem */ }
 const readMacMemory = () => execFile("sysctl", ["-n", "kern.memorystatus_level"], (error, out) => { if (!error) macMemory = macUsed(out) ?? macMemory; });
-export function systemLoad() {
+export async function systemLoad() {
 	const now = cpuTimes(), total = now.total - lastCpu.total, idle = now.idle - lastCpu.idle; lastCpu = now;
 	if (process.platform === "darwin") readMacMemory(); // answers the next call
-	return { cpu: total > 0 ? Math.round(100 * (1 - idle / total)) : 0, memory: macMemory ?? Math.round(100 * (1 - os.freemem() / os.totalmem())) };
+	const disk = await volume(process.platform === "win32" ? `${process.env.SystemDrive ?? "C:"}\\` : "/");
+	return { cpu: total > 0 ? Math.round(100 * (1 - idle / total)) : 0, memory: macMemory ?? Math.round(100 * (1 - os.freemem() / os.totalmem())), disk: disk?.percent ?? 0 };
+}
+
+// Used share like df: used / (used + available to users); sizes in bytes. null: no disk there (an empty card reader, a missing letter).
+async function volume(mount: string) {
+	try {
+		const info = await statfs(mount), used = (info.blocks - info.bfree) * info.bsize, size = info.blocks * info.bsize, room = used + info.bavail * info.bsize;
+		return size > 0 ? { mount, used, size, percent: room > 0 ? Math.round(100 * used / room) : 0 } : null;
+	} catch { return null; }
+}
+
+/** Every disk volume for the disk graph's hover: Windows drive letters, elsewhere the real /dev mounts from df. */
+export async function volumes() {
+	// shortcut: macOS lists the user-facing volumes only (its /System/Volumes/* share the / container); extend the filter if one is missing.
+	const mounts = process.platform === "win32"
+		? [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"].map(letter => `${letter}:\\`)
+		: (await promisify(execFile)("df", ["-kP"], { timeout: 15_000 })).stdout.split("\n").slice(1).map(line => /^(\/dev\/\S+)\s+\d+\s+\d+\s+\d+\s+\d+%\s+(.+)$/.exec(line.trim()))
+			.filter(match => match !== null && !/^\/dev\/loop/.test(match[1]) && !/^\/(System\/Volumes|snap|boot)\//.test(match[2] + "/")).map(match => match![2]);
+	return (await Promise.all([...new Set(mounts)].map(volume))).filter(item => item !== null);
 }
 
 /** The 5 programs using the most CPU (% of all cores) and memory (bytes), same-name processes added up, for the graphs' hover. */

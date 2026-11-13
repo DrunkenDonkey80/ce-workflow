@@ -2644,40 +2644,49 @@ $("hub-restart").addEventListener("click", async () => {
  try { await post("hub", { action: "restart" }); showNotice("Hub restarting; the page reconnects by itself.", true); } catch (error) { showNotice(error.message); }
 });
 // PC load every 5 s while the page is visible; 24 samples = the last 2 minutes.
-const loadSamples: { cpu: number; memory: number }[] = [];
+type LoadKey = "cpu" | "memory" | "disk";
+const LOAD_NAME = { cpu: "CPU", memory: "Memory", disk: "Disk" };
+const loadSamples: Record<LoadKey, number>[] = [];
 async function pollLoad() {
  if (document.hidden) return;
  try { loadSamples.push(await get("system")); } catch { return; }
  if (loadSamples.length > 24) loadSamples.shift();
- for (const [key, name] of [["cpu", "CPU"], ["memory", "Memory"]] as const) {
-  const box = $("load-" + key), value = loadSamples.at(-1)![key];
+ for (const key of ["cpu", "memory", "disk"] as const) {
+  const box = $("load-" + key), value = loadSamples.at(-1)![key] ?? 0, name = LOAD_NAME[key];
   // Closed down to the bottom edge, so the graph is a filled area the number stands out against.
   const left = 48 - loadSamples.length * 2;
   box.querySelector("polyline")!.setAttribute("points", [`${left},20`, ...loadSamples.map((sample, index) => `${index * 2 + left},${(20 - sample[key] / 5).toFixed(1)}`), "46,20"].join(" "));
   box.querySelector("span")!.textContent = String(value);
   box.setAttribute("aria-label", `${name} ${value}%`);
  }
+ $("load-disk").toggleAttribute("data-full", (loadSamples.at(-1)!.disk ?? 0) >= 90);
  showLoadTip();
 }
 // Hovering a graph lists the 5 programs using the most of it; looked up on hover only, at most every 10 s (it costs about a second).
 // Our own tooltip, not title: the browser hides a title tooltip whenever it changes, so every 5 s update made it blink.
+// The disk graph lists every volume instead (looked up the same way).
 type Top = { name: string; value: number }[];
-let topProcs: { cpu: Top; memory: Top } | null = null, topAt = 0, tipKey: "cpu" | "memory" | null = null;
-const topText = (key: "cpu" | "memory") => !topProcs?.[key].length ? "" : "\n\nTop programs:\n" + topProcs[key].map(item => `${key === "cpu" ? `${item.value}%` : `${(item.value / 1e9).toFixed(1)} GB`}  ${item.name}`).join("\n");
+type Volume = { mount: string; used: number; size: number; percent: number };
+let topProcs: { cpu: Top; memory: Top } | null = null, topAt = 0, tipKey: LoadKey | null = null, vols: Volume[] | null = null, volsAt = 0;
+const gb = (bytes: number) => `${Math.round(bytes / 1e9)} GB`;
+const topText = (key: LoadKey) => key === "disk" ? (vols?.length ? "\n\nVolumes:\n" + vols.map(item => `${item.percent}%  ${gb(item.used)} of ${gb(item.size)}  ${item.mount}`).join("\n") : "")
+ : !topProcs?.[key].length ? "" : "\n\nTop programs:\n" + topProcs[key].map(item => `${key === "cpu" ? `${item.value}%` : `${(item.value / 1e9).toFixed(1)} GB`}  ${item.name}`).join("\n");
 function showLoadTip() {
  const tip = $("load-tip");
  if (!tipKey) { tip.hidden = true; return; }
  const value = loadSamples.at(-1)?.[tipKey];
- tip.textContent = `${tipKey === "cpu" ? "CPU" : "Memory"} ${value ?? "…"}% (graph: last 2 minutes)` + topText(tipKey);
+ tip.textContent = `${LOAD_NAME[tipKey]} ${value ?? "…"}% ${tipKey === "disk" ? "used, system disk" : "(graph: last 2 minutes)"}` + topText(tipKey);
  tip.hidden = false;
  const box = $("load-" + tipKey).getBoundingClientRect();
  tip.style.top = box.bottom + 4 + "px"; tip.style.left = Math.max(4, Math.min(box.left, innerWidth - tip.offsetWidth - 4)) + "px";
- if (Date.now() - topAt >= 10_000) {
+ if (tipKey === "disk") {
+  if (Date.now() - volsAt >= 10_000) { volsAt = Date.now(); get("volumes").then(value => { vols = value; showLoadTip(); }, () => {}); }
+ } else if (Date.now() - topAt >= 10_000) {
   topAt = Date.now();
   get("processes").then(value => { topProcs = value; showLoadTip(); }, () => {});
  }
 }
-for (const key of ["cpu", "memory"] as const) {
+for (const key of ["cpu", "memory", "disk"] as const) {
  $("load-" + key).addEventListener("mouseenter", () => { tipKey = key; showLoadTip(); });
  $("load-" + key).addEventListener("mouseleave", () => { tipKey = null; showLoadTip(); });
 }

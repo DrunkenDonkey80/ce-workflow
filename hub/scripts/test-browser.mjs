@@ -1043,8 +1043,12 @@ try {
  const badSeen = await fetch(`${origin}/s/${id}/api/hub`, { method: "POST", headers: { authorization: `Bearer ${hub.config.localKey}`, origin, "content-type": "application/json" }, body: JSON.stringify({ action: "settings", seenVersion: "../x" }) });
  assert.equal(badSeen.status, 400, "seen version must be x.y.z");
  await browser("wait", "--fn", "document.querySelector('#load-cpu polyline').getAttribute('points')");
- assert.match(await evaluate("['load-cpu', 'load-memory'].map(id => document.getElementById(id).getAttribute('aria-label')).join(' · ')"), /^CPU \d+% · Memory \d+%$/, "PC load boxes left of the gear");
- assert.deepEqual(await evaluate("['load-cpu', 'load-memory', 'settings-button'].map(id => { const r = document.getElementById(id).getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })"), [[34, 34], [34, 34], [34, 34]], "same-size squares");
+ assert.match(await evaluate("['load-cpu', 'load-memory', 'load-disk'].map(id => document.getElementById(id).getAttribute('aria-label')).join(' · ')"), /^CPU \d+% · Memory \d+% · Disk \d+%$/, "PC load boxes left of the gear");
+ assert.equal(await evaluate("['load-cpu', 'load-memory', 'load-disk'].map(id => getComputedStyle(document.getElementById(id), '::before').content).join(' ')"), '"CPU" "RAM" "DISK"', "each box is captioned on its top edge");
+ assert.deepEqual(await evaluate("['load-cpu', 'load-memory', 'load-disk', 'settings-button'].map(id => { const r = document.getElementById(id).getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })"), [[34, 34], [34, 34], [34, 34], [34, 34]], "same-size squares");
+ await browser("hover", "#load-disk");
+ await browser("wait", "--fn", "document.getElementById('load-tip').textContent.includes('Volumes:')");
+ assert.match(await evaluate("document.getElementById('load-tip').textContent"), /^Disk \d+% used, system disk\n\nVolumes:\n\d+% {2}\d+ GB of \d+ GB {2}\S/, "hovering the disk box lists every volume with used % and GB");
  await evaluate("document.getElementById('left-panel').style.display = 'none'"); // a collapsed left panel must not hide the tooltip
  await browser("hover", "#load-cpu");
  assert.match(await evaluate("$('load-tip').hidden ? '' : $('load-tip').textContent".replaceAll("$(", "document.getElementById(")), /^CPU \d+% \(graph/, "hovering a graph shows its own tooltip, updated in place (a title would blink every 5 s)");

@@ -436,7 +436,12 @@ h2 { font-size: 15px; font-weight: 600; }
 .load { position: relative; box-sizing: border-box; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); overflow: hidden; }
 .load svg { position: absolute; inset: 2px; width: calc(100% - 4px); height: calc(100% - 4px); }
 .load polyline { stroke-width: 1; vector-effect: non-scaling-stroke; fill-opacity: .3; }
-#load-cpu polyline { stroke: var(--accent); fill: var(--accent); } #load-memory polyline { stroke: var(--warning); fill: var(--warning); }
+#load-cpu polyline { stroke: var(--accent); fill: var(--accent); } #load-memory polyline { stroke: var(--warning); fill: var(--warning); } #load-disk polyline { stroke: var(--muted); fill: var(--muted); }
+/* A tiny caption on the top edge says which box is which; the number sits a little lower to clear it. */
+.load::before { content: attr(data-label); position: absolute; top: 1px; left: 0; right: 0; z-index: 1; text-align: center; font-size: 8px; line-height: 1; letter-spacing: .03em; color: var(--muted); }
+.load span { padding-top: 6px; }
+/* A nearly full system disk turns red: Pi and builds fail once it is full. */
+#load-disk[data-full] { border-color: var(--error); } #load-disk[data-full] polyline { stroke: var(--error); fill: var(--error); }
 /* A solid halo in the box colour keeps the number readable over the filled graph. */
 .load span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: var(--text); text-shadow: -1px -1px 0 var(--panel), 1px -1px 0 var(--panel), -1px 1px 0 var(--panel), 1px 1px 0 var(--panel), 0 -1px 0 var(--panel), 0 1px 0 var(--panel), -1px 0 0 var(--panel), 1px 0 0 var(--panel), 0 0 3px var(--panel); }
 /* Desktop: the plan bar leads the status line, next to the title; the other buttons keep their full text. */
