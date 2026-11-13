@@ -109,6 +109,7 @@ const tests = [
 	"test-advisor-model.mjs",
 	"test-run-budget.mjs",
 	"test-compare-benchmark-runs.mjs",
+	"test-audit-compaction.mjs",
 	...listed("scripts").filter((name) => /^test-work-.*\.mjs$/.test(name)),
 ];
 const gitConfigCount = Number(process.env.GIT_CONFIG_COUNT ?? 0);
