@@ -197,7 +197,8 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 			else throw Object.assign(new Error(`Give done and total as numbers, total above 0 (got done=${data.done} total=${data.total}).`), { status: 400 });
 			views.get(m[1])?.publish("progress", progressOf(m[1])); return { ok: true };
 		},
-		"POST /api/sessions/([0-9a-f-]{36})/prompt": (data, m) => host.prompt(m[1], String(data.message ?? "")),
+		// A run button's script reports back long after its session went idle and parked: wake it, and queue behind a busy agent (like timers).
+		"POST /api/sessions/([0-9a-f-]{36})/prompt": async (data, m) => { await host.resume(m[1]); return host.prompt(m[1], String(data.message ?? ""), host.busyReasons(m[1]).length ? { streamingBehavior: "followUp" } : {}); },
 		// S-02: timers of one session; the CLI (and through it the schedule tool) is the only writer.
 		// Another session meeting this one's open question (ce-workflow session_dialog): read the forms, answer one.
 		"GET /api/sessions/([0-9a-f-]{36})/dialogs": (_d, m) => pageApi.dialogs(m[1]),

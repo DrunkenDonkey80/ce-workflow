@@ -114,6 +114,10 @@ try {
 	assert.equal(JSON.parse(cli("session", id).out).id, id, "pi-hub session names one session");
 	assert.equal(cli("session", "00000000-0000-0000-0000-000000000000").code, 1, "and fails for one the hub does not have");
 	assert.equal((await api("/api/status")).body.sessions.find(s => s.id === id).subtitle, undefined);
+	// A run button's `pi-hub prompt` after a long build reaches the session even though it parked meanwhile.
+	assert.match(cli("prompt", id, "build", "done").out, /Sent/);
+	assert.equal((await api("/api/status")).body.sessions.find(s => s.id === id).live, true, "pi-hub prompt wakes a parked session");
+	await api(`/api/sessions/${id}/park`, {});
 	// pi-hub fork: a new session in the same folder whose history starts with the source's messages; the source is untouched.
 	const sessions = async () => (await api("/api/status")).body.sessions, source = (await sessions()).find(s => s.id === id);
 	fs.appendFileSync(source.sessionFile, JSON.stringify({ type: "message", message: { role: "user", content: "make it calm" } }) + "\n"); // parked: its history on disk

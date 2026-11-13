@@ -4,6 +4,11 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+## 0.9.2 — 2026-11-13
+
+### Fixed
+- Hub: a run button that reports back with `pi-hub prompt` after a long job (an SDK build) now reaches its session. The session had usually gone idle and parked by then, so the message was refused with "Session is parked." and never showed up. The hub now wakes the session, and if the agent is busy, the message waits as a follow-up, the same as timer messages.
+
 ## 0.9.1 — 2026-11-13
 
 ### Added
