@@ -1,0 +1,126 @@
+{
+ "version": 1,
+ "activeMs": 0,
+ "runs": 0,
+ "waitingMs": 0,
+ "toolWallMs": 10099,
+ "compactions": {
+  "count": 0,
+  "ms": 0
+ },
+ "models": {
+  "anthropic/claude-opus-5-5:high": {
+   "replies": 11,
+   "thinkingMs": 17292,
+   "actingMs": 38961,
+   "input": 24,
+   "output": 5886,
+   "cacheRead": 850066,
+   "cacheWrite": 50003,
+   "cost": 0.5378442000000001,
+   "errors": 0
+  }
+ },
+ "tools": {
+  "bash": {
+   "count": 7,
+   "ms": 3592,
+   "maxMs": 1150,
+   "failures": 0
+  },
+  "write": {
+   "count": 1,
+   "ms": 3,
+   "maxMs": 3,
+   "failures": 0
+  },
+  "edit": {
+   "count": 1,
+   "ms": 10,
+   "maxMs": 10,
+   "failures": 0
+  },
+  "subagents_enable": {
+   "count": 1,
+   "ms": 1,
+   "maxMs": 1,
+   "failures": 0
+  },
+  "subagent": {
+   "count": 1,
+   "ms": 180,
+   "maxMs": 180,
+   "failures": 0
+  },
+  "plan3": {
+   "count": 1,
+   "ms": 115,
+   "maxMs": 115,
+   "failures": 0
+  }
+ },
+ "categories": {
+  "shell": {
+   "count": 7,
+   "ms": 3592,
+   "maxMs": 1150,
+   "failures": 0
+  }
+ },
+ "commands": {
+  "bash\u0000cd \".\" && git status --short | head; git log --oneline -3; wc -c docs/proposals/haystack-review/astra-brief.md; sed -n 1,200p docs/proposals/haystack-review/astra-brief.md": {
+   "count": 1,
+   "ms": 150,
+   "maxMs": 150,
+   "failures": 0
+  },
+  "bash\u0000cd \"./extensions\" && head -c 1500 work-knowledge.ts | head -40; echo ----; sed -n 700,770p work-knowledge.ts; echo ----; grep -n \"fallback\\|candidate\\|retry\\|429\\|rate\" work-compaction-memory.ts | hea": {
+   "count": 1,
+   "ms": 116,
+   "maxMs": 116,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && wc -l extensions/{browser-fetch,browser-search,plan3-web,redact,work-env,work-verification-contract,advisor-model,jev-tools}.ts; grep -n \"readab\\|boilerplate\\|innerText\\|maxChars\\|truncat\\|c": {
+   "count": 1,
+   "ms": 235,
+   "maxMs": 235,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat extensions/redact.ts; head -20 extensions/work-verification-contract.ts; grep -n \"TEXT_CHARS =\" extensions/browser-fetch.ts; grep -rn \"innerText\\|textContent\\|readability\" browser-fetch/": {
+   "count": 1,
+   "ms": 177,
+   "maxMs": 177,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls scripts/test-*.mjs | wc -l; ls .github/workflows 2>/dev/null; ls scripts/test-*.mjs hub/scripts/test-* 2>/dev/null | wc -l": {
+   "count": 1,
+   "ms": 1150,
+   "maxMs": 1150,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && find . -name \"test-*.mjs\" -not -path \"*/node_modules/*\" | wc -l; head -20 .github/workflows/app-release.yml | grep -n \"on:\\|tags\\|push\"": {
+   "count": 1,
+   "ms": 898,
+   "maxMs": 898,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && find . -name \"test-*.mjs\" -not -path \"*/node_modules/*\" -not -path \"./.worktrees/*\" | cut -d/ -f2 | sort | uniq -c | sort -rn | head": {
+   "count": 1,
+   "ms": 866,
+   "maxMs": 866,
+   "failures": 0
+  }
+ },
+ "steps": {
+  "HW-01": {
+   "ms": 60154,
+   "testMs": 0,
+   "replies": 11,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 11
+   }
+  }
+ },
+ "spans": [],
+ "hints": []
+}
