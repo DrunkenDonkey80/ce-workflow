@@ -1,0 +1,31 @@
+<!doctype html>
+<!-- V-04: one fixed screen that every OpenDesign theme card pictures in its own colors (tokens.css beside it). -->
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="tokens.css"><style>
+* { box-sizing: border-box; }
+body { margin: 0; height: 800px; background: var(--bg, #fff); color: var(--fg, #222); font: 15px/1.45 var(--font-body, system-ui, sans-serif); display: grid; grid-template-columns: 220px 1fr; }
+aside { background: var(--surface-warm, var(--surface, #f6f6f6)); border-right: 1px solid var(--border, #ddd); padding: 24px 16px; }
+aside b { display: block; font: 700 20px var(--font-display, inherit); margin-bottom: 24px; }
+aside a { display: block; padding: 9px 12px; border-radius: var(--radius-sm, 6px); color: var(--muted, #666); text-decoration: none; }
+aside a.on { background: var(--accent, #36c); color: var(--accent-on, #fff); }
+main { padding: 28px 36px; display: grid; gap: 20px; align-content: start; }
+h1 { margin: 0; font: 700 34px/1.15 var(--font-display, inherit); letter-spacing: var(--tracking-display, normal); }
+p { margin: 0; color: var(--muted, #666); }
+.row { display: flex; gap: 12px; align-items: center; }
+.card { background: var(--surface, #fff); border: 1px solid var(--border, #ddd); border-radius: var(--radius-md, 10px); padding: 18px 20px; box-shadow: var(--elev-raised, none); }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.stats strong { display: block; font: 700 30px var(--font-display, inherit); }
+button { font: inherit; padding: 10px 18px; border-radius: var(--radius-md, 8px); border: 1px solid var(--border, #ccc); background: var(--surface, #fff); color: var(--fg, #222); }
+button.primary { background: var(--accent, #36c); color: var(--accent-on, #fff); border-color: var(--accent, #36c); }
+input { font: inherit; flex: 1; padding: 10px 14px; border-radius: var(--radius-md, 8px); border: 1px solid var(--border, #ccc); background: var(--bg, #fff); color: var(--fg, #222); }
+.tag { padding: 3px 10px; border-radius: var(--radius-pill, 999px); font-size: 13px; color: #fff; }
+table { width: 100%; border-collapse: collapse; }
+td { padding: 10px 4px; border-top: 1px solid var(--border-soft, var(--border, #eee)); }
+</style></head><body>
+<aside><b>Northwind</b><a class="on">Overview</a><a>Orders</a><a>Customers</a><a>Products</a><a>Reports</a><a>Settings</a></aside>
+<main>
+ <div class="row" style="justify-content: space-between"><div><h1>Good morning, Alex</h1><p>Here is what happened in your store today.</p></div><div class="row"><button>Export</button><button class="primary">New order</button></div></div>
+ <div class="stats"><div class="card"><p>Revenue</p><strong>$12,480</strong><span class="tag" style="background: var(--success, #2a2)">+8.2%</span></div><div class="card"><p>Orders</p><strong>342</strong><span class="tag" style="background: var(--warn, #c80)">12 pending</span></div><div class="card"><p>Returns</p><strong>7</strong><span class="tag" style="background: var(--danger, #c33)">3 disputed</span></div></div>
+ <div class="card"><div class="row" style="margin-bottom: 12px"><input value="Search orders"><button class="primary">Search</button></div>
+ <table><tr><td>#1042 Maria Lopez</td><td>2 items</td><td>$184.00</td><td><span class="tag" style="background: var(--success, #2a2)">Paid</span></td></tr><tr><td>#1041 Sam Carter</td><td>1 item</td><td>$59.90</td><td><span class="tag" style="background: var(--warn, #c80)">Pending</span></td></tr><tr><td>#1040 Lee Park</td><td>4 items</td><td>$312.50</td><td><span class="tag" style="background: var(--danger, #c33)">Refund</span></td></tr></table></div>
+</main>
+</body></html>

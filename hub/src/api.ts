@@ -14,7 +14,7 @@ import { freezeReferenceBundle } from "../../extensions/design-bundles.ts";
 import { FileRefused, gitReadEnv, listFiles, readProjectDiff, readProjectFile } from "./files.ts";
 import { readLinkedImage, readPastedImage, savePastedImage } from "./images.ts";
 import { linkedFile, linkedFiles, openLinkedFile, sendLinkedFile } from "./linked-files.ts";
-import { ARCHIVE, cardShot, designLists, designPage, explore, referencePage, referenceSnapshot, unview, viewPage, watchDesign } from "./explore.ts";
+import { ARCHIVE, cardShot, warmShots, designLists, designPage, explore, referencePage, referenceSnapshot, unview, viewPage, watchDesign } from "./explore.ts";
 import { sevenZip, startUpload, uploadJob } from "./wormhole.ts";
 import { renderDesign, reportText } from "../../extensions/design-render.ts";
 import { designStateJson, type DesignJson } from "../../extensions/design-state.ts";
@@ -487,6 +487,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				return call(id, `/api/${endpoint}`, { set: data.set, n: data.n });
 			}
 			// D1: an OpenDesign card scrolled into view downloads its package once per commit; the fresh entry comes back.
+			case "designwarm": only(data, ["target"], "Invalid fields."); warmShots(folder(id)); return {};
 			case "designfetch": {
 				only(data, ["target", "id"], "Invalid fields.");
 				const name = typeof data.id === "string" && /^od(?:-colors)?:([a-z0-9][a-z0-9-]{0,60})$/.exec(data.id)?.[1];

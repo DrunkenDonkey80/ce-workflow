@@ -199,6 +199,10 @@ try {
 			write(".pi/designs/systems/example/components.html", html + "<p>changed</p>"); assert.equal((await get(id, route)).status, 200);
 			assert.equal(fs.readdirSync(thumbs).length, 2, "a changed page gets a new shot"); write(".pi/designs/systems/example/components.html", html);
 			assert.equal((await get(id, `designthumb?id=od:example&revision=../x`)).status, 400);
+			write(".pi/designs/systems/example/tokens.css", ":root { --bg: #fafafa; --accent: #ff385c; --fg: var(--x); }"); write(".pi/designs/systems/example/preview/colors.html", "<p>swatches</p>");
+			const theme = (await get(id, "designcatalog")).body.entries.find(item => item.id === "od-colors:example");
+			assert.deepEqual(theme.colors, { Background: "#fafafa", Accent: "#ff385c" }, "theme swatches come from tokens.css, plain colors only");
+			const sample = await get(id, `designthumb?id=od-colors:example&revision=${commit}`); assert.equal(sample.status, 200); assert.equal(sample.body.toString("ascii", 1, 4), "PNG");
 		}
 		assert.equal((await post(id, "designexample", { id: draft.id, revision: draft.revision, path: "../escape" })).status, 400, "sample requests do not accept paths");
 		assert.equal((await post(id, "designexample", { id: "draft:../escape", revision: draft.revision })).status, 404);

@@ -287,7 +287,7 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
    gestures(row, () => { if (!addButton.disabled) pick(); }, () => inspect(item));
    if (item.preview === "image" && item.imageRevision) { const thumb = image(item, true); if (item.kind === "component") thumb.classList.add("library-thumb-whole"); row.append(thumb); }
    if (item.colors) { const swatches = make("ul"); swatches.className = "library-swatches"; swatches.setAttribute("aria-label", item.name + " colors"); for (const [name, hex] of Object.entries(item.colors)) { const swatch = make("li", name); swatch.style.setProperty("--swatch", hex); swatch.title = `${name} ${hex}`; swatches.append(swatch); } row.append(swatches); }
-   else if (item.preview === "sample" && (item.availability === "cached" || item.source === "od")) row.append(cardPreview(item));
+   if (item.preview === "sample" && (item.availability === "cached" || item.source === "od")) row.append(cardPreview(item));
    if (item.status) row.append(make("p", item.status));
    row.append(title, details, provenance);
    if (item.description) row.append(make("p", item.description));
@@ -314,7 +314,7 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
  function open() {
   return loaded ??= (async () => {
    status.textContent = "Loading reference metadata…";
-   try { const value = await get("designcatalog"); entries = value.entries; offline = [value.offline, ...(value.warnings ?? [])].filter(Boolean).join(" "); draw(); const item = entries.find(item => item.id === selected); if (item) inspect(item); }
+   try { const value = await get("designcatalog"); entries = value.entries; offline = [value.offline, ...(value.warnings ?? [])].filter(Boolean).join(" "); draw(); const item = entries.find(item => item.id === selected); if (item) inspect(item); void post("designwarm", {}).catch(() => {}); }
    catch (error) { status.textContent = "Could not load the library. Refresh to retry: " + error.message; loaded = undefined; }
   })();
  }

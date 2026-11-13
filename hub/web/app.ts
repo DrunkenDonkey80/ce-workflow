@@ -180,7 +180,9 @@ function renderActivity() {
 // R7: full split, narrowed to the chat's width, or collapsed to >>; the choice and tab survive reloads.
 const workspace = $("workspace"), remembered = (key, values, fallback) => { try { const value = localStorage.getItem(key); return values.includes(value) ? value : fallback; } catch { return fallback; } };
 const remember = (key, value) => { try { localStorage.setItem(key, value); } catch { /* private mode */ } };
+let designSession = false; // set once the session list says this is a design session
 function setLeft(mode, save = true) {
+ if (designSession) mode = "full"; // a design session keeps the design beside a narrow chat
  workspace.dataset.left = mode; if (save) saveLayout();
  $("expand-left").hidden = mode !== "collapsed"; $("collapse-left").hidden = mode === "collapsed";
  $("narrow-left").setAttribute("aria-pressed", String(mode === "narrow")); $("narrow-left").textContent = mode === "narrow" ? "Widen" : "Narrow";
@@ -376,7 +378,7 @@ const splitter = $("splitter"); let resize;
 // The chat width survives reloads and restarts.
 // The chat width survives reloads and restarts per session and tab (applyLayout).
 function resizeChat(width) {
- const value = Math.max(280, Math.min(640, width));
+ const value = designSession ? 280 : Math.max(280, Math.min(640, width));
  $("workspace").style.setProperty("--chat-width", value + "px");
  splitter.setAttribute("aria-valuenow", String(value)); saveLayout();
 }
@@ -1807,6 +1809,7 @@ async function loadSessions() {
   // A run that finished here turns blue too; it clears only once this page is in front of the user.
   // Looking at it also drops it from the attention key's list.
   const own = groups.flatMap(group => group.sessions).find(session => session.id === sessionId);
+  if (own?.design && !designSession) { designSession = true; workspace.classList.add("design-session"); setLeft("full"); resizeChat(280); }
   if (own?.design && !designPreview && !filesView.exploring && $("library").hidden) void showDesign();
   if (seenNow() && own && (own.tone === "unseen" || own.attention)) { void post("seen", {}).catch(() => {}); delete own.attention; }
   // Questions first, then the newest: a question blocks work, a finished run can wait.
@@ -1828,11 +1831,31 @@ for (const type of ["mousedown", "mouseup", "auxclick"]) window.addEventListener
  press.preventDefault();
  if (inner && type === "mouseup") { if (filesView.exploring) closeExplore(); else libraryView.back(); }
 }, true);
-// Ctrl+Tab / Ctrl+Shift+Tab: next / previous session, like browser tabs (a normal browser keeps Ctrl+Tab for itself; the desktop app passes it on).
+// Ctrl+Tab: back to the session used before this one (again: forth), like Alt+Tab; Ctrl+Shift+Tab: previous session in the list.
+// A normal browser keeps Ctrl+Tab for itself; the desktop app passes it on.
+const recentKey = "hub-recent-sessions";
+let recentSessions: string[] = [];
+try { recentSessions = JSON.parse(localStorage.getItem(recentKey) ?? "[]"); if (!Array.isArray(recentSessions)) recentSessions = []; } catch { /* private mode */ }
+recentSessions = [sessionId, ...recentSessions.filter(id => id !== sessionId && typeof id === "string")].slice(0, 20);
+remember(recentKey, JSON.stringify(recentSessions));
 window.addEventListener("keydown", event => {
  if (event.key !== "Tab" || !event.ctrlKey || event.altKey || event.metaKey) return;
- if (stepSession(event.shiftKey ? -1 : 1)) event.preventDefault();
+ if (event.shiftKey) { if (stepSession(-1)) event.preventDefault(); return; }
+ const open = new Set(lastSessions?.[0].filter(group => !group.archived).flatMap(group => group.sessions.map(session => session.id)) ?? []);
+ let order: string[] = []; try { order = JSON.parse(localStorage.getItem(recentKey) ?? "[]"); } catch { /* private mode */ }
+ const previous = (Array.isArray(order) ? order : recentSessions).find(id => id !== sessionId && open.has(id));
+ if (previous) { event.preventDefault(); jumpTo(previous); } else if (stepSession(1)) event.preventDefault();
 }, true);
+// F4: narrow the chat to its thinnest column beside the left panel, and back to how it was. Not in design sessions: their chat stays narrow.
+let wideChat: { left: string; width: number } | undefined;
+window.addEventListener("keydown", event => {
+ if (event.key !== "F4" || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || phone.matches) return;
+ event.preventDefault();
+ if (designSession) return;
+ const width = Number(splitter.getAttribute("aria-valuenow"));
+ if (workspace.dataset.left === "full" && width <= 280) { const back = wideChat ?? { left: "full", width: 380 }; wideChat = undefined; setLeft(back.left); resizeChat(back.width); }
+ else { wideChat = { left: workspace.dataset.left!, width }; setLeft("full"); resizeChat(280); }
+});
 (window as unknown as { piHubGo: (id: string) => void }).piHubGo = jumpTo;
 // The app's attention key (hub/app): open the newest session that needs you; this page being in front counts as seen.
 (window as unknown as { piHubAttention: () => void }).piHubAttention = () => {

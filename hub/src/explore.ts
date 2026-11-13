@@ -14,7 +14,8 @@ import { DESIGN_CSP, renderDesign, SANDBOX_CSP } from "../../extensions/design-r
 import { agentDir } from "./rpc-client.ts";
 import { withBridge } from "./design-bridge.ts";
 import { appPreviewFolder, buildInfo } from "../../extensions/design-build.ts";
-import { catalogFiles, catalogFolder, type CatalogEntry } from "../../extensions/design-catalog.ts";
+import { catalogFiles, catalogFolder, designCatalog, type CatalogEntry } from "../../extensions/design-catalog.ts";
+import { fetchSystem } from "../../extensions/design.ts";
 import { confined } from "../../extensions/plan3-files.ts";
 
 export const ARCHIVE = /\.(?:zip|7z|rar|tar|tgz|tbz2?|txz|tar\.(?:gz|bz2|xz|zst))$/i;
@@ -141,29 +142,53 @@ export async function referencePage(project: string, id: unknown, revision: unkn
  * on disk by the page's content, shared by every project, so only a changed page renders again. */
 const shooting = new Map<string, Promise<Buffer>>(), shotQueue: (() => void)[] = [];
 let shots = 0;
+// An OpenDesign theme is pictured as one fixed sample screen in its colors (its own color page is just swatches).
+const THEME_SAMPLE = readFile(new URL("./theme-sample.html", import.meta.url));
 export async function cardShot(project: string, id: unknown, revision: unknown) {
-	const { item, revision: content } = await catalogFiles(project, id, revision);
-	const key = createHash("sha256").update(`${item.id}\0${item.page}\0${content}`).digest("hex");
+	const { item, files, revision: content } = await catalogFiles(project, id, revision);
+	const tokens = item.id.startsWith("od-colors:") ? files.get("tokens.css") : undefined;
+	const key = createHash("sha256").update(`${item.id}\0${item.page}\0${content}`).update(tokens ? await THEME_SAMPLE : "").digest("hex");
 	const file = join(agentDir(), "ce-workflow", "design-thumbs", `${key}.png`);
 	const kept = await readFile(file).catch(() => undefined);
 	if (kept) return kept;
 	let pending = shooting.get(key);
-	if (!pending) { pending = shoot(project, id, revision, file).finally(() => shooting.delete(key)); shooting.set(key, pending); }
+	if (!pending) { pending = shoot(project, id, revision, file, tokens).finally(() => shooting.delete(key)); shooting.set(key, pending); }
 	return pending;
 }
+/** V-04: the hub renders every card's shot in the background once the library opens, so nobody has to scroll to keep it
+ * going. One at a time, leaving a render slot for the cards the user is looking at; OpenDesign packages download first. */
+const warming = new Set<string>();
+export function warmShots(project: string) {
+	if (warming.has(project)) return;
+	warming.add(project);
+	void (async () => {
+		for (const item of (await designCatalog(project)).entries) {
+			if (item.preview !== "sample" || item.availability === "unavailable") continue;
+			try {
+				if (item.source === "od" && item.availability !== "cached") await fetchSystem(project, item.id.replace(/^od(?:-colors)?:/, ""));
+				await cardShot(project, item.id, item.revision);
+			} catch { /* one page that fails does not stop the rest; its card offers Retry */ }
+		}
+	})().catch(() => undefined).finally(() => warming.delete(project));
+}
 // shortcut: old shots of changed pages stay on disk (about 100 KB each); prune by age if the folder grows.
-async function shoot(project: string, id: unknown, revision: unknown, file: string) {
+async function shoot(project: string, id: unknown, revision: unknown, file: string, tokens?: Buffer) {
 	if (shots >= 2) await new Promise<void>(go => shotQueue.push(go)); // each render starts a headless browser
 	shots++;
+	let sample: string | undefined;
 	try {
-		const { item, directory } = await catalogFolder(project, id, revision);
-		const shot = await renderDesign({ folder: directory, screen: item.page!, width: 1280, height: 800, reducedMotion: true, maxEdge: 640 });
+		let { item, directory } = await catalogFolder(project, id, revision), screen = item.page!;
+		if (tokens) {
+			sample = directory = await mkdtemp(join(tmpdir(), "pi-hub-theme-")); screen = "index.html";
+			await writeFile(join(sample, "index.html"), await THEME_SAMPLE); await writeFile(join(sample, "tokens.css"), tokens);
+		}
+		const shot = await renderDesign({ folder: directory, screen, width: 1280, height: 800, reducedMotion: true, maxEdge: 640 });
 		if (!shot.png.length) throw fail(502, "The page gave no picture.");
 		await mkdir(dirname(file), { recursive: true });
 		const temp = `${file}.${randomBytes(4).toString("hex")}`;
 		await writeFile(temp, shot.png); await rename(temp, file);
 		return shot.png;
-	} finally { shots--; shotQueue.shift()?.(); }
+	} finally { shots--; shotQueue.shift()?.(); if (sample) await rm(sample, { recursive: true, force: true }); }
 }
 
 /** Attach the exact isolated sample shown, even when its original studio source has since changed. */

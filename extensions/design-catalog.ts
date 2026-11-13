@@ -138,6 +138,18 @@ function webEntries(cwd: string, owner: string, entries: CatalogEntry[], warning
 			provenance: `Found by the agent on ${new URL(item.page).hostname} (web search, ${item.at.slice(0, 10)}).` });
 	} catch (error) { warnings.push(error.message); }
 }
+// An OpenDesign theme's main colors, named like the Astryx swatches; plain color values only (never var() or url()).
+const TOKEN_NAMES = { bg: "Background", surface: "Card", fg: "Text", muted: "Muted text", border: "Border", accent: "Accent", success: "Success", warn: "Warning", danger: "Error" };
+function tokenColors(cwd: string, folder: string) {
+	let css: string;
+	try { css = fs.readFileSync(confined(cwd, `${folder}/tokens.css`), "utf8").slice(0, 200_000); } catch { return undefined; }
+	const colors: Record<string, string> = {};
+	for (const [token, name] of Object.entries(TOKEN_NAMES)) {
+		const value = new RegExp(`--${token}\\s*:\\s*(#[0-9a-fA-F]{3,8}|(?:rgb|hsl)a?\\([\\d\\s.,%/]+\\))\\s*;`).exec(css)?.[1];
+		if (value) colors[name] = value;
+	}
+	return Object.keys(colors).length ? colors : undefined;
+}
 export async function designCatalog(cwd: string, owner?: string) {
 	const index: { commit: string; names: string[]; offline?: string } = await systemIndex(cwd).catch(error => ({ commit: "", names: [], offline: String(error.message).slice(0, 240) }));
 	const entries: CatalogEntry[] = [];
@@ -150,7 +162,8 @@ export async function designCatalog(cwd: string, owner?: string) {
 			// V-12: each package gives a Designs card (its components page) and a Themes card (its colors page beside ../tokens.css).
 			for (const [id, kind, pages, provenance] of [[`od:${name}`, "system", ["kit.html", "components.html"], "OpenDesign source sample (inspiration, not a project foundation)"], [`od-colors:${name}`, "theme", ["preview/colors.html"], "OpenDesign color page (inspiration, not a project foundation)"]] as const) {
 				const page = current ? pages.find(file => fs.statSync(confined(cwd, `${folder}/${file}`), { throwIfNoEntry: false })?.isFile()) : undefined;
-				entries.push({ id, source: "od", kind, name, revision: index.commit, preview: page || !complete ? "sample" : "none", availability: page ? "cached" : complete ? "unavailable" : "not-cached",
+				const colors = kind === "theme" && page ? tokenColors(cwd, folder) : undefined;
+				entries.push({ ...colors && { colors }, id, source: "od", kind, name, revision: index.commit, preview: page || !complete ? "sample" : "none", availability: page ? "cached" : complete ? "unavailable" : "not-cached",
 					folder: page ? folder : undefined, page, license: "Apache-2.0", provenance: page || !complete ? provenance : `${provenance}. This package has no such page.`, url });
 			}
 		}

@@ -6,6 +6,14 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ### Added
 - Hub: a third load box shows how full the system disk is, and turns red at 90%. Hovering it lists every volume with its used % and GB. The CPU, RAM and DISK boxes now carry a small caption on top.
+- Hub: F4 narrows the chat to a thin column beside the left panel, and F4 again restores it as it was.
+- Design library: OpenDesign theme cards show a sample app screen painted in the theme's colors, with its color swatches below.
+
+### Changed
+- Design library: once the library opens, the hub renders every card's picture in the background (downloading OpenDesign pages first), so you no longer have to keep scrolling to keep it going.
+- Hub: Ctrl+Tab switches back to the session you used before, and pressing it again returns, like Alt+Tab. Ctrl+Shift+Tab still steps to the previous session in the list.
+- Hub: design sessions keep their chat as a narrow column beside the design; it can't be widened, and F4 does nothing there.
+- Design sessions: when you approve a design ("let's use this design"), the session now selects it right away and asks you where to implement it, instead of trying to edit the app and telling you to select it yourself.
 
 ### Fixed
 - Hub: tables in replies no longer squeeze a column to one letter per line on phones; words stay whole, and a table too wide for the screen scrolls sideways.

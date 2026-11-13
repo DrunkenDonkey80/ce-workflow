@@ -314,6 +314,9 @@ h2 { font-size: 15px; font-weight: 600; }
 .pool-actions button.danger { color: #fff; background: var(--error); border-color: var(--error); }
 @media (max-width: 899px) { .expand-left, #narrow-left, #collapse-left { display: none; } }
 .splitter { background: var(--chat); cursor: col-resize; border-inline: 1px solid var(--line); touch-action: none; }
+/* A design session keeps its chat narrow beside the design: no resizing, no pane buttons. */
+.workspace.design-session > .splitter { visibility: hidden; }
+.workspace.design-session :is(#narrow-left, #collapse-left, #expand-left) { display: none; }
 .splitter::after { content: "⋮"; position: relative; top: 45%; color: var(--group); }
 .chat { background: var(--chat); display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .chat-heading h2 { margin-right: auto; }
