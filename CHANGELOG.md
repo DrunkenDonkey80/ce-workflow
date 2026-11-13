@@ -18,6 +18,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - Design and theme previews no longer go blank when you scroll back to them. Cards now show a screenshot of each page instead of running the live page, so there is no limit on how many stay shown; the live page opens when you click the card. Each screenshot is taken once and kept on disk, and taken again only when that design changes.
 - Remembered facts written in Bulgarian (or any non-Latin script) are now recalled; a Bulgarian-only message used to match nothing.
 - `npm run verify` now also runs the compaction-audit test.
+- Project hub links now reach parked sessions too. The hub parks idle sessions, so a linked project often had nothing to send to; now each of its sessions stays reachable as `project-name~hub` and is resumed when a message arrives. The @ menu lists those real names instead of one `Project~Hub` entry that intercom could not find. Update both hubs.
 
 ## 0.8.0 — 2026-11-12
 

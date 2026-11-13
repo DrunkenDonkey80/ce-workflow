@@ -1338,7 +1338,8 @@ async function linkedRows() {
  let rows: string[][] = [];
  try {
   const list = await post("links", { session: sessionId, action: "list" });
-  rows = list.links.map(link => { const name = link.standin ?? `${link.remote.name}~${link.hubName}`; return [name, `linked: ${link.label}${link.online ? "" : " (offline)"}`, name]; });
+  // A project link offers each of its stand-ins (one per remote session); a session link its one stand-in.
+  rows = list.links.flatMap(link => (link.kind === "project" ? link.standins : [link.standin ?? `${link.remote.name}~${link.hubName}`]).map(name => [name, `linked: ${link.label}${link.online ? "" : " (offline)"}`, name]));
  } catch { /* hub links off */ }
  linkCache = { at: Date.now(), rows }; return rows;
 }

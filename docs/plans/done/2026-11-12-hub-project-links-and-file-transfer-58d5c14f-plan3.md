@@ -36,7 +36,7 @@ reviewed: 2026-11-12
   - Agent proposal, to keep that tradeoff from causing resends: when the delivery completes after the sender's receipt window, the stand-in tells the sender "delivered to … after all"; when it fails, it tells the reason, as forward() already does. A slow `file` op never marks the hub offline.
   - Files saved before a failed `deliver` stay in the inbox; the failure message names them.
 - **D-09 (user, Q-04)** 5 MB is the total of all files in one message. The `/link/file` body cap is 5 MB as base64 (6,990,508 bytes) plus 64 KB for metadata; every other `/link/` op keeps 64 KB. The sending hub sums file sizes before reading any and refuses over 5 MB with the total.
-- **D-10 (assumed)** A project link keeps stand-ins only for the other project's live sessions; parked ones disappear at the next ping and come back when resumed. A `deliver` from a session the hub has not seen yet triggers one ping of that hub before it is refused.
+- **D-10 (revised after use)** A project link keeps a stand-in for every session of the other project, parked ones too; a message to a parked one resumes it (as session links do). The first version kept only live ones, and since the hub auto-parks idle sessions the link usually had no target. A `deliver` from a session the hub has not seen yet triggers one ping of that hub before it is refused.
 - **D-11 (assumed)** A traversal file name (`../../x`) is not refused: it is reduced to its sanitized base name inside `.pi/inbox`, as `savePastedImage` does, so the file still arrives.
 
 ## Open questions

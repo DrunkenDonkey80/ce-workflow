@@ -332,12 +332,12 @@ export function createLinks(options: {
 	}
 
 	// S07 stand-ins (D9-D13): one pi-intercom session per link, named for the other side, while that hub is online;
-	// a project link has one per live session of the other project (D-01), keyed `<link>/<record>`.
+	// a project link has one per session of the other project, parked ones too: a message resumes them (D-01, D-10), keyed `<link>/<record>`.
 	type Remote = Link["remote"];
 	type Standin = { link: Link; to: Remote; name: string; key: string; client: any };
 	const standinId = (link: Link, to: Remote) => link.kind === "project" ? `${link.id}/${to.record}` : link.id;
 	const targets = (link: Link): Remote[] => link.kind !== "project" ? [link.remote]
-		: (remotes.get(link.id) ?? []).filter(session => session.live).map(({ record, name }) => ({ ...link.remote, record, name }));
+		: (remotes.get(link.id) ?? []).map(({ record, name }) => ({ ...link.remote, record, name }));
 	const standins = new Map<string, Standin>(), offline = new Set<string>(), misses = new Map<string, number>();
 	let unavailable: string | undefined, client: Promise<IntercomLoad> | undefined, syncing = Promise.resolve(), ticking = false, timer: NodeJS.Timeout | undefined;
 	const safe = (text: string) => text.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "session";

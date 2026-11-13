@@ -203,9 +203,13 @@ for (const [name, url, records] of [["pc", "https://pc.t.ts.net:1", pcRecords], 
 	const zeta = mac.agents.zeta = await mac.broker.agent("zeta");
 	assert.equal((await zeta.send("emailupload-alpha~pc", { text: "new here" })).delivered, true);
 	assert.deepEqual([alpha.inbox.at(-1).from, alpha.inbox.at(-1).content.text], ["belot-zeta~mac", "new here"]);
-	// A parked session drops its stand-in at the next ping; unlink removes the rest on both hubs.
-	state.eps.live = false; await pc.links.tick();
-	assert.deepEqual(pc.links.standins().filter(s => s.id === project.id).map(s => s.name).sort(), ["belot-gamma~mac", "belot-zeta~mac"]);
+	// A parked session keeps its stand-in (the hub auto-parks idle ones); a message resumes it. Unlink removes the rest on both hubs.
+	state.eps.live = false; await eps.disconnect(); await pc.links.tick();
+	assert.deepEqual(pc.links.standins().filter(s => s.id === project.id).map(s => s.name).sort(), ["belot-eps~mac", "belot-gamma~mac", "belot-zeta~mac"]);
+	assert.deepEqual(pc.links.linksOf("alpha").find(l => l.kind === "project").standins.sort(), ["belot-eps~mac", "belot-gamma~mac", "belot-zeta~mac"], "the @ menu lists each stand-in");
+	assert.equal((await alpha.send("belot-eps~mac", { text: "wake eps" })).delivered, true);
+	await until(() => mac.agents.eps.inbox.some(m => m.content.text === "wake eps"), "parked project session resumed");
+	assert.equal(woken.at(-1), "eps");
 	assert.deepEqual(await pc.links.unlink(project.id), { ok: true });
 	await Promise.all([pc.links.sync(), mac.links.sync()]);
 	assert.deepEqual([pc.links.standins().filter(s => s.id === project.id), mac.links.standins(), mac.links.store.list()], [[], [], []]);
