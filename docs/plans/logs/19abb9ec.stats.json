@@ -2,43 +2,43 @@
  "version": 1,
  "activeMs": 0,
  "runs": 0,
- "waitingMs": 0,
- "toolWallMs": 15974,
+ "waitingMs": 943679,
+ "toolWallMs": 1476956,
  "compactions": {
   "count": 0,
   "ms": 0
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
-   "replies": 23,
-   "thinkingMs": 72779,
-   "actingMs": 70525,
-   "input": 48,
-   "output": 14610,
-   "cacheRead": 1978814,
-   "cacheWrite": 70727,
-   "cost": 1.0417898,
+   "replies": 111,
+   "thinkingMs": 351567,
+   "actingMs": 316581,
+   "input": 252,
+   "output": 67946,
+   "cacheRead": 12445382,
+   "cacheWrite": 246665,
+   "cost": 5.082329399999999,
    "errors": 0
   }
  },
  "tools": {
   "bash": {
-   "count": 17,
-   "ms": 5098,
-   "maxMs": 1150,
-   "failures": 0
+   "count": 97,
+   "ms": 425135,
+   "maxMs": 41180,
+   "failures": 6
   },
   "write": {
-   "count": 2,
-   "ms": 6,
+   "count": 4,
+   "ms": 8,
    "maxMs": 3,
    "failures": 0
   },
   "edit": {
-   "count": 1,
-   "ms": 10,
-   "maxMs": 10,
-   "failures": 0
+   "count": 12,
+   "ms": 91,
+   "maxMs": 18,
+   "failures": 1
   },
   "subagents_enable": {
    "count": 1,
@@ -53,18 +53,54 @@
    "failures": 0
   },
   "plan3": {
-   "count": 2,
-   "ms": 181,
-   "maxMs": 115,
+   "count": 22,
+   "ms": 947974,
+   "maxMs": 943796,
+   "failures": 1
+  },
+  "compaction_note": {
+   "count": 1,
+   "ms": 0,
+   "maxMs": 0,
+   "failures": 0
+  },
+  "jev_triage": {
+   "count": 9,
+   "ms": 11535,
+   "maxMs": 2279,
+   "failures": 2
+  },
+  "codemode": {
+   "count": 5,
+   "ms": 57683,
+   "maxMs": 44560,
+   "failures": 2
+  },
+  "read": {
+   "count": 3,
+   "ms": 58,
+   "maxMs": 53,
+   "failures": 0
+  },
+  "lens_diagnostics": {
+   "count": 1,
+   "ms": 4553,
+   "maxMs": 4553,
    "failures": 0
   }
  },
  "categories": {
   "shell": {
-   "count": 17,
-   "ms": 5098,
-   "maxMs": 1150,
-   "failures": 0
+   "count": 88,
+   "ms": 324772,
+   "maxMs": 41180,
+   "failures": 4
+  },
+  "test": {
+   "count": 9,
+   "ms": 100363,
+   "maxMs": 30114,
+   "failures": 2
   }
  },
  "commands": {
@@ -169,6 +205,450 @@
    "ms": 266,
    "maxMs": 266,
    "failures": 0
+  },
+  "bash\u0000cd \".\" && git add docs/proposals/2026-11-13-haystack-wider-review.md docs/plans/*19abb9ec* docs/plans/logs/19abb9ec* 2>/dev/null; git commit -qm \"HW-02: wider Haystack desk review\" ; grep -rn \"durable": {
+   "count": 1,
+   "ms": 19016,
+   "maxMs": 19016,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"renderKnowledge\\|before_agent_start\\|customType\\|systemPrompt\" extensions/work-knowledge.ts | sed -n 1,30p | grep -v \"^7[0-9][0-9]:\" | head; grep -rn \"renderKnowledge(\" extensions/*": {
+   "count": 1,
+   "ms": 122,
+   "maxMs": 122,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 870,930p extensions/work-models.ts": {
+   "count": 1,
+   "ms": 71,
+   "maxMs": 71,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rn \"knowledgeContextMessage\" extensions/*.ts | grep -v \"export function\"; f=$(find ~/.pi/agent/sessions -name \"*.jsonl\" -newermt \"2026-11-10\" | head -200 | xargs grep -l \"durable-knowl": {
+   "count": 1,
+   "ms": 623,
+   "maxMs": 623,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1785,1815p extensions/work-models.ts; f=\"/c/Users/Flex/.pi/agent/sessions/--C--SOFT-git-BugReport--/2026-11-12T07-45-36-020Z_01a1ceb8-2112-73f6-8a41-8aeb80c99282.jsonl\"; grep -o \"dura": {
+   "count": 1,
+   "ms": 154,
+   "maxMs": 154,
+   "failures": 0
+  },
+  "bash\u0000mkdir -p \"$TEMP/hs\" && cat > \"$TEMP/hs/scan.mjs\" <<'EOF' import { readdirSync, readFileSync, statSync } from \"node:fs\"; import { join } from \"node:path\"; import { homedir } from \"node:os\"; const root ": {
+   "count": 1,
+   "ms": 4765,
+   "maxMs": 4765,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/hs\" && cat > peek.mjs <<'EOF' import { readdirSync, readFileSync, statSync } from \"node:fs\"; import { join } from \"node:path\"; import { homedir } from \"node:os\"; const root = join(homedir(),": {
+   "count": 1,
+   "ms": 4201,
+   "maxMs": 4201,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/hs\" && f=$(grep -rl \"docs.waveshare.com/ESP32-S3-RLCD-4.2\" ~/.pi/agent/sessions --include=*.jsonl | head -1); grep \"docs.waveshare.com/ESP32-S3-RLCD-4.2\" \"$f\" | grep toolResult | head -1 | c": {
+   "count": 1,
+   "ms": 1688,
+   "maxMs": 1688,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/hs\" && f=$(grep -rl \"docs.waveshare.com/ESP32-S3-RLCD-4.2\" ~/.pi/agent/sessions --include=*.jsonl | head -3); for x in $f; do grep '\"toolName\":\"browser_fetch\"' \"$x\" | grep -v '\"isError\":true": {
+   "count": 1,
+   "ms": 2021,
+   "maxMs": 2021,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/hs\" && cat > sizes.mjs <<'EOF' import { readdirSync, readFileSync, statSync } from \"node:fs\"; import { join } from \"node:path\"; import { homedir } from \"node:os\"; const root = join(homedir()": {
+   "count": 1,
+   "ms": 4544,
+   "maxMs": 4544,
+   "failures": 0
+  },
+  "bash\u0000ls ~/.pi/agent/npm/node_modules 2>/dev/null | grep -i \"readab\\|jsdom\\|linkedom\\|turndown\\|web-access\"; find ~/.pi/agent/npm/node_modules -maxdepth 3 -type d \\( -name \"@mozilla\" -o -name \"linkedom\" -o ": {
+   "count": 1,
+   "ms": 149,
+   "maxMs": 149,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/hs\" && cat > boiler.mjs <<'EOF' import { createRequire } from \"node:module\"; const require = createRequire(\"C:/Users/Flex/.pi/agent/npm/node_modules/\"); const { parseHTML } = require(\"linked": {
+   "count": 1,
+   "ms": 3558,
+   "maxMs": 3558,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/docs\" && grep -rln \"retry\" . | head; grep -rn -i \"auto.retry\\|retry.*maxRetries\\|\\\"retry\\\"\" settings.md ": {
+   "count": 1,
+   "ms": 101,
+   "maxMs": 101,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/docs\" && sed -n 120,140p settings.md; grep -n -i \"fallback\\|virtual\" virtual-models.md | head -15": {
+   "count": 1,
+   "ms": 77,
+   "maxMs": 77,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/docs\" && sed -n 65,130p virtual-models.md": {
+   "count": 1,
+   "ms": 53,
+   "maxMs": 53,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/hs\" && cat > errs.mjs <<'EOF' import { readdirSync, readFileSync, statSync } from \"node:fs\"; import { join } from \"node:path\"; import { homedir } from \"node:os\"; const root = join(homedir(),": {
+   "count": 1,
+   "ms": 5682,
+   "maxMs": 5682,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat >> docs/proposals/2026-11-13-haystack-wider-review.md <<'EOF' ## Gap measurements (HW-03) Session logs `~/.pi/agent/sessions/**/*.jsonl` modified since 2026-10-25 (727 files, about 50,70": {
+   "count": 1,
+   "ms": 196,
+   "maxMs": 196,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/hs\" && node -e \"for (const k of require('./ksearch.json')) console.log(k.f.split(/[\\\\\\\\/]/).slice(-2).join('/').slice(0,60), '|', k.q, '|', k.t.replace(/\\s+/g,' ').slice(0,200))\"": {
+   "count": 1,
+   "ms": 75,
+   "maxMs": 75,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -v; grep -n \"export function buildKnowledgeQuery\\|export function queryKnowledge\\|function knowledgeStorePaths\\|export function knowledgePaths\" extensions/work-knowledge.ts; grep -n \"ex": {
+   "count": 1,
+   "ms": 130,
+   "maxMs": 130,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/hs\" && cat > replay.mjs <<'EOF' import { readdirSync, readFileSync, statSync, writeFileSync } from \"node:fs\"; import { join } from \"node:path\"; import { homedir } from \"node:os\"; const K = a": {
+   "count": 1,
+   "ms": 29847,
+   "maxMs": 29847,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/hs\" && node -e \" const t=require('./recall.json'); const n=t.reduce((a,x)=>a+x.claims.length,0); const m={}; for(const x of t) for(const c of x.claims){const k=c.matched.split(':')[0]; m[k]=": {
+   "count": 1,
+   "ms": 111,
+   "maxMs": 111,
+   "failures": 0
+  },
+  "bash\u0000cat \"$TEMP/hs/sample.json\"": {
+   "count": 2,
+   "ms": 102,
+   "maxMs": 60,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/hs\" && node -e \" const s=require('./sample.json'); for (const i of [0,2,5,9,25,3]) { const x=s[i]; console.log('##',x.id,x.cwd,'|',x.prompt.replace(/\\s+/g,' ').slice(0,220)); x.claims.forEac": {
+   "count": 1,
+   "ms": 70,
+   "maxMs": 70,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/hs\" && cat > cyr.mjs <<'EOF' import { readdirSync, readFileSync, statSync } from \"node:fs\"; import { join } from \"node:path\"; import { homedir } from \"node:os\"; const root = join(homedir(), ": {
+   "count": 1,
+   "ms": 3488,
+   "maxMs": 3488,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'),p=require('path');const out=[]; function walk(d){for(const e of fs.readdirSync(d,{withFileTypes:true})){const f=p.join(d,e.name);if(e.isDirectory())walk(f);e": {
+   "count": 2,
+   "ms": 346,
+   "maxMs": 173,
+   "failures": 1
+  },
+  "bash\u0000cd \"$TEMP/hs\" && cat > verify.mjs <<'EOF' import { readdirSync, readFileSync, statSync } from \"node:fs\"; import { join } from \"node:path\"; import { homedir } from \"node:os\"; const root = join(homedir(": {
+   "count": 1,
+   "ms": 6812,
+   "maxMs": 6812,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 148,175p extensions/work-knowledge.ts | head -30": {
+   "count": 1,
+   "ms": 56,
+   "maxMs": 56,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git\" && for f in */.ce-workflow/local/knowledge.jsonl ~/.pi/agent/knowledge/claims.jsonl; do node -e \" const l=require('fs').readFileSync(process.argv[1],'utf8').split('\\n').filter(Boolean": {
+   "count": 1,
+   "ms": 937,
+   "maxMs": 937,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/hs\" && node verify.mjs | head -1; sed -i \"s/console.log(r.map/console.log('over60', r.filter(x=>x.s>60).length, 'minOver60', Math.round(r.filter(x=>x.s>60).reduce((a,b)=>a+b.s,0)\\/60));\\/\\/c": {
+   "count": 1,
+   "ms": 19100,
+   "maxMs": 19100,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat >> docs/proposals/2026-11-13-haystack-wider-review.md <<'EOF' - **K1 knowledge recall: real gap (precision, not recall).** Replaying `buildKnowledgeQuery` + `queryKnowledge` over every u": {
+   "count": 1,
+   "ms": 204,
+   "maxMs": 204,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && f=\"C:/Users/Flex/.pi/agent/sessions/--C--SOFT-git-ce-workflow--/subagent-artifacts/outputs/a6b7b88f-ede3-4b43-af0c-99f7f04886ef/docs/proposals/haystack-review/astra-verdicts-wider.md\"; ls do": {
+   "count": 1,
+   "ms": 92,
+   "maxMs": 92,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"^#\\|^| \\*\\*B\\|^| B\" docs/proposals/2026-11-13-haystack-wider-review.md | head -40; ls scripts/test-audit-compaction.mjs; grep -n \"test-audit\\|audit-compaction\" scripts/verify-packag": {
+   "count": 1,
+   "ms": 97,
+   "maxMs": 97,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 95,113p scripts/verify-package.mjs; head -12 scripts/test-audit-compaction.mjs; ls scripts/test-*.mjs | wc -l; timeout 120 node scripts/test-audit-compaction.mjs 2>&1 | tail -3; node ": {
+   "count": 1,
+   "ms": 259,
+   "maxMs": 259,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls scripts/test-*.mjs | sed \"s#scripts/##\" | grep -v \"^test-work-\" ; node --input-type=module -e \" import * as K from 'file:///./extensions/work-knowledge.ts'; console.log(Object.keys(K).joi": {
+   "count": 1,
+   "ms": 159,
+   "maxMs": 159,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"MACHINE_MESSAGE_MARKERS\" -A10 extensions/work-knowledge.ts | head -14; grep -n \"^export function recordKnowledge\" -A6 extensions/work-knowledge.ts": {
+   "count": 1,
+   "ms": 83,
+   "maxMs": 83,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --input-type=module -e \" import * as K from 'file:///./extensions/work-knowledge.ts'; import fs from 'node:fs'; import os from 'node:os'; import p from 'node:path'; const d=fs.mkdtempSy": {
+   "count": 1,
+   "ms": 145,
+   "maxMs": 145,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat >> docs/proposals/2026-11-13-haystack-wider-review.md <<'EOF' ## Astra merge (HW-04) Astra's independent verdicts: `docs/proposals/haystack-review/astra-verdicts-wider.md` (gpt-6-astra, ": {
+   "count": 1,
+   "ms": 191,
+   "maxMs": 191,
+   "failures": 0
+  },
+  "bash\u0000head -c 700 ~/.pi/agent/knowledge/claims.jsonl; echo; grep -c \"\" ~/.pi/agent/knowledge/claims.jsonl": {
+   "count": 1,
+   "ms": 83,
+   "maxMs": 83,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/and a stricter match for user-scope claims outside their recorded project\\./and a higher match threshold for user-scope claims (they carry no project, so today a shared common word": {
+   "count": 1,
+   "ms": 155,
+   "maxMs": 155,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git commit -qm \"HW-04: shortlist wording\" -- docs/proposals/2026-11-13-haystack-wider-review.md && git log --oneline -1": {
+   "count": 1,
+   "ms": 153,
+   "maxMs": 153,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"^- \\[\" docs/plans/2026-11-13-wider-haystack-review-the-parts-the-first-pass-skipped-19abb9ec-plan3.md": {
+   "count": 1,
+   "ms": 45,
+   "maxMs": 45,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/hs\" && cat > k1.mjs <<'EOF' // K1 baseline: replay recall over real prompts; judge (prompt, claim) pairs once, cached in judged.json. // usage: node k1.mjs <label> -> writes pending.json (pa": {
+   "count": 1,
+   "ms": 27912,
+   "maxMs": 27912,
+   "failures": 1
+  },
+  "bash\u0000cd \"$TEMP/hs\" && sed -i 's#import { join } from \"node:path\";#import { join, basename, dirname } from \"node:path\";#; s#k\\.f\\.split(/\\[\\\\\\?/\\]/)\\.at(-2)#basename(dirname(k.f))#; s#cwd\\.split(/\\[\\\\\\?/\\]/": {
+   "count": 1,
+   "ms": 91,
+   "maxMs": 91,
+   "failures": 1
+  },
+  "bash\u0000cd \"$TEMP/hs\" && grep -n \"split(\" k1.mjs | cut -c1-200": {
+   "count": 1,
+   "ms": 58,
+   "maxMs": 58,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/hs\" && head -3 k1.mjs | cut -c1-200 && node k1.mjs base": {
+   "count": 1,
+   "ms": 28226,
+   "maxMs": 28226,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/hs\" && sed -i 's#let prompts = 0, fired = 0, claims = 0; const sample = \\[\\];#let prompts = 0, fired = 0, claims = 0; const sample = [], seenIds = new Set();#; s#if (m.role !== \"user\") conti": {
+   "count": 1,
+   "ms": 22985,
+   "maxMs": 22985,
+   "failures": 0
+  },
+  "bash\u0000cat \"$TEMP/hs/pending.json\"": {
+   "count": 3,
+   "ms": 152,
+   "maxMs": 55,
+   "failures": 0
+  },
+  "bash\u0000cat \"$TEMP/hs/judged.json\"": {
+   "count": 3,
+   "ms": 138,
+   "maxMs": 49,
+   "failures": 2
+  },
+  "bash\u0000cd \"$TEMP/hs\" && node k1.mjs base | tee base.json": {
+   "count": 1,
+   "ms": 21368,
+   "maxMs": 21368,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"tokens(\" extensions/work-knowledge.ts | head; grep -n \"STOP_WORDS =\" -A3 extensions/work-knowledge.ts | head -5": {
+   "count": 1,
+   "ms": 84,
+   "maxMs": 84,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"unrelated\\|recall\\|reciprocal\\|^function\\|^const\\|assert\" scripts/test-work-knowledge-retrieval.mjs | head -40; wc -l scripts/test-work-knowledge-retrieval.mjs": {
+   "count": 1,
+   "ms": 73,
+   "maxMs": 73,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff --stat extensions/work-knowledge.ts; sed -n 112,122p extensions/work-knowledge.ts; git show HEAD:extensions/work-knowledge.ts | sed -n 112,122p | diff - <(sed -n 112,122p extensions": {
+   "count": 1,
+   "ms": 175,
+   "maxMs": 175,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-knowledge-retrieval.mjs && node scripts/test-work-knowledge.mjs 2>&1 | tail -2; git stash -q -- extensions/work-knowledge.ts && node scripts/test-work-knowledge-retrie": {
+   "count": 1,
+   "ms": 725,
+   "maxMs": 725,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"recordKnowledge(\" scripts/test-work-knowledge.mjs | head -3; grep -n \"^export function recordKnowledge\" -A80 extensions/work-knowledge.ts | grep -n \"return\" | head": {
+   "count": 1,
+   "ms": 93,
+   "maxMs": 93,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/\\tconst bg = recordKnowledge(/\\tconst { record: bg } = recordKnowledge(/; s/\\tconst café = recordKnowledge(/\\tconst { record: café } = recordKnowledge(/\" scripts/test-work-knowledg": {
+   "count": 1,
+   "ms": 888,
+   "maxMs": 888,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-knowledge-retrieval.mjs && node scripts/test-work-knowledge.mjs 2>&1 | tail -2 && cd \"$TEMP/hs\" && node k1.mjs unicode | tee unicode.json; cmp known-base.json known-un": {
+   "count": 1,
+   "ms": 23442,
+   "maxMs": 23442,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"const result = {}\" extensions/work-knowledge.ts | head": {
+   "count": 1,
+   "ms": 63,
+   "maxMs": 63,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add extensions/work-knowledge.ts scripts/test-work-knowledge-retrieval.mjs && git commit -qm \"Knowledge recall: Unicode/NFC query tokens and Bulgarian stop words (Haystack B1, HW-09) A B": {
+   "count": 1,
+   "ms": 378,
+   "maxMs": 378,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rn \"isMachineAuthoredUserText\" --include=*.ts --include=*.mjs . | grep -v node_modules; grep -rn \"Scheduled (\" --include=*.ts extensions hub/src 2>/dev/null | head -5": {
+   "count": 1,
+   "ms": 24441,
+   "maxMs": 24441,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 425,450p scripts/test-work-knowledge.mjs; grep -rn \"⏰ Scheduled\\|u23f0\" --include=*.ts -l . 2>/dev/null | grep -v \"node_modules\\|/\\.pi/\" | head": {
+   "count": 1,
+   "ms": 2465,
+   "maxMs": 2465,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"⏰ Scheduled\\|u23f0\" extensions/work-compaction-memory.ts hub/src/scheduler.ts | head": {
+   "count": 1,
+   "ms": 59,
+   "maxMs": 59,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"SCRIPT_TIMER\" extensions/work-compaction-memory.ts | head -4; grep -n \"SCHEDULED_PREFIX\" hub/src/scheduler.ts | head -4": {
+   "count": 1,
+   "ms": 80,
+   "maxMs": 80,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 450,462p scripts/test-work-knowledge.mjs": {
+   "count": 1,
+   "ms": 42,
+   "maxMs": 42,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-knowledge.mjs 2>&1 | tail -1 && cd \"$TEMP/hs\" && node k1.mjs timer | tee timer.json": {
+   "count": 1,
+   "ms": 21779,
+   "maxMs": 21779,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/hs\" && sed -i 's#writeFileSync(\"pending.json\", JSON.stringify(pending));#writeFileSync(\"pending.json\", JSON.stringify(pending)); writeFileSync(`sample-${process.argv[2]}.json`, JSON.stringif": {
+   "count": 1,
+   "ms": 41180,
+   "maxMs": 41180,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/hs\" && node k1.mjs timer > timer.json": {
+   "count": 1,
+   "ms": 21475,
+   "maxMs": 21475,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/hs\" && node k1.mjs timer": {
+   "count": 1,
+   "ms": 20843,
+   "maxMs": 20843,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git checkout -- extensions/work-knowledge.ts scripts/test-work-knowledge.mjs && git status --short": {
+   "count": 1,
+   "ms": 110,
+   "maxMs": 110,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/hs\" && sed -i 's#ids: res.map((r) => r.id), claims:#ids: res.map((r) => r.id), scopes: Object.fromEntries(res.map((r) => [r.id, r.scope + \":\" + r.matched.split(\":\")[0] + \":\" + Math.round(r.s": {
+   "count": 1,
+   "ms": 20476,
+   "maxMs": 20476,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && wc -l docs/upstream/haystack.md && cat docs/upstream/haystack.md": {
+   "count": 1,
+   "ms": 64,
+   "maxMs": 64,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python3 - <<'EOF' 2>/dev/null || node -e \" const fs=require('fs');const f='docs/upstream/haystack.md';let s=fs.readFileSync(f,'utf8'); s=s.replace('## Out of scope\\n\\nRAG and integrations: d": {
+   "count": 1,
+   "ms": 30114,
+   "maxMs": 30114,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && git diff --stat docs/upstream/haystack.md; tail -3 docs/upstream/haystack.md": {
+   "count": 1,
+   "ms": 70,
+   "maxMs": 70,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1,14p CHANGELOG.md": {
+   "count": 1,
+   "ms": 52,
+   "maxMs": 52,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add docs/upstream/haystack.md CHANGELOG.md && git commit -qm \"Haystack ledger: second-pass verdicts (HW-07); changelog\" && git log --oneline -1": {
+   "count": 1,
+   "ms": 175,
+   "maxMs": 175,
+   "failures": 0
   }
  },
  "steps": {
@@ -186,6 +666,48 @@
    "replies": 12,
    "models": {
     "anthropic/claude-opus-5-5:high": 12
+   }
+  },
+  "HW-03": {
+   "ms": 335794,
+   "testMs": 24303,
+   "replies": 34,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 34
+   },
+   "failures": 2
+  },
+  "HW-04": {
+   "ms": 50696,
+   "testMs": 0,
+   "replies": 9,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 9
+   }
+  },
+  "HW-05": {
+   "ms": 965919,
+   "testMs": 0,
+   "replies": 3,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 3
+   }
+  },
+  "HW-06": {
+   "ms": 553250,
+   "testMs": 76060,
+   "replies": 40,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 40
+   },
+   "failures": 6
+  },
+  "(none)": {
+   "ms": 6680,
+   "testMs": 0,
+   "replies": 2,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 2
    }
   }
  },

@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: ready
+status: complete
 created: 2026-11-13
-updated: 2026-11-13T07:11:48.004Z
+updated: 2026-11-13T07:47:00.194Z
 started: 2026-11-13T07:10:09.640Z
 ---
 
@@ -52,6 +52,14 @@ Acceptance examples:
 
 - `docs/proposals/2026-11-13-haystack-wider-review.md` has six rows (B1 to B6). Each row shows our verdict, Astra's verdict, the final verdict, the reason, the counterpart and `path:line` evidence. Rows marked Adopt idea or Test first also give the gap number, for example "knowledge recall returned nothing in N% of turns that later re-read a recorded fact".
 - Each idea popup states its gap number, or says "no measured gap".
+### IDEA-e550c9eb: K1: make knowledge recall quieter and fix non-Latin queries
+
+> Recall precision improves on the replay without losing known-good matches; focused tests scripts/test-work-knowledge.mjs and scripts/test-work-knowledge-retrieval.mjs pass.
+### IDEA-f35158c9: Add the missing compaction-audit test to npm run verify
+
+> npm run verify lists and runs test-audit-compaction.mjs.
+
+
 
 ## Decisions
 
@@ -61,6 +69,12 @@ Acceptance examples:
 - **D-04 Measure the gap before the popup.** Agent proposal based on the umbrella outcome: three of the five accepted ideas had nothing to gain (b71bab2b D-08 to D-10), and a log scan could have ruled each out before it was offered. So a cheap local measurement now runs before the shortlist (R3). Source: agent; the user can veto it at review.
 - **D-05 Build accepted ideas in this plan, not in separate follow-up drafts.** This follows the user's later choice of one umbrella plan ("one umbrella plan for all five ... decide keep/not keep and implement") and the option picked 2026-11-13 ("then build or drop each idea after measuring it"). Source: user.
 - **D-06 Ports carry the Apache-2.0 notice; re-implementing needs none.** Carried over from 2af79ca5 D-09. Source: user, 2026-11-12.
+- IDEA-e550c9eb: accepted — K1: make knowledge recall quieter and fix non-Latin queries. Source: user via Plan3 idea review; not independently verified. Response: {"kind":"selection","selections":["Accept (Recommended)"]}
+- IDEA-f35158c9: accepted — Add the missing compaction-audit test to npm run verify. Source: user via Plan3 idea review; not independently verified. Response: {"kind":"selection","selections":["Accept (Recommended)"]}
+- **D-07 Accepted: K1 recall precision (IDEA-e550c9eb) and the verifier omission (IDEA-f35158c9).** Dropped before the popup on measured gaps: B2 fallback, B3 main-content fetch, B4 security, B5 summary audit, B6 CI. Source: user via plan3 ideas 2026-11-13.
+
+
+
 
 ## Open questions
 
@@ -101,26 +115,26 @@ Commands:
 
 - [x] **HW-01** Astra brief docs/proposals/haystack-review/astra-brief-wider.md written (B1-B6 table, counterpart summaries, gap-measure ask); Astra run a6b7b88f launched async.
 - [x] **HW-02** Desk review written: B4 Already covered, B1/B2/B3/B5/B6 Test first; 5 candidates K1 recall, W1 main-content fetch, M1 side-model fallback, E1 checkpoint faithfulness, T1 fast tests.
-- [wip] **HW-03** For each candidate, measure the gap it would fix with a local scan or code count; drop or flag candidates with no gap (D-04).
-  - B1: recall misses (turns that re-read or re-ask a fact the knowledge store already had).
-  - B2: provider errors and retries in session logs.
-  - B3: browser_fetch page sizes and the share of boilerplate.
-  - B6: run time and flaky failures of `npm run verify`.
-- [ ] **HW-04** When Astra lands, merge its column, count agreement, settle disagreements in code, and write the shortlist with gap numbers.
+- [x] **HW-03** Gaps measured from 19 days of session logs: K1 real (half of recall turns carry no useful claim), W1/T1 small, M1/E1 none.
+- [x] **HW-04** Astra merged (agreement 4 of 6); shortlist: K1 recall precision, verifier omission; B2/B3/B4/B5 and CI dropped on measured gaps.
 
 ### Phase 2: Idea review [think]
 
-- [ ] **HW-05** Offer the shortlist through `plan3` `ideas`; record each accept or reject in Decisions.
+- [x] **HW-05** User accepted both shortlisted ideas (K1 recall precision, verifier omission); D-07.
 
 ### Phase 3: Build and keep or drop [code]
 
-- [ ] **HW-06** Build each accepted idea with a focused test (C2); keep or revert by R5, one local commit per idea.
-  - Steps per idea are added with `plan3` `add` after HW-05.
+- [x] **HW-06** Both accepted ideas built and measured via HW-08..HW-13: Unicode tokens and verify-list line kept, timer change reverted, user-scope floor not built.
 
 ### Phase 4: Records [code]
 
-- [ ] **HW-07** Update docs/upstream/haystack.md with B1 to B6 verdicts, adopted and dropped ideas, and the watch decision (R6).
-  - Add CHANGELOG Unreleased bullets for anything user-visible.
+- [x] **HW-07** docs/upstream/haystack.md gains the B1-B6 second-pass table, adopted/dropped ideas and no-watch decision; CHANGELOG Unreleased updated; commit 0277c1f7.
+- [x] **HW-08** Baseline: 1,294 deduped prompts, recall fires 94.7%, 2.47 claims/prompt; 52-turn sample judged 78 useful / 52 noise claims, 11 noise-only turns; known-search hash 7f5f016dfaa7.
+- [x] **HW-09** Unicode/NFC query tokens + Bulgarian stop words, Cyrillic/accent/unrelated cases in the retrieval test; replay unchanged (bug fix, no precision gain); commit 835ea3e2.
+- [x] **HW-10** Reverted: treating timer wake-ups as machine text dropped judged precision 60% to 47% (78/52 to 52/59); timer text often names the job and recalls the right facts.
+- [x] **HW-11** Not built: user-scope claims are 43% useful vs 69% for project ones, but useful and noise interleave across scores (useful at 10-11 and 36+, noise at 12-33), so no floor helps without losing good matches.
+- [x] **HW-12** Kept: Unicode tokens (835ea3e2, correctness fix, precision unchanged) and the verify-list line (250e9814); timer change reverted, user-scope floor not built.
+- [x] **HW-13** test-audit-compaction.mjs added to the verify-package.mjs list; commit 250e9814.
 
 ## Global validation
 
@@ -130,8 +144,101 @@ Commands:
 
 ## Resume context
 
-Plan drafted 2026-11-13 from the user's answers; nothing has run yet. Next: HW-01 (Astra brief and launch), with HW-02 alongside it.
+All steps done. Kept: Unicode/NFC knowledge query tokens (835ea3e2), compaction-audit test in verify (250e9814); ledger 0277c1f7. Nothing pushed. Full suite not run.
 
 ## Amendments
 
 None.
+- 2026-11-13: Added HW-08, HW-09, HW-10, HW-11, HW-12 after HW-07: Accepted IDEA-e550c9eb: K1: make knowledge recall quieter and fix non-Latin queries
+- 2026-11-13: Added HW-13 after HW-12: Accepted IDEA-f35158c9: Add the missing compaction-audit test to npm run verify
+
+
+
+
+## Ideas
+
+### IDEA-e550c9eb K1: make knowledge recall quieter and fix non-Latin queries
+
+Status: accepted
+Response: {"kind":"selection","selections":["Accept (Recommended)"]}
+
+#### What this is
+
+> Every turn, ce-workflow quietly adds 3 to 5 remembered facts to the model's context. Measured over 1,897 recent prompts: it fires on 95% of them, and in a judged sample of 29 turns, 14 carried nothing useful (for example the '/tmp maps to AppData\Local\Temp' fact showing up for a question about tools_enable). Prompts written only in Bulgarian get no recall at all.
+
+#### What you gain
+
+> Less noise in every turn's context, so the model is less often steered by an unrelated fact; Bulgarian prompts start matching Bulgarian facts.
+
+#### Drawbacks and risks
+
+> A stricter filter can also hide a fact that would have helped. Recall precision is judged by a classifier, so the before/after numbers are estimates.
+
+#### Implementation and affected files
+
+> Three small changes in extensions/work-knowledge.ts, each measured with the same replay used for the gap: (1) the query tokenizer keeps Unicode letters and normalizes accents (NFC), (2) scheduled-timer messages ('⏰ Scheduled ...') count as machine text, so recall uses your last real request instead, (3) user-wide facts (they have no project) need a stronger word match than project facts. Keep each change only if the share of no-useful turns drops and the 12 known-good knowledge searches still find their facts.
+
+#### Cost
+
+> About an hour of agent time plus a few cents of classifier calls for the before/after replay.
+
+#### Recommendation
+
+> Accept. It is the only area where the measurement found a real gap, and Astra independently found the Bulgarian bug.
+
+#### Sources and agreement
+
+> docs/proposals/2026-11-13-haystack-wider-review.md (Gap measurements K1, Astra merge B1); Haystack document_stores/in_memory/document_store.py:42-61 (Unicode tokenizer); extensions/work-knowledge.ts:655 (tokens), :48 (machine markers)
+
+#### Proposed requirement
+
+> Recall precision improves on the replay without losing known-good matches; focused tests scripts/test-work-knowledge.mjs and scripts/test-work-knowledge-retrieval.mjs pass.
+
+#### Proposed steps
+
+> - Save the HW-03 replay + Jev judging as a repeatable throwaway baseline (no-useful share, average claims per turn, the 12 known-good searches).
+> - Unicode/NFC query tokenizer with a Cyrillic regression case in test-work-knowledge-retrieval.mjs.
+> - Treat scheduled-timer messages as machine-authored in isMachineAuthoredUserText, with a test.
+> - Raise the match floor for user-scope claims; keep only if the replay shows fewer no-useful turns and no lost known-good matches.
+> - Commit each kept change with its numbers; revert any that do not help.
+
+### IDEA-f35158c9 Add the missing compaction-audit test to npm run verify
+
+Status: accepted
+Response: {"kind":"selection","selections":["Accept (Recommended)"]}
+
+#### What this is
+
+> scripts/test-audit-compaction.mjs is an offline test that passes, but the full check (npm run verify) never runs it because it is not in the list in scripts/verify-package.mjs. Astra found this; I confirmed it.
+
+#### What you gain
+
+> A break in the compaction audit script gets caught by the normal pre-push check.
+
+#### Drawbacks and risks
+
+> Adds about a second to the full check.
+
+#### Implementation and affected files
+
+> Add one line, "test-audit-compaction.mjs", to the tests list in scripts/verify-package.mjs. CI (Astra's other suggestion) is left out: one committer on Windows, about 5 minutes of full checks a day.
+
+#### Cost
+
+> A few minutes.
+
+#### Recommendation
+
+> Accept.
+
+#### Sources and agreement
+
+> scripts/verify-package.mjs:107-113; Astra verdicts B6 (docs/proposals/haystack-review/astra-verdicts-wider.md)
+
+#### Proposed requirement
+
+> npm run verify lists and runs test-audit-compaction.mjs.
+
+#### Proposed steps
+
+> - Add test-audit-compaction.mjs to the verify-package.mjs tests list and run node scripts/test-audit-compaction.mjs.
