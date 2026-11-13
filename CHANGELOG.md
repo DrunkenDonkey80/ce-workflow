@@ -4,6 +4,13 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+### Changed
+- Every session (not only Plan3 runs) now tells the agent to check its own work with its tools: tests, a headless browser, app windows, phones, VMs. It names the exact blocker when it can't.
+- `tools_enable` now says when to reach for each tool ("before telling the user to open or click something…"), not just what it does.
+- When a reply still ends with "now you can run/open/test…" or "I haven't tested it", the agent is sent back once to do it itself (a UI change means really clicking it in a headless browser or the app), or to say in one line why only you can. Measured: Opus 5.5 checked its UI work in 9 of 9 runs instead of 1, Sol 6.1 in 6 of 9 instead of 1, at 30–60% more cost on UI tasks.
+- `scripts/benchmark-self-verify-live.mjs` measures this with and without the change on live models.
+- Video review tracking: `docs/upstream/processed-videos.json` records which YouTube videos were reviewed or skipped, and `scripts/work-video-status.mjs` lists only the new digests.
+
 ### Fixed
 - Hub: a session whose plan grew past 1 MB no longer refuses every chat message with "Expected a bounded regular file". Chat reads the plan and its diagram only while a diagram tab is on screen, the plan check reads just its header, and a diagram that cannot load costs only its @mention context, with a notice, instead of the message.
 

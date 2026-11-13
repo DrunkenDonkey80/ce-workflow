@@ -1,47 +1,47 @@
 {
  "version": 1,
- "activeMs": 2955278,
- "runs": 6,
+ "activeMs": 5305186,
+ "runs": 11,
  "waitingMs": 0,
- "toolWallMs": 1592921,
+ "toolWallMs": 3145117,
  "compactions": {
-  "count": 3,
-  "ms": 69602
+  "count": 5,
+  "ms": 119130
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
-   "replies": 168,
-   "thinkingMs": 710360,
-   "actingMs": 399727,
-   "input": 432,
-   "output": 116116,
-   "cacheRead": 17573730,
-   "cacheWrite": 768880,
-   "cost": 9.683193999999999,
+   "replies": 271,
+   "thinkingMs": 1176846,
+   "actingMs": 548164,
+   "input": 696,
+   "output": 168217,
+   "cacheRead": 27259791,
+   "cacheWrite": 1159127,
+   "cost": 14.6147172,
    "errors": 0
   }
  },
  "tools": {
   "bash": {
-   "count": 118,
-   "ms": 1389154,
+   "count": 198,
+   "ms": 2738321,
    "maxMs": 600151,
-   "failures": 6
+   "failures": 7
   },
   "read": {
-   "count": 33,
-   "ms": 962,
+   "count": 48,
+   "ms": 1065,
    "maxMs": 558,
    "failures": 0
   },
   "edit": {
-   "count": 36,
-   "ms": 1687,
+   "count": 53,
+   "ms": 1943,
    "maxMs": 1048,
    "failures": 2
   },
   "compaction_note": {
-   "count": 2,
+   "count": 3,
    "ms": 0,
    "maxMs": 0,
    "failures": 0
@@ -63,18 +63,24 @@
    "ms": 48025,
    "maxMs": 35928,
    "failures": 0
+  },
+  "test_sensitivity": {
+   "count": 5,
+   "ms": 143946,
+   "maxMs": 31475,
+   "failures": 2
   }
  },
  "categories": {
   "shell": {
-   "count": 102,
-   "ms": 115040,
-   "maxMs": 63297,
-   "failures": 5
+   "count": 171,
+   "ms": 514434,
+   "maxMs": 253053,
+   "failures": 6
   },
   "test": {
-   "count": 16,
-   "ms": 1274114,
+   "count": 27,
+   "ms": 2223887,
    "maxMs": 600151,
    "failures": 1
   }
@@ -781,6 +787,456 @@
    "ms": 246,
    "maxMs": 246,
    "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"bounded regular file\" --glob \"!node_modules\" . | cut -c1-260; rg -n \"bounded regular file\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules\" -l 2>/dev/null | head": {
+   "count": 1,
+   "ms": 1141,
+   "maxMs": 1141,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"readBoundedText|readBounded\\w*\\(\" --glob \"!node_modules\" extensions hub/src | cut -c1-240": {
+   "count": 1,
+   "ms": 116,
+   "maxMs": 116,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"from \\\"\\./plan3-files\\.ts\\\"|from \\\"\\.\\./\\.\\./extensions/plan3-files\\.ts\\\"|plan3-files\" --glob \"!node_modules\" --glob \"*.ts\" extensions hub/src | cut -c1-240": {
+   "count": 1,
+   "ms": 199,
+   "maxMs": 199,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n -i \"bounded regular\" --glob \"!node_modules\" . \"C:/Users/Flex/.pi/agent/npm/node_modules\" \"C:/Users/Flex/.pi/agent/git\" 2>/dev/null | cut -c1-200 | head; echo ---; rg -n \"\\bread\\(\" exte": {
+   "count": 1,
+   "ms": 164,
+   "maxMs": 164,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"DIAGRAM_BYTES\" extensions hub/src | cut -c1-200; sed -n \"85,115p\" extensions/plan3-diagram.ts | cut -c1-260": {
+   "count": 1,
+   "ms": 111,
+   "maxMs": 111,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"diagramPath\\(|loadDiagram\\(\" extensions hub/src | rg -v \"^extensions\\\\\\\\plan3-diagram.ts:(9|10)\" | cut -c1-240": {
+   "count": 1,
+   "ms": 122,
+   "maxMs": 122,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -l -i \"bounded regular\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules\" hub/node_modules node_modules 2>/dev/null | head; echo ---; git log --oneline -S \"bounded regular fil": {
+   "count": 1,
+   "ms": 5796,
+   "maxMs": 5796,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n -i \"bounded regular\" node_modules/pi-subagents/src/runs/shared/worktree-cleanup-apply.js | cut -c1-260": {
+   "count": 1,
+   "ms": 97,
+   "maxMs": 97,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n \"340,352p;672,684p\" src/api.ts | cut -c1-300": {
+   "count": 1,
+   "ms": 79,
+   "maxMs": 79,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"stats\\.json|\\.stats\\b\" extensions hub/src --glob \"*.ts\" | cut -c1-240 | head -20; ls -la docs/plans/logs/ | sort -k5 -n | tail -5": {
+   "count": 1,
+   "ms": 916,
+   "maxMs": 916,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"case \\\"message\\\"\" src/api.ts | cut -c1-300; rg -n \"\\bread\\b|readFileSync|statSync|size >\" src/api.ts src/hub.ts src/sessions.ts 2>/dev/null | rg -i \"size|max|bound|limit\" | cut -c": {
+   "count": 1,
+   "ms": 154,
+   "maxMs": 154,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"\\\"/api/message\\\"|api/message\" extensions hub/src --glob \"*.ts\" | cut -c1-240": {
+   "count": 1,
+   "ms": 100,
+   "maxMs": 100,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && find docs/plans -name \"*.md\" -printf \"%s %p\\n\" | sort -n | tail -4; rg -n \"async function displayedWebTarget|function resolveWebTarget\" -A8 extensions/plan3.ts | cut -c1-220 | head -30": {
+   "count": 1,
+   "ms": 674,
+   "maxMs": 674,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat > \"$LOCALAPPDATA/Temp/repro-bounded.mts\" <<'EOF' import fs from \"node:fs\"; import os from \"node:os\"; import path from \"node:path\"; const { loadDiagram } = await import(\"file:///./extensi": {
+   "count": 1,
+   "ms": 231,
+   "maxMs": 231,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"function forwardDiagramChat|function diagramChatMessage\" -A14 extensions/*.ts | cut -c1-230 | head -45": {
+   "count": 1,
+   "ms": 104,
+   "maxMs": 104,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"post\\(\\\"message\\\"\" web/*.ts | cut -c1-260": {
+   "count": 1,
+   "ms": 97,
+   "maxMs": 97,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"function diagramTarget|const diagramTarget|^let target|let target\\b|comments:\" web/*.ts | cut -c1-260; rg -n \"leftTab|left-panel|activeTab|panelTab\" web/app.ts | head -20 | cut -c": {
+   "count": 1,
+   "ms": 128,
+   "maxMs": 128,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n \"185,200p\" web/app.ts | cut -c1-260; rg -n \"diagramTab\\s*=|let diagramTab|leftView|left-view|data-view|panelView|function setLeft|showLeft|leftOpen|left-collapsed|collapse\" web/ap": {
+   "count": 1,
+   "ms": 154,
+   "maxMs": 154,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"data-left=.collapsed|\\[data-left\" web/styles.css | cut -c1-220 | head; rg -n \"id=\\\"canvas\\\"|id=\\\"left-panel\\\"\" web/index.html | cut -c1-200; rg -n \"diagramTarget\\(\\)\" web/*.ts | c": {
+   "count": 1,
+   "ms": 178,
+   "maxMs": 178,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"const notifyWeb|function notifyWeb\" -A4 extensions/plan3.ts | cut -c1-220; rg -n \"export function emptyDiagram\" -A3 extensions/plan3-diagram.ts | cut -c1-200; head -12 docs/plans/2026": {
+   "count": 1,
+   "ms": 220,
+   "maxMs": 220,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"\\.target\\b\" extensions/design-bundles.ts | cut -c1-220; rg -n \"target\" scripts/test-work-plan3*.mjs hub/scripts/*.mjs 2>/dev/null | rg \"api/message|\\\"message\\\"\" | cut -c1-220 | head": {
+   "count": 1,
+   "ms": 123,
+   "maxMs": 123,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"95,106p\" hub/scripts/test-browser.mjs | cut -c1-260; sed -n \"1025,1060p\" scripts/test-work-plan3.mjs | cut -c1-240": {
+   "count": 1,
+   "ms": 79,
+   "maxMs": 79,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"bFile\\s*=|b0b0b0b0\" scripts/test-work-plan3.mjs | head -8 | cut -c1-260; sed -n \"1060,1080p\" scripts/test-work-plan3.mjs | cut -c1-200": {
+   "count": 1,
+   "ms": 96,
+   "maxMs": 96,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"^import .*readFile|readFile,\" scripts/test-work-plan3.mjs | head -3 | cut -c1-200": {
+   "count": 1,
+   "ms": 218,
+   "maxMs": 218,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git stash push -q -- extensions/plan3-diagram.ts extensions/plan3.ts extensions/plan3-files.ts && (timeout 600 node scripts/test-work-plan3.mjs > /tmp/p3red.log 2>&1; echo \"before fix exit=$": {
+   "count": 1,
+   "ms": 2328,
+   "maxMs": 2328,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"AssertionError|Error|bounded|c7|c8\" /tmp/p3red.log | head -8 | cut -c1-300": {
+   "count": 1,
+   "ms": 75,
+   "maxMs": 75,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 600 node scripts/test-work-plan3.mjs > /tmp/p3.log 2>&1; echo \"exit=$?\"; tail -5 /tmp/p3.log | cut -c1-300": {
+   "count": 1,
+   "ms": 9251,
+   "maxMs": 9251,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"notify\\s*[:=(]|notifications\\b|notices\\b\" scripts/test-work-plan3.mjs | head -8 | cut -c1-200": {
+   "count": 1,
+   "ms": 99,
+   "maxMs": 99,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n \"106,114p\" scripts/test-browser.mjs | cut -c1-240; rg -n \"collapse-left|sentMessages|messagesSent|lastMessage\" scripts/test-browser.mjs | head -10 | cut -c1-200": {
+   "count": 1,
+   "ms": 108,
+   "maxMs": 108,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n \"385,402p\" scripts/test-browser.mjs | cut -c1-260; rg -n \"messages\\.at\\(-1\\)\" scripts/test-browser.mjs | head -8 | cut -c1-220": {
+   "count": 1,
+   "ms": 127,
+   "maxMs": 127,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"fill\\\", \\\"#message-input\\\"\" scripts/test-browser.mjs | head -4 | cut -c1-240; rg -n \"\\\"click\\\", \\\"#send\\\"|press\\\", \\\"Enter\\\"\" scripts/test-browser.mjs | head -3 | cut -c1-200": {
+   "count": 1,
+   "ms": 113,
+   "maxMs": 113,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && timeout 600 node scripts/test-browser.mjs > /tmp/tb.log 2>&1 && echo ok || { echo FAIL; rg -n \"AssertionError|\\\"error\\\"|expected|actual|at file\" /tmp/tb.log | head -10 | cut -c1-300; }": {
+   "count": 1,
+   "ms": 59849,
+   "maxMs": 59849,
+   "failures": 0
+  },
+  "bash\u0000sed -n \"1,20p\" /tmp/tb.log | cut -c1-300": {
+   "count": 1,
+   "ms": 65,
+   "maxMs": 65,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"draft-recovery').hidden && !document.getElementById\\('send'\\).disabled\" scripts/test-browser.mjs | cut -c1-120; sed -n \"155,175p\" scripts/test-browser.mjs | cut -c1-260": {
+   "count": 1,
+   "ms": 104,
+   "maxMs": 104,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n -F \"draft-recovery').hidden && \" scripts/test-browser.mjs | cut -c1-200;": {
+   "count": 1,
+   "ms": 87,
+   "maxMs": 87,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"draft-retry\\\"\\)\\.addEventListener|request\\.target|\\.request\\b.*target|ReferenceMessage =\" web/*.ts | cut -c1-260": {
+   "count": 1,
+   "ms": 93,
+   "maxMs": 93,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"target\" src/design-*.ts ../extensions/design-bundles.ts 2>/dev/null | rg -i \"references|submission|bundle\" | head -10 | cut -c1-240": {
+   "count": 1,
+   "ms": 108,
+   "maxMs": 108,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && cp scripts/test-browser.mjs /tmp/tb-backup.mjs && node -e \" const fs=require('fs');const f='scripts/test-browser.mjs';let s=fs.readFileSync(f,'utf8'); s=s.replace(\\`await browser(\\\"click": {
+   "count": 3,
+   "ms": 288324,
+   "maxMs": 179929,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');const f='scripts/test-browser.mjs';let s=fs.readFileSync(f,'utf8'); s=s.replace(\\`await browser(\\\"click\\\", \\\"#draft-retry\\\"); await browser(\\\"wait\\\"\\`, \\": {
+   "count": 3,
+   "ms": 136385,
+   "maxMs": 61655,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"async function post\\b|const post\\b\" -A6 web/app.ts | cut -c1-260": {
+   "count": 1,
+   "ms": 82,
+   "maxMs": 82,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -i \"s/\\[undefined, \\\"product\\\"\\].includes(body.target)/[null, \\\"product\\\"].includes(body.target)/; s/(await chatSend(\\\"plain while collapsed\\\")).target, undefined,/(await chatSend(\\\"": {
+   "count": 1,
+   "ms": 439,
+   "maxMs": 439,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/data: { text: \\\"no diagram in view\\\" }/data: { target: null, text: \\\"no diagram in view\\\" }/\" scripts/test-work-plan3.mjs && rg -c \"target: null, text: \\\"no diagram in view\\\"\" scri": {
+   "count": 1,
+   "ms": 67457,
+   "maxMs": 67457,
+   "failures": 0
+  },
+  "bash\u0000sed -n \"5,8p\" /tmp/tb.log | cut -c1-400": {
+   "count": 1,
+   "ms": 72,
+   "maxMs": 72,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"pending\\.request|typeof .*\\.target === \\\"string\\\"|request\\?\\.target\" web/app.ts | cut -c1-300": {
+   "count": 1,
+   "ms": 92,
+   "maxMs": 92,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"function savedReferenceRequest\" -A8 web/app.ts | cut -c1-300": {
+   "count": 1,
+   "ms": 75,
+   "maxMs": 75,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && (timeout 600 node scripts/test-browser.mjs > /tmp/tb.log 2>&1 && echo browser ok || { echo FAIL; sed -n \"6,7p\" /tmp/tb.log | cut -c1-400; rg -n \"AssertionError\" -A3 /tmp/tb.log | head -6": {
+   "count": 1,
+   "ms": 228363,
+   "maxMs": 228363,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add CHANGELOG.md extensions/plan3-files.ts extensions/plan3-diagram.ts extensions/plan3.ts hub/web/app.ts hub/scripts/test-browser.mjs scripts/test-work-plan3.mjs && git commit -q -m \"Hu": {
+   "count": 1,
+   "ms": 261,
+   "maxMs": 261,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"\\\"/api/message\\\"\" extensions/plan3.ts hub/src/*.ts | cut -c1-200": {
+   "count": 1,
+   "ms": 119,
+   "maxMs": 119,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"api/message\" extensions/*.ts hub/src/*.ts | cut -c1-200": {
+   "count": 1,
+   "ms": 111,
+   "maxMs": 111,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"async function postWeb|function forwardDiagramChat|function diagramChatMessage|function displayedWebTarget|function resolveWebTarget|function notifyWeb\" extensions/*.ts | cut -c1-200": {
+   "count": 1,
+   "ms": 96,
+   "maxMs": 96,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"export (async )?function (listPlans|resolvePlan|summarize)\\b\" extensions/*.ts | cut -c1-160; sed -n \"327,330p\" extensions/plan3-diagram.ts": {
+   "count": 1,
+   "ms": 86,
+   "maxMs": 86,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls docs/plans/*.md docs/plans/done/*.md | wc -l; du -ch docs/plans/*.md docs/plans/done/*.md | tail -1; node -e \" const t=Date.now();import('./extensions/plan3.ts').then(async m=>{const a=Da": {
+   "count": 1,
+   "ms": 401,
+   "maxMs": 401,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"pi\\.on\\(\\\"\" extensions/plan3.ts | cut -c1-180; rg -n \"refresh\\(\" extensions/plan3.ts | wc -l": {
+   "count": 1,
+   "ms": 105,
+   "maxMs": 105,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"\\.on\\(\\\"[a-z_]+\\\"\" extensions/plan3.ts | cut -c1-200": {
+   "count": 1,
+   "ms": 96,
+   "maxMs": 96,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"on\\(\\s*\\\"|on\\?\\.\\(\\\"\" extensions/plan3.ts | rg -v \"events\" | cut -c1-200": {
+   "count": 1,
+   "ms": 101,
+   "maxMs": 101,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"post\\(\\\"message\\\"|function sendSubmission|async function sendMessage|post\\(\\\"drop\\\"\" web/app.ts | cut -c1-220; rg -n \"post\\(\\\"\" web/app.ts | wc -l; rg -n \"post\\(\\\"[a-z]+\\\", \\{\" -o": {
+   "count": 1,
+   "ms": 192,
+   "maxMs": 192,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"null, not a missing key\" -A1 web/app.ts | cut -c1-260": {
+   "count": 1,
+   "ms": 106,
+   "maxMs": 106,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/\\[null, \\\"product\\\"\\].includes(body.target)/[undefined, \\\"product\\\"].includes(body.target)/; s/(await chatSend(\\\"plain while collapsed\\\")).target, null,/(await chatSend(\\\"plain whi": {
+   "count": 1,
+   "ms": 9507,
+   "maxMs": 9507,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && (timeout 900 node scripts/test-browser.mjs > /tmp/tb.log 2>&1 && echo browser ok || { echo FAIL; sed -n \"6,7p\" /tmp/tb.log | cut -c1-400; rg -n \"AssertionError\" -A3 /tmp/tb.log | head -6": {
+   "count": 1,
+   "ms": 48065,
+   "maxMs": 48065,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"different brief\" extensions/*.ts hub/src/*.ts | cut -c1-200; sed -n \"18,24p\" extensions/design-bundles.ts | cut -c1-240": {
+   "count": 1,
+   "ms": 114,
+   "maxMs": 114,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff e4707e52~1 --stat -- hub/web/app.ts && git diff e4707e52~1 -- hub/web/app.ts | rg \"^[+-] \" | cut -c1-220; cd hub && (timeout 900 node scripts/test-browser.mjs > /tmp/tb.log 2>&1 && ": {
+   "count": 1,
+   "ms": 48687,
+   "maxMs": 48687,
+   "failures": 0
+  },
+  "bash\u0000tail -c 1500 /tmp/probe.log; echo; sed -n \"1,8p\" /tmp/tb.log | cut -c1-300": {
+   "count": 1,
+   "ms": 73,
+   "maxMs": 73,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && git diff --stat -- scripts/test-browser.mjs; for i in 1 2; do timeout 900 node scripts/test-browser.mjs > /tmp/tb$i.log 2>&1 && echo \"run $i ok\" || { echo \"run $i FAIL\"; sed -n \"7p\" /tmp": {
+   "count": 1,
+   "ms": 253053,
+   "maxMs": 253053,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"Error|assert\" /tmp/tb2.log | head -6 | cut -c1-400": {
+   "count": 1,
+   "ms": 1021,
+   "maxMs": 1021,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"7,22p\" /tmp/tb2.log | cut -c1-300; git log --oneline -3 -- hub/web/app.ts hub/scripts/test-browser.mjs; git status --short": {
+   "count": 1,
+   "ms": 173,
+   "maxMs": 173,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && timeout 900 node scripts/test-browser.mjs > /tmp/tb3.log 2>&1 && echo \"ok\" || { echo FAIL; rg -n \"Error\" /tmp/tb3.log | head -3 | cut -c1-300; }": {
+   "count": 1,
+   "ms": 179536,
+   "maxMs": 179536,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff -- CHANGELOG.md | head -20 | cut -c1-200; git diff --stat -- extensions/plan3.ts hub/web/app.ts hub/scripts/test-browser.mjs scripts/test-work-plan3.mjs": {
+   "count": 1,
+   "ms": 184,
+   "maxMs": 184,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git log --oneline -4 && git diff -- extensions/plan3.ts | rg \"^[+-]\\s\" | cut -c1-160": {
+   "count": 1,
+   "ms": 119,
+   "maxMs": 119,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff -U1 -- extensions/plan3.ts > /tmp/p3.diff && node -e \" const s=require('fs').readFileSync('/tmp/p3.diff','utf8');const [head,...hunks]=s.split(/^(?=@@)/m); require('fs').writeFileSy": {
+   "count": 1,
+   "ms": 116,
+   "maxMs": 116,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && git diff -U1 -- extensions/plan3.ts > p3.tmp.diff && node -e \" const fs=require('fs');const s=fs.readFileSync('p3.tmp.diff','utf8');const [head,...hunks]=s.split(/^(?=@@)/m); fs.writeFileSyn": {
+   "count": 2,
+   "ms": 850,
+   "maxMs": 433,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git show 20e111f8 -- extensions/plan3.ts | rg \"^[+-]\\s\" | cut -c1-140; git diff -- extensions/plan3.ts | rg \"^[+-]\\s\" | cut -c1-100": {
+   "count": 1,
+   "ms": 163,
+   "maxMs": 163,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git show HEAD:CHANGELOG.md | sed -n \"1,30p\" | cut -c1-140; git branch -vv | head -1 | cut -c1-120": {
+   "count": 1,
+   "ms": 146,
+   "maxMs": 146,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git log --oneline origin/master -1; git rev-list --left-right --count origin/master...master": {
+   "count": 1,
+   "ms": 89,
+   "maxMs": 89,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat > move.tmp.mjs <<'EOF' import { readFileSync, writeFileSync } from \"node:fs\"; export const move = text => { const nl = text.includes(\"\\r\\n\") ? \"\\r\\n\" : \"\\n\"; const lines = text.split(/\\r": {
+   "count": 1,
+   "ms": 387,
+   "maxMs": 387,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git commit -q --amend --no-edit && git show --stat --oneline HEAD | head -7 && git show HEAD:CHANGELOG.md | sed -n \"5,10p\" | cut -c1-80": {
+   "count": 1,
+   "ms": 217,
+   "maxMs": 217,
+   "failures": 0
   }
  },
  "steps": {
@@ -820,13 +1276,13 @@
    "failures": 1
   },
   "(none)": {
-   "ms": 1628083,
-   "testMs": 1121605,
-   "replies": 93,
+   "ms": 3736478,
+   "testMs": 2071378,
+   "replies": 196,
    "models": {
-    "anthropic/claude-opus-5-5:high": 93
+    "anthropic/claude-opus-5-5:high": 196
    },
-   "failures": 6
+   "failures": 9
   }
  },
  "spans": [
@@ -853,6 +1309,26 @@
   {
    "start": "2026-11-13T11:36:34.261Z",
    "ms": 382678
+  },
+  {
+   "start": "2026-11-13T13:32:15.653Z",
+   "ms": 92103
+  },
+  {
+   "start": "2026-11-13T13:35:21.920Z",
+   "ms": 11663
+  },
+  {
+   "start": "2026-11-13T13:39:31.437Z",
+   "ms": 936324
+  },
+  {
+   "start": "2026-11-13T14:05:43.571Z",
+   "ms": 80633
+  },
+  {
+   "start": "2026-11-13T14:37:27.072Z",
+   "ms": 1179657
   }
  ],
  "hints": []

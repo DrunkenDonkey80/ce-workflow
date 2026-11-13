@@ -1,23 +1,23 @@
 {
  "version": 1,
- "activeMs": 18053582,
- "runs": 13,
+ "activeMs": 18085099,
+ "runs": 14,
  "waitingMs": 127649,
- "toolWallMs": 12381065,
+ "toolWallMs": 12383772,
  "compactions": {
   "count": 4,
   "ms": 105088
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
-   "replies": 697,
-   "thinkingMs": 2776560,
-   "actingMs": 1425681,
-   "input": 1880,
-   "output": 406739,
-   "cacheRead": 80433632,
-   "cacheWrite": 2999544,
-   "cost": 39.22674640000003,
+   "replies": 699,
+   "thinkingMs": 2779545,
+   "actingMs": 1426828,
+   "input": 1884,
+   "output": 407061,
+   "cacheRead": 80605052,
+   "cacheWrite": 3000513,
+   "cost": 39.272331400000034,
    "errors": 1
   }
  },
@@ -29,8 +29,8 @@
    "failures": 0
   },
   "bash": {
-   "count": 492,
-   "ms": 11819282,
+   "count": 493,
+   "ms": 11821734,
    "maxMs": 408496,
    "failures": 10
   },
@@ -79,8 +79,8 @@
  },
  "categories": {
   "shell": {
-   "count": 402,
-   "ms": 4528907,
+   "count": 403,
+   "ms": 4531359,
    "maxMs": 265320,
    "failures": 9
   },
@@ -458,12 +458,6 @@
    "maxMs": 164924,
    "failures": 0
   },
-  "bash\u0000git add scripts/astryx-component-shots.mjs && git commit -q -m \"Maintainer prototype: render pinned Astryx component examples to images (V-07)\" -m \"Uses the installed pinned runtime only (never instal": {
-   "count": 1,
-   "ms": 158,
-   "maxMs": 158,
-   "failures": 0
-  },
   "bash\u0000cat > scripts/.tmp-ex.mjs <<'EOF' import { createJiti } from \"jiti\"; const { runAstryx } = await createJiti(import.meta.url).import(\"../extensions/design-library.ts\"); for (const name of [\"Badge\", \"Ba": {
    "count": 1,
    "ms": 35619,
@@ -615,9 +609,9 @@
    "failures": 0
   },
   "\u0000(other)": {
-   "count": 274,
-   "ms": 26682,
-   "maxMs": 157,
+   "count": 275,
+   "ms": 26840,
+   "maxMs": 158,
    "failures": 7
   },
   "bash\u0000node scripts/test-work-design.mjs 2>&1 | grep -v -i deprecation | tail -4 | cut -c1-300; node hub/scripts/test-api.mjs 2>&1 | grep -v -i deprecation | tail -6 | cut -c1-400": {
@@ -1297,6 +1291,12 @@
    "ms": 170,
    "maxMs": 170,
    "failures": 0
+  },
+  "bash\u0000cd \".\"; git add -u && git commit -qm \"Release 0.9.1: design library background shots and theme samples, Ctrl+Tab last session, F4 narrow chat, disk load box\" && git push -q origin master && git status": {
+   "count": 1,
+   "ms": 2452,
+   "maxMs": 2452,
+   "failures": 0
   }
  },
  "steps": {
@@ -1404,11 +1404,11 @@
    "failures": 1
   },
   "(none)": {
-   "ms": 6487133,
+   "ms": 6493717,
    "testMs": 3803983,
-   "replies": 268,
+   "replies": 270,
    "models": {
-    "anthropic/claude-opus-5-5:high": 268
+    "anthropic/claude-opus-5-5:high": 270
    },
    "failures": 10
   }
@@ -1465,6 +1465,10 @@
   {
    "start": "2026-11-13T12:20:30.435Z",
    "ms": 900211
+  },
+  {
+   "start": "2026-11-13T12:43:21.502Z",
+   "ms": 31517
   }
  ],
  "hints": [

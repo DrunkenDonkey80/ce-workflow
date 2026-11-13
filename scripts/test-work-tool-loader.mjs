@@ -16,6 +16,7 @@ const loader = toolsEnableTool(pi);
 assert.deepEqual(loader.parameters.properties.tools.items.enum, ["mobile_act", "screen_read"]);
 assert.match(loader.description, /- mobile_act: operate an iOS/);
 assert.doesNotMatch(loader.description, /generate_image|other_deferred/);
+assert.match(loader.description, /^Before telling the user to open, click, look at or test something[\s\S]*desktop app → app_act[\s\S]*phone app or simulator → mobile_act[\s\S]*grants no consent/, "the loader says when to reach for each family, not just what it is");
 const result = await loader.execute("1", { tools: ["mobile_act", "screen_read", "mobile_act", "generate_image"] });
 assert.deepEqual(active, ["read", "bash", "mobile_act", "screen_read"], "activates each named tool once, keeps the rest");
 assert.match(result.content[0].text, /Enabled mobile_act, screen_read/);

@@ -26,6 +26,7 @@ import { childWorkItems, listWorkItems, loadStore } from "./work-store.ts";
 import { docCandidates, slug as docSlug, writeDocs } from "./plan3-docs.ts";
 import { lockedWritesNote } from "./locked-writes.ts";
 import { registerTestSensitivity, TEST_SENSITIVITY } from "./test-sensitivity.ts";
+import { registerSelfVerify, SELF_VERIFY } from "./self-verify.ts";
 
 const POINTER = "plan3-current";
 const RUN = "plan3-run";
@@ -707,6 +708,7 @@ function orderPlans(ctx, plans) {
 // ---------- extension ----------
 export default function plan3(pi) {
 	registerTestSensitivity(pi);
+	registerSelfVerify(pi, (ctx) => !!pointer(ctx).planning);
 	const idle = (ctx) => {
 		if (ctx.isIdle()) return true;
 		ctx.ui.notify("Plan3 needs an idle agent; stop the current run first.", "warning");
@@ -2089,8 +2091,8 @@ export default function plan3(pi) {
 	pi.on?.("session_tree", (_event, ctx) => refresh(ctx));
 	pi.on?.("before_agent_start", event => {
 		const sections = event?.systemPromptOptions?.sections;
-		if (sections && typeof sections === "object") { sections["locked-writes"] = LOCKED_WRITES; sections["test-sensitivity"] = TEST_SENSITIVITY; return; }
-		return { systemPrompt: `${event.systemPrompt ?? ""}\n\n${LOCKED_WRITES}\n\n${TEST_SENSITIVITY}` };
+		if (sections && typeof sections === "object") { sections["locked-writes"] = LOCKED_WRITES; sections["test-sensitivity"] = TEST_SENSITIVITY; sections["self-verify"] = SELF_VERIFY; return; }
+		return { systemPrompt: `${event.systemPrompt ?? ""}\n\n${LOCKED_WRITES}\n\n${TEST_SENSITIVITY}\n\n${SELF_VERIFY}` };
 	});
 	// The rule above is a reminder; this flags the benchmark's commonest violation as soon as it is written (D-12).
 	pi.on?.("tool_result", event => {

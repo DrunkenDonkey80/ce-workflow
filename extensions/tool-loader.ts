@@ -23,8 +23,8 @@ export function toolsEnableTool(pi) {
 	return {
 		name: TOOLS_ENABLE,
 		label: "Enable tools",
-		description: `Declare situational tools for your next request; their full parameters and rules arrive with them, and they stay on for this session. Enable only what the task needs (a phone app: mobile_act + screen_read; a desktop app: app_act + screen_read; a VirtualBox VM: vm_act + screen_read).\n${available.map((name) => `- ${name}: ${SITUATIONAL_TOOLS[name]}`).join("\n")}`,
-		promptSnippet: "Enable situational tools (phone, desktop app, VM, screen capture, logged-in browser, images, hub buttons)",
+		description: `Before telling the user to open, click, look at or test something, check whether one of these tools can do it, enable it and do it yourself: local web UI → headless agent-browser via bash + screen_read; a desktop app → app_act + screen_read; a phone app or simulator → mobile_act + screen_read; an installer or guest OS → vm_act + screen_read; an external site needing the user's login → browser_act. Enabling brings the full parameters and rules for your next request, stays on for this session and grants no consent by itself; enable only what the task needs.\n${available.map((name) => `- ${name}: ${SITUATIONAL_TOOLS[name]}`).join("\n")}`,
+		promptSnippet: "Enable situational tools before handing a UI check to the user: app windows, phones, VMs, screenshots, logged-in sites, images, hub buttons",
 		parameters: {
 			type: "object",
 			properties: { tools: { type: "array", items: { type: "string", enum: available }, minItems: 1 } },
