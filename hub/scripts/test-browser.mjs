@@ -173,14 +173,14 @@ try {
   assert.equal(total, 215);
   assert.deepEqual(await evaluate("(() => { const a = document.querySelector('#library input[type=search]').getBoundingClientRect(), right = Math.max(a.right, document.querySelector('#library input[type=search] + button').getBoundingClientRect().right), b = document.querySelector('#library input[type=url]').getBoundingClientRect(), c = document.querySelector('#library form button').getBoundingClientRect(), d = document.querySelector('#library form select').getBoundingClientRect(); return [a.left === b.left, right === c.right, a.height === b.height && b.height === c.height && c.height === d.height]; })()"), [true, true, true], "the input rows line up");
  }
- { // V-04: Designs cards frame their cached page as they come into view and keep it, so a card in view is never blank; the page keeps at most 24.
-  const framed = "[...document.querySelectorAll('#library .library-card-preview')].map(node => { const box = document.getElementById('library').getBoundingClientRect(), r = node.getBoundingClientRect(); return [!!node.querySelector('iframe[src]'), r.bottom > box.top - 260 && r.top < box.bottom + 260, r.bottom > box.top && r.top < box.bottom]; })";
+ { // V-04: Designs cards show a screenshot (never a live page) once they near the view, and keep it, so a card in view is never blank.
+  const framed = "[...document.querySelectorAll('#library .library-card-preview')].map(node => { const box = document.getElementById('library').getBoundingClientRect(), r = node.getBoundingClientRect(); return [!!node.querySelector('img')?.naturalWidth, r.bottom > box.top - 260 && r.top < box.bottom + 260, r.bottom > box.top && r.top < box.bottom]; })";
   const settled = `(states => states.every(([frame, near, shown]) => frame || !shown) && states.some(([frame]) => frame))(${framed})`; // a card in view always has its frame
   await browser("click", "#library [data-tab=designs]"); await browser("wait", "--fn", settled);
   const states = await evaluate(framed);
   assert(states.some(([frame, near]) => !near && !frame), `cards far below the view load no frame: ${JSON.stringify(states)}`);
   for (const top of ["1e6", "0"]) { await evaluate(`document.getElementById('library').scrollTop = ${top}`); await browser("wait", "--fn", settled); }
-  assert((await evaluate(framed)).filter(([frame]) => frame).length <= 24, "at most 24 live card frames");
+  assert.equal(await evaluate("document.querySelectorAll('#library .library-list iframe').length"), 0, "no live page in the grid");
  }
  { // V-10: every component card is a picture; Inspect shows bundled usage and props (no runtime involved).
   await browser("click", "#library [data-tab=components]");
@@ -260,7 +260,7 @@ try {
  assert.equal(await evaluate("localStorage.getItem('design-library:favorites')"), "[]");
  { // V-12: OpenDesign color pages are Themes cards, framed only near the view; Add reference attaches the page with its tokens.
   await browser("fill", "#library input[type=search]", "fixture");
-  const framed = "[...document.querySelectorAll('#library .library-card-preview')].map(node => { const box = document.getElementById('library').getBoundingClientRect(), r = node.getBoundingClientRect(); return [!!node.querySelector('iframe[src]'), r.bottom > box.top - 260 && r.top < box.bottom + 260, r.bottom > box.top && r.top < box.bottom]; })";
+  const framed = "[...document.querySelectorAll('#library .library-card-preview')].map(node => { const box = document.getElementById('library').getBoundingClientRect(), r = node.getBoundingClientRect(); return [!!node.querySelector('img')?.naturalWidth, r.bottom > box.top - 260 && r.top < box.bottom + 260, r.bottom > box.top && r.top < box.bottom]; })";
   const settled = `(states => states.every(([frame, near, shown]) => frame || !shown) && states.some(([frame]) => frame))(${framed})`; // a card in view always has its frame
   await browser("wait", "--fn", settled);
   assert((await evaluate(framed)).some(([frame, near]) => !near && !frame), "color cards far below the view load no frame");

@@ -15,7 +15,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - The mouse Back/Forward buttons no longer switch sessions in the hub; Back now leaves an open design-library card or Explore.
 
 ### Fixed
-- Design and theme previews no longer go blank when you scroll back to them; up to 24 stay loaded.
+- Design and theme previews no longer go blank when you scroll back to them. Cards now show a screenshot of each page instead of running the live page, so there is no limit on how many stay shown; the live page opens when you click the card. Each screenshot is taken once and kept on disk, and taken again only when that design changes.
 - Remembered facts written in Bulgarian (or any non-Latin script) are now recalled; a Bulgarian-only message used to match nothing.
 - `npm run verify` now also runs the compaction-audit test.
 

@@ -128,45 +128,40 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
   img.addEventListener("error", () => img.replaceWith(make("p", "Image unavailable on this host. Metadata is still available.")), { once: true });
   return img;
  }
- // V-04: big card previews load when a card scrolls into view and stay until the cap needs room for another.
- // Only cards out of view make room: unloading a visible one left it blank, since it never scrolls in again.
- const frames = new Map<HTMLElement, string | undefined>(), visible = new Set<HTMLElement>(), cardItems = new WeakMap<HTMLElement, CatalogEntry>(), waiting: (() => void)[] = [];
+ // V-04: a card shows a screenshot of its page (the hub renders it once and keeps it on disk), never a live page;
+ // the live page opens only in the card's detail. It loads when the card nears the view and then stays.
+ const cardItems = new WeakMap<HTMLElement, CatalogEntry>(), waiting: (() => void)[] = [];
  let downloads = 0;
- const unload = (wrap: HTMLElement) => { const id = frames.get(wrap); frames.delete(wrap); if (id) release(id); wrap.querySelector("iframe")?.remove(); };
- const seen = new IntersectionObserver(changes => { for (const change of changes) { const wrap = change.target as HTMLElement; if (change.isIntersecting) { visible.add(wrap); void preview(wrap); } else visible.delete(wrap); } }, { root, rootMargin: "200px 0px" });
- const fit = new ResizeObserver(changes => { for (const change of changes) (change.target as HTMLElement).style.setProperty("--scale", String((change.target as HTMLElement).clientWidth / 1280)); });
+ const seen = new IntersectionObserver(changes => { for (const change of changes) if (change.isIntersecting) { seen.unobserve(change.target); void preview(change.target as HTMLElement); } }, { root, rootMargin: "200px 0px" });
  async function fetched(item: CatalogEntry) {
   if (downloads >= 3) await new Promise<void>(go => waiting.push(go));
   downloads++;
   try { const value = await post("designfetch", { id: item.id }); if (value.entry) Object.assign(item, value.entry); return item.availability === "cached"; }
   finally { downloads--; waiting.shift()?.(); }
  }
- async function preview(wrap: HTMLElement) {
-  if (frames.has(wrap)) { const key = frames.get(wrap); frames.delete(wrap); frames.set(wrap, key); return; } // newest use last
-  if (frames.size >= 24) { const old = [...frames.keys()].find(other => !visible.has(other)); if (old) unload(old); }
-  frames.set(wrap, undefined); wrap.setAttribute("aria-busy", "true");
+ async function preview(wrap: HTMLElement, attempt = 0) {
+  wrap.setAttribute("aria-busy", "true");
   const item = cardItems.get(wrap)!;
+  const failed = (message: string) => {
+   wrap.setAttribute("aria-busy", "false");
+   const retry = make("button", "Retry preview"); retry.type = "button"; retry.addEventListener("click", () => void preview(wrap, attempt + 1));
+   wrap.replaceChildren(make("p", "Preview unavailable: " + message), retry);
+  };
   try {
    if (item.source === "od" && item.availability !== "cached") {
     const cached = await fetched(item);
     const add = wrap.closest("article")?.querySelector<HTMLButtonElement>("[data-add]"); if (add) add.disabled = !cached;
     if (!cached) throw new Error("this package has no preview page");
    }
-   if (!frames.has(wrap)) return;
-   const value = await post("designcard", { id: item.id, revision: item.revision });
-   if (!frames.has(wrap) || !wrap.isConnected) { release(value.key); return; }
-   frames.set(wrap, value.key);
-   const frame = make("iframe"); frame.title = item.name + " preview"; frame.tabIndex = -1; frame.setAttribute("aria-hidden", "true"); frame.setAttribute("sandbox", "allow-scripts"); frame.referrerPolicy = "no-referrer";
-   frame.addEventListener("load", () => wrap.setAttribute("aria-busy", "false"), { once: true });
-   frame.src = `/x/${value.key}/${value.open.split("/").map(encodeURIComponent).join("/")}`; wrap.replaceChildren(frame);
-  } catch (error) {
-   frames.delete(wrap); wrap.setAttribute("aria-busy", "false");
-   const retry = make("button", "Retry preview"); retry.type = "button"; retry.addEventListener("click", () => void preview(wrap));
-   wrap.replaceChildren(make("p", "Preview unavailable: " + error.message), retry);
-  }
+   const shot = make("img"); shot.alt = item.name + " preview"; shot.decoding = "async";
+   shot.addEventListener("load", () => wrap.setAttribute("aria-busy", "false"), { once: true });
+   shot.addEventListener("error", () => failed("the page could not be pictured"), { once: true });
+   shot.src = `api/designthumb?id=${encodeURIComponent(item.id)}&revision=${encodeURIComponent(item.revision)}${attempt ? "&retry=" + attempt : ""}&token=__TOKEN__`;
+   wrap.replaceChildren(shot);
+  } catch (error) { failed(error.message); }
  }
  function cardPreview(item: CatalogEntry) {
-  const wrap = make("div"); wrap.className = "library-card-preview"; cardItems.set(wrap, item); seen.observe(wrap); fit.observe(wrap); return wrap;
+  const wrap = make("div"); wrap.className = "library-card-preview"; cardItems.set(wrap, item); seen.observe(wrap); return wrap;
  }
  function sample(item: CatalogEntry) {
   const request = inspection, loading = make("p", "Opening isolated source sample…"); loading.setAttribute("role", "status"); detail.append(loading);
@@ -300,8 +295,7 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
    if (url) { const page = make("button", "Capture page"); page.type = "button"; page.dataset.capture = ""; page.title = url; page.addEventListener("click", () => void capture(url, "whole", page, feedback)); row.append(page); }
    row.append(feedback); return row;
   };
-  for (const wrap of [...frames.keys()]) unload(wrap);
-  seen.disconnect(); fit.disconnect(); visible.clear();
+  seen.disconnect();
   const groups = new Map<string, CatalogEntry[]>();
   for (const item of matches) { const group = item.availability === "cached" && item.designRevision ? item.designRevision : item.id; if (!groups.has(group)) groups.set(group, []); groups.get(group)!.push(item); }
   list.replaceChildren(...[...groups.values()].map(items => {

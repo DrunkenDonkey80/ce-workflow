@@ -3,14 +3,15 @@
 // (no ?token=) and remotely (no cookie in a sandboxed frame). Such pages run sandboxed: an opaque origin that cannot call the hub.
 import type http from "node:http";
 import { execFile } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { createReadStream, type FSWatcher, watch } from "node:fs";
-import { mkdir, mkdtemp, readdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, extname, join, relative, resolve, isAbsolute } from "node:path";
 import { linkedFile } from "./linked-files.ts";
 import { sevenZip } from "./wormhole.ts";
-import { DESIGN_CSP, SANDBOX_CSP } from "../../extensions/design-render.ts";
+import { DESIGN_CSP, renderDesign, SANDBOX_CSP } from "../../extensions/design-render.ts";
+import { agentDir } from "./rpc-client.ts";
 import { withBridge } from "./design-bridge.ts";
 import { appPreviewFolder, buildInfo } from "../../extensions/design-build.ts";
 import { catalogFiles, catalogFolder, type CatalogEntry } from "../../extensions/design-catalog.ts";
@@ -136,14 +137,33 @@ export async function referencePage(project: string, id: unknown, revision: unkn
 	finally { referencePending.delete(owner); }
 }
 
-/** V-04: a library card's preview serves the cached folder in place (no copy), with the sample CSP; a session keeps its newest 32 (the page keeps 24). */
-export async function cardPage(project: string, id: unknown, revision: unknown, owner: string, remote: boolean) {
-	const { item, directory } = await catalogFolder(project, id, revision);
-	const key = randomBytes(16).toString("hex");
-	folders.set(key, directory); live.set(key, { project, remote, own: true, owner, reference: true, card: true, served: new Set() });
-	const cards = [...live].filter(([, view]) => view.owner === owner && view.card);
-	for (const [old] of cards.slice(0, Math.max(0, cards.length - 32))) unview(old);
-	return { key, open: item.page };
+/** V-04: a library card's screenshot (a live page per card cost too much memory). It is rendered once headless and kept
+ * on disk by the page's content, shared by every project, so only a changed page renders again. */
+const shooting = new Map<string, Promise<Buffer>>(), shotQueue: (() => void)[] = [];
+let shots = 0;
+export async function cardShot(project: string, id: unknown, revision: unknown) {
+	const { item, revision: content } = await catalogFiles(project, id, revision);
+	const key = createHash("sha256").update(`${item.id}\0${item.page}\0${content}`).digest("hex");
+	const file = join(agentDir(), "ce-workflow", "design-thumbs", `${key}.png`);
+	const kept = await readFile(file).catch(() => undefined);
+	if (kept) return kept;
+	let pending = shooting.get(key);
+	if (!pending) { pending = shoot(project, id, revision, file).finally(() => shooting.delete(key)); shooting.set(key, pending); }
+	return pending;
+}
+// shortcut: old shots of changed pages stay on disk (about 100 KB each); prune by age if the folder grows.
+async function shoot(project: string, id: unknown, revision: unknown, file: string) {
+	if (shots >= 2) await new Promise<void>(go => shotQueue.push(go)); // each render starts a headless browser
+	shots++;
+	try {
+		const { item, directory } = await catalogFolder(project, id, revision);
+		const shot = await renderDesign({ folder: directory, screen: item.page!, width: 1280, height: 800, reducedMotion: true, maxEdge: 640 });
+		if (!shot.png.length) throw fail(502, "The page gave no picture.");
+		await mkdir(dirname(file), { recursive: true });
+		const temp = `${file}.${randomBytes(4).toString("hex")}`;
+		await writeFile(temp, shot.png); await rename(temp, file);
+		return shot.png;
+	} finally { shots--; shotQueue.shift()?.(); }
 }
 
 /** Attach the exact isolated sample shown, even when its original studio source has since changed. */

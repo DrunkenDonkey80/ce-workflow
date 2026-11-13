@@ -222,12 +222,12 @@ export async function renderDesign(state: RenderState): Promise<Rendered> {
 	if (state.pageState !== undefined && state.state !== undefined) throw new Error("Choose a captured or named design state, not both.");
 	const width = Math.round(state.width), height = Math.round(state.height);
 	const screen = state.screen ?? "index.html";
-	if (!/^[\w.-]+\.html?$/.test(screen)) throw new Error(`screen must be an HTML file directly in the design folder: ${screen}`);
+	if (!/^(?:[\w-][\w.-]*\/)*[\w.-]+\.html?$/.test(screen)) throw new Error(`screen must be an HTML file in the design folder: ${screen}`); // subfolders allowed, never ..
 	if (!fs.existsSync(path.join(state.folder, screen))) throw new Error(`${screen} does not exist in the design.`);
 	const server = await serve(state.folder);
 	const hash = state.hash ? `#${encodeURIComponent(state.hash.replace(/^#/, ""))}` : "";
 	try {
-		const { steps, page, png } = await visit(`${server.origin}/${encodeURIComponent(screen)}${hash}`, width, height, PAGE_SCRIPT(state), { element: !!state.element, full: state.full, input: state.input, reducedMotion: state.reducedMotion, tolerate: page => !!page.missing });
+		const { steps, page, png } = await visit(`${server.origin}/${screen.split("/").map(encodeURIComponent).join("/")}${hash}`, width, height, PAGE_SCRIPT(state), { element: !!state.element, full: state.full, input: state.input, reducedMotion: state.reducedMotion, tolerate: page => !!page.missing });
 		const report: RenderReport = {
 			state: page.state, viewport: `${width}×${height}`, observedViewport: page.observedViewport ?? "unavailable", readiness: page.readiness,
 			input: { requested: state.input ?? "mouse", requestedReducedMotion: !!state.reducedMotion, touchPoints: page.input?.touchPoints ?? null, coarse: page.input?.coarse ?? null, reducedMotion: page.input?.reducedMotion ?? null }, scrollWidth: page.scrollWidth, overflow: page.scrollWidth > page.vw + 1, wide: page.wide ?? [],

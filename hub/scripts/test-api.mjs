@@ -192,6 +192,14 @@ try {
 		assert.notEqual(draft.revision, selected.revision, "export handoff metadata remains in its exact source revision");
 		assert(saved.some(item => item.id === "export:Orphan" && /v2/.test(item.status)), "an export survives without a studio record");
 		assert.equal(saved.find(item => item.id === "od:example").page, "components.html", "legacy samples fall back from kit to components");
+		{ // V-04: a card is a screenshot rendered once and kept on disk by content; a changed page renders anew.
+			const thumbs = path.join(root, "ce-workflow", "design-thumbs"), route = `designthumb?id=od:example&revision=${commit}`;
+			const first = await get(id, route); assert.equal(first.status, 200); assert.equal(first.body.toString("ascii", 1, 4), "PNG");
+			assert.equal(fs.readdirSync(thumbs).length, 1); assert.deepEqual((await get(id, route)).body, first.body, "the kept shot is served again");
+			write(".pi/designs/systems/example/components.html", html + "<p>changed</p>"); assert.equal((await get(id, route)).status, 200);
+			assert.equal(fs.readdirSync(thumbs).length, 2, "a changed page gets a new shot"); write(".pi/designs/systems/example/components.html", html);
+			assert.equal((await get(id, `designthumb?id=od:example&revision=../x`)).status, 400);
+		}
 		assert.equal((await post(id, "designexample", { id: draft.id, revision: draft.revision, path: "../escape" })).status, 400, "sample requests do not accept paths");
 		assert.equal((await post(id, "designexample", { id: "draft:../escape", revision: draft.revision })).status, 404);
 		assert.equal(await rawGet(`/s/${id}/api/designexample`, {}), 401);

@@ -13,7 +13,7 @@ import { freezeReferenceBundle } from "../../extensions/design-bundles.ts";
 import { FileRefused, gitReadEnv, listFiles, readProjectDiff, readProjectFile } from "./files.ts";
 import { readLinkedImage, readPastedImage, savePastedImage } from "./images.ts";
 import { linkedFile, linkedFiles, openLinkedFile, sendLinkedFile } from "./linked-files.ts";
-import { ARCHIVE, cardPage, designLists, designPage, explore, referencePage, referenceSnapshot, unview, viewPage, watchDesign } from "./explore.ts";
+import { ARCHIVE, cardShot, designLists, designPage, explore, referencePage, referenceSnapshot, unview, viewPage, watchDesign } from "./explore.ts";
 import { sevenZip, startUpload, uploadJob } from "./wormhole.ts";
 import { renderDesign, reportText } from "../../extensions/design-render.ts";
 import { designStateJson, type DesignJson } from "../../extensions/design-state.ts";
@@ -359,6 +359,11 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				response.writeHead(200, { "content-type": bytes[0] === 0x89 ? "image/png" : "image/webp", "content-length": bytes.length, "cache-control": "private, max-age=86400", "x-content-type-options": "nosniff" });
 				response.end(bytes); return;
 			}
+			case "designthumb": { // V-04: a library card's screenshot, rendered once and kept on disk
+				const bytes = await cardShot(folder(id), params.get("id"), params.get("revision"));
+				response.writeHead(200, { "content-type": "image/png", "content-length": bytes.length, "cache-control": "private, max-age=86400", "x-content-type-options": "nosniff" });
+				response.end(bytes); return;
+			}
 			case "file": case "diff":
 				try { return await (endpoint === "file" ? readProjectFile : readProjectDiff)(folder(id), params.get("path")); }
 				catch (error) { throw error instanceof FileRefused ? fail(403, error.message) : error; }
@@ -473,10 +478,6 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				only(data, ["target", "set", "n"], "Invalid fields.");
 				if (typeof data.set !== "string" || !/^s\d{1,9}$/.test(data.set) || !Number.isInteger(data.n) || (data.n as number) < 1 || (data.n as number) > 100) throw fail(400, "Invalid image result.");
 				return call(id, `/api/${endpoint}`, { set: data.set, n: data.n });
-			}
-			case "designcard": {
-				only(data, ["target", "id", "revision"], "Invalid fields.");
-				return cardPage(folder(id), data.id, data.revision, id, remote);
 			}
 			// D1: an OpenDesign card scrolled into view downloads its package once per commit; the fresh entry comes back.
 			case "designfetch": {
