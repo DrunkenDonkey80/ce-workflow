@@ -4,6 +4,7 @@
 import type http from "node:http";
 import { execFile, execFileSync, spawn } from "node:child_process";
 import { mkdirSync, readFileSync, statSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import os from "node:os";
 import { promisify } from "node:util";
 import path from "node:path";
@@ -21,7 +22,7 @@ import { buildInfo } from "../../extensions/design-build.ts";
 import { catalogReference, designCatalog, designDocs, designImage } from "../../extensions/design-catalog.ts";
 import { fetchSystem } from "../../extensions/design.ts";
 import { addDesignReference, designReferences, editDesignReference, referenceAssets, urlReference, urlSnapshot } from "../../extensions/design-references.ts";
-import { currentPlan, listPlans } from "../../extensions/plan3.ts";
+import { currentPlan, listPlans, webPlan } from "../../extensions/plan3.ts";
 import { toForm, toResponse } from "./forms.ts";
 import { nextName as nextFreeName, type Registry, scanRecents, star } from "./registry.ts";
 import type { RpcRecord } from "./rpc-client.ts";
@@ -127,8 +128,13 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	/** Snapshot extras, as ce-workflow's snapshot: target, current, status and (for Pi's own plan) its action state. */
 	async function extras(id: string, wanted?: string | null) {
 		// No seen() here: background tabs and the app's hidden tabs reconnect too; only a page in front of the user posts "seen".
-		const { target, now } = await resolve(id, wanted);
-		const plan = published(id)?.plan; // shortcut: only Pi's current plan carries bias/finishable; another displayed plan shows without its action row until Pi switches to it.
+		const { target, now, resolved } = await resolve(id, wanted);
+		let plan = published(id)?.plan; // shortcut: only Pi's current plan carries bias/finishable; another displayed plan shows without its action row until Pi switches to it.
+		// Parked: the action row is built here from the plan file, with the bias Pi last published; a click resumes the session.
+		if (!host.live.has(id) && resolved.kind === "plan") {
+			const saved = (registry.get(id)?.modes as { planBias?: { id?: string; level?: number } } | undefined)?.planBias;
+			plan = webPlan(resolved.plan, saved?.id === resolved.plan.id ? saved.level ?? 0 : 0, await readFile(resolved.plan.file, "utf8"));
+		}
 		return { target, current: now?.id ?? null, status: await status(id), ...(plan && target.kind === "plan" && plan.id === target.id ? { plan } : {}) };
 	}
 

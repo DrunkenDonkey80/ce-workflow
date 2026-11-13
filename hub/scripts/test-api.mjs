@@ -275,6 +275,14 @@ try {
 	assert.deepEqual(snapshot.target, { kind: "plan", id: "bbbbbbbb" });
 	assert.equal(snapshot.current, "bbbbbbbb");
 	assert.deepEqual(snapshot.status, { folder: "proj", tab: "1", modes: { research: "off", night: "off" }, git: null, commands: [], model: { provider: "fake", id: "fake-2", name: "Fake Two" }, effort: "high", context: null, parked: true });
+	// A parked session still gets the plan action row (Resolve/Review/Finish/Resume), built from the file; a click resumes it.
+	const parkedPlan = ({ id, title, open, bias, planning, finishable }) => ({ id, title, open, bias, planning, finishable });
+	assert.deepEqual(parkedPlan(snapshot.plan), { id: "bbbbbbbb", title: "Newer", open: 0, bias: 0, planning: false, finishable: false });
+	const savedModes = hub.registry.get(id).modes;
+	hub.registry.update(id, { modes: { research: "on", night: "off", planBias: { id: "bbbbbbbb", level: 2 } } });
+	assert.equal((await get(id, "snapshot")).body.plan.bias, 2, "the bias Pi last published for this plan");
+	hub.registry.update(id, { modes: savedModes });
+	assert.equal(hub.host.live.has(id), false, "the plan row does not wake it");
 	execFileSync("git", ["init", "-q", "-b", "work"], { cwd: folder });
 	const loose = fs.readdirSync(folder).filter(name => name !== ".git").length;
 	const { files: gitFiles, ...counts } = (await get(id, "snapshot")).body.status.git;

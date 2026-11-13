@@ -19,6 +19,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - Remembered facts written in Bulgarian (or any non-Latin script) are now recalled; a Bulgarian-only message used to match nothing.
 - `npm run verify` now also runs the compaction-audit test.
 - Project hub links now reach parked sessions too. The hub parks idle sessions, so a linked project often had nothing to send to; now each of its sessions stays reachable as `project-name~hub` and is resumed when a message arrives. The @ menu lists those real names instead of one `Project~Hub` entry that intercom could not find. Update both hubs.
+- A parked session's page keeps its plan actions (Resolve, Review, Finish, Resume and the plan bias): the hub reads them from the plan file, and a click wakes the session to run it. They used to disappear until the session was resumed by hand.
 
 ## 0.8.0 — 2026-11-12
 

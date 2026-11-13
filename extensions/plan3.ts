@@ -615,6 +615,10 @@ function advisorPrompt(kind, plan, advisors, focus) {
 	return `Plan3: ${kind} for the plan at ${JSON.stringify(plan.file)}.\n${boundary}\n\n${launch}${body}\n${questionFormat}\nDo not implement product code. ${HINT_RULE}`;
 }
 
+// planning/finishable drive the page's Resolve/Review/Finish/Resume row, with the same gates as the /plans3 menu; the hub also builds it for a parked session.
+export const webPlan = (plan, bias, text) => ({ id: plan.id, file: plan.file, title: plan.title, status: plan.status, done: plan.done, total: plan.total, open: plan.open, focus: plan.wip[0] ?? plan.next, bias,
+	planning: isPlanning(plan), finishable: isPlanning(plan) && !plan.open && !finishProblems(text).length });
+
 // R24: code-only readiness check.
 export function finishProblems(text) {
 	const { lines } = split(text);
@@ -772,7 +776,7 @@ export default function plan3(pi) {
 	const modelRef = model => ({ provider: model.provider, id: model.id, name: model.name ?? model.id });
 	const contextPercent = ctx => { try { return ctx?.getContextUsage?.()?.percent ?? null; } catch { return null; } };
 	// Session modes for the page: research comes from work-models (absent when that extension is off), night from Plan3.
-	const webModes = () => { const info: { research?: string; design?: string } = {}; pi.events?.emit?.("wo:web-info", info); return { research: info.research ?? "off", night: night.mode(), bias: hubBias, ...info.design && { design: info.design } }; };
+	const webModes = () => { const info: { research?: string; design?: string } = {}; pi.events?.emit?.("wo:web-info", info); return { research: info.research ?? "off", night: night.mode(), bias: hubBias, ...hubPlan && { planBias: { id: hubPlan.id, level: hubPlan.bias } }, ...info.design && { design: info.design } }; };
 	const webStatus = ctx => ({ model: ctx?.model ? modelRef(ctx.model) : null, effort: pi.getThinkingLevel?.() ?? null, context: contextPercent(ctx), modes: webModes() });
 	pi.events?.on?.("wo:modes-changed", () => publishHub());
 	// work-self-update.ts: never reload under running subagents or a compaction.
@@ -788,9 +792,6 @@ export default function plan3(pi) {
 		if (json === hubSent) return;
 		try { hubPublish(hubCtx.ui, "state", state); hubSent = json; } catch { hubCtx = null; } // a stale context after /new or reload; the next refresh rebinds
 	}
-	// planning/finishable drive the page's Resolve/Review/Finish/Resume row, with the same gates as the /plans3 menu.
-	const webPlan = (plan, bias, text) => ({ id: plan.id, file: plan.file, title: plan.title, status: plan.status, done: plan.done, total: plan.total, open: plan.open, focus: plan.wip[0] ?? plan.next, bias,
-		planning: isPlanning(plan), finishable: isPlanning(plan) && !plan.open && !finishProblems(text).length });
 	async function webModels(ctx) {
 		const available = (await ctx.modelRegistry?.getAvailable?.()) ?? [], saved = globalThis[Symbol.for("ce-workflow.scoped-models")]; // /wo Set scoped models
 		const scoped = (saved ? saved.map(id => available.find(model => model.provider + "/" + model.id === id)).filter(Boolean) : (ctx.scopedModels ?? []).filter(entry => entry?.model).map(entry => entry.model)).map(modelRef), keys = new Set(scoped.map(model => model.provider + "/" + model.id));
