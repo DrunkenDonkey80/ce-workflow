@@ -2315,7 +2315,7 @@ function startEarlyCompact(ctx, why = "while you type", ignoreWarms = false) {
 	if (earlyCompact || ctx.isIdle?.() === false || typeof ctx.compact !== "function") return false;
 	const minutes = coldCacheCompactMinutes(ctx, ctx.sessionManager?.getBranch?.() ?? ctx.sessionManager?.getEntries?.() ?? [], Date.now(), ignoreWarms);
 	if (minutes === undefined) return false;
-	ctx.ui?.notify?.(`Prompt cache expired ${minutes}m ago; compacting ${Math.round((ctx.getContextUsage?.()?.tokens ?? 0) / 1000)}k tokens ${why}.`, "info");
+	ctx.ui?.notify?.(`Prompt cache expired ${minutes}m ago; compacting ${Math.round((ctx.getContextUsage?.()?.tokens ?? 0) / 1000)}k tokens ${why}.`, "warning");
 	earlyCompact = new Promise<void>((resolve) => ctx.compact({
 		onComplete: () => resolve(),
 		onError: (error: unknown) => { ctx.ui.notify(`Compaction failed (${formatError(error)}); your message goes without it.`, "warning"); resolve(); },
@@ -2349,7 +2349,7 @@ function startColdCompact(ctx, pi, text, images = undefined) {
 	const minutes = coldCacheCompactMinutes(ctx, ctx.sessionManager?.getBranch?.() ?? ctx.sessionManager?.getEntries?.() ?? []);
 	if (minutes === undefined) return false;
 	const tokens = Math.round((ctx.getContextUsage?.()?.tokens ?? 0) / 1000);
-	ctx.ui?.notify?.(`Prompt cache expired ${minutes}m ago; compacting ${tokens}k tokens before sending.`, "info");
+	ctx.ui?.notify?.(`Prompt cache expired ${minutes}m ago; compacting ${tokens}k tokens before sending.`, "warning");
 	const content = images?.length ? [{ type: "text", text }, ...images] : text;
 	ctx.compact({
 		onComplete: () => pi.sendUserMessage(content),
@@ -4028,7 +4028,7 @@ if (blockedInternalBackgroundCompletionTurn) {
 		const mode = currentCompactionMode(ctx);
 		// Tools outlived the prompt cache: the next request re-bills everything anyway, so a large context compacts first.
 		const coldMinutes = event.toolResults?.length ? coldCacheCompactMinutes(ctx, ctx.sessionManager?.getBranch?.() ?? []) : undefined;
-		if (coldMinutes !== undefined) ctx.ui.notify(`Prompt cache expired during ${coldMinutes}m of tool work; compacting before the next request.`, "info");
+		if (coldMinutes !== undefined) ctx.ui.notify(`Prompt cache expired during ${coldMinutes}m of tool work; compacting before the next request.`, "warning");
 		const forced = boundaryCompactionRequested || coldMinutes !== undefined;
 		if (!forced) {
 			// Provider usage stays low when an upstream proxy compresses requests; the stored transcript keeps growing.

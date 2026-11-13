@@ -97,7 +97,8 @@ export function createChatMirror(pi, publish: (event: string, data: unknown) => 
 	pi.on("input", event => { publish("input", { text: typeof event.text === "string" ? event.text.slice(0, 64_000) : "", source: event.source, streamingBehavior: event.streamingBehavior }); });
 	pi.on("message_start", event => put(event.message, true, true, true));
 	pi.on("message_update", event => put(event.message, true));
-	pi.on("message_end", event => put(event.message, false, true, false, cache.observe(event.message)));
+	// A live cache miss is also a warning in the timeline (SessionView turns cache_miss into a kept notice).
+	pi.on("message_end", event => { const miss = cache.observe(event.message); put(event.message, false, true, false, miss); if (miss) publish("cache_miss", miss); });
 	pi.on("session_compact", () => cache.reset());
 	return {
 		snapshot: () => structuredClone(rows),

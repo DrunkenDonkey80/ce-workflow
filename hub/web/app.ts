@@ -41,6 +41,18 @@ let pendingSubmission: { text: string; refs: string[]; at: number; request?: Ref
 let selectedReferenceIds: string[] = [];
 const referenceRows = new Map<string, DesignReference>();
 const chat = new Map();
+// Kept warnings/errors (hub notices): rows in the chat timeline, placed by time among the message rows.
+let notices: { text: string; level: string; at: number; source: string }[] = [];
+const rowStamp = (id: string) => Number(/^[a-z]+_(\d+)/.exec(id)?.[1] ?? 0);
+function mergeNotices() {
+ const rows = [...chat.values()].filter(row => row.role !== "notice"), first = rowStamp(rows[0]?.id ?? "");
+ notices.forEach((notice, index) => {
+  if (state.more && first && notice.at < first) return; // belongs to older chat that isn't loaded
+  const at = rows.findIndex(row => rowStamp(row.id) > notice.at);
+  rows.splice(at < 0 ? rows.length : at, 0, { id: `notice_${notice.at}_${index}`, role: "notice", text: notice.text, level: notice.level, source: notice.source, at: notice.at, streaming: false });
+ });
+ chat.clear(); for (const row of rows) chat.set(row.id, row);
+}
 
 const BIAS_LABEL = { "-2": "Worker (Plan)", "-1": "Worker (Task)", 0: "Default", 1: "Thinker (Task)", 2: "Thinker (Plan)" };
 // Without a plan the bias is per session: Thinker / Default / Worker.
@@ -912,9 +924,9 @@ const fillChat = () => { const feed = $("feed"); if (state.more && !loadingEarli
 async function loadEarlier() {
  if (loadingEarlier) return; loadingEarlier = true; let loaded = false;
  try {
-  const first = chat.keys().next().value, page = await get("rows" + (first ? "?before=" + encodeURIComponent(first) : ""));
+  const first = [...chat.values()].find(row => row.role !== "notice")?.id, page = await get("rows" + (first ? "?before=" + encodeURIComponent(first) : ""));
   const rows = [...page.rows, ...chat.values()]; chat.clear(); for (const row of rows) chat.set(row.id, row);
-  state.more = page.more; const list = $("feed"), height = list.scrollHeight; renderChat(); list.scrollTop += list.scrollHeight - height; loaded = true;
+  state.more = page.more; mergeNotices(); const list = $("feed"), height = list.scrollHeight; renderChat(); list.scrollTop += list.scrollHeight - height; loaded = true;
  } catch (error) { showNotice(error.message); } finally { loadingEarlier = false; if (loaded) fillChat(); }
 }
 $("to-bottom").addEventListener("click", () => toBottom());
@@ -933,7 +945,7 @@ function renderChat() {
   let shown = 0, bytes = 0, keep = rows.length;
   for (; keep > 0; keep--) {
    const row = rows[keep - 1];
-   if (!compact || row.role === "user" || finals.has(row.id) || row.blocks?.some(block => block.ask) || (cacheMissToggle.checked && row.cacheMiss)) { shown++; bytes += encoder.encode(row.text).length; }
+   if (!compact || row.role === "user" || row.role === "notice" || finals.has(row.id) || row.blocks?.some(block => block.ask) || (cacheMissToggle.checked && row.cacheMiss)) { shown++; bytes += encoder.encode(row.text).length; }
    if (shown > 100 || bytes > 512000 || rows.length - keep >= 3000) break;
   }
   for (const row of rows.splice(0, keep)) chat.delete(row.id);
@@ -954,9 +966,10 @@ function renderChat() {
   // A turn with only thinking/tool calls is a compact block list without the "Agent" header; an empty one is hidden.
   item.className = "message " + row.role + (text ? "" : " message-blocks") + (finals.has(row.id) ? " final" : "") + (row.blocks?.some(block => block.ask) ? " has-ask" : "") + (row.role === "user" && text.startsWith("⏰ Scheduled") ? " scheduled" : ""); item.classList.toggle("has-cache-miss", !!row.cacheMiss); item.hidden = !text && !row.blocks?.length && !note && !row.cacheMiss;
   // Rows are told apart by colour (user block vs plain agent text); the label stays for screen readers.
-  item.children[0].textContent = text ? (row.role === "user" ? "You:" : "Agent:") : ""; item.children[0].className = "sr-only";
+  if (row.role === "notice") item.className = "message notice " + row.level;
+  item.children[0].textContent = row.role === "notice" ? (row.level === "error" ? "Error" : "Warning") : text ? (row.role === "user" ? "You:" : "Agent:") : ""; item.children[0].className = row.role === "notice" ? "notice-label" : "sr-only";
   renderBlocks(item.children[1] as HTMLElement, row); renderLinks(item.children[2] as HTMLElement, row.text);
-  item.children[3].textContent = note; (item.children[4] as HTMLElement).hidden = !row.excerpt;
+  item.children[3].textContent = row.role === "notice" ? `${new Date(row.at).toLocaleString()} \u00b7 ${row.source}` : note; (item.children[4] as HTMLElement).hidden = !row.excerpt;
   item.children[5].textContent = row.cacheMiss ?? "";
  }
  // ✕ on the last prompt takes it and everything after it out of the context (a prompt sent by mistake).
@@ -3003,7 +3016,11 @@ listen("status", value => {
  if (!value?.parked) waking = false; renderShell();
 });
 listen("sessions", () => void loadSessions()); // another session started, finished, asked or parked
-listen("notice", value => showNotice(value.text));
+listen("notice", value => {
+ showNotice(value.text);
+ if (value.level !== "warning" && value.level !== "error") return;
+ notices = [...notices, value].slice(-50); mergeNotices(); renderChat();
+});
 listen("progress", value => setProgress(value)); // e.g. a model picked while parked could not be used (S-11)
 // Plan events always describe Pi's current plan. When Pi switches plans, the page follows it,
 // unless the reader picked another plan in the menu: that view stays until Pi switches again.
@@ -3034,6 +3051,7 @@ listen("snapshot", value => {
  if (target && target !== "product" && value.plan?.id !== target) void get("plans").then(({ plans }) => { const shown = plans.find(item => item.id === target); if (shown) { state.plan = shown; renderShell(); } }, () => {}); state.activity = value.activity ?? {}; state.more = !!value.more;
  // Check-in rows are excerpts again (phones reconnect often): let the newest reply load in full once more.
  chat.clear(); finalLoads.clear(); for (const row of value.chat ?? []) chat.set(row.id, row);
+ notices = value.notices ?? []; mergeNotices();
  // Dialogs over 16 KB arrive brief; fetch their full body.
  promptView.sync((value.dialogs ?? []).filter(ask => !ask.brief));
  for (const ask of value.dialogs ?? []) if (ask.brief) get("dialog?id=" + encodeURIComponent(ask.askId)).then(full => { promptView.pending(full); renderShell(); }, error => showNotice(error.message)); renderActivity(); renderChat(); showNotice(""); renderShell();

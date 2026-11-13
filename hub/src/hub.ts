@@ -11,6 +11,7 @@ import path from "node:path";
 import { Registry, hubDataDir, readSessionSummary, writeJsonAtomic } from "./registry.ts";
 import { SessionHost } from "./sessions.ts";
 import { SessionView } from "./view.ts";
+import { postNotice, readNotices } from "./notices.ts";
 import { createPageApi } from "./api.ts";
 import { Scheduler, timerInput } from "./scheduler.ts";
 import { createUsage, USAGE_PROVIDERS, type Usage, type UsageOptions } from "./usage.ts";
@@ -136,6 +137,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 			subagents: () => { const list = (host.live.get(id)?.published.state as { subagents?: unknown } | undefined)?.subagents; return Array.isArray(list) ? list : []; },
 			viewers: count => { const live = host.live.get(id); if (live) live.viewers = count; viewers(id, count); },
 			forms: () => pageApi.forms(id),
+			notice: text => postNotice(views.get(id), id, text, "warning", "cache"),
 		}));
 		const live = host.live.get(id);
 		if (!value.hydrated) await value.hydrate(live ? (await live.rpc.send({ type: "get_messages" })).data?.messages : undefined);
@@ -187,7 +189,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 		"POST /api/sessions/([0-9a-f-]{36})/fork": (data, m) => host.fork(m[1], String(data.name ?? "")),
 		"POST /api/sessions/([0-9a-f-]{36})/subtitle": (data, m) => host.setSubtitle(m[1], String(data.text ?? "")),
 		// pi-hub notice: a run command's script reports back on the session's open pages (no model turn).
-		"POST /api/sessions/([0-9a-f-]{36})/notice": (data, m) => { if (!registry.get(m[1])) throw Object.assign(new Error("Unknown session."), { status: 404 }); views.get(m[1])?.publish("notice", { text: String(data.text ?? "").slice(0, 2000) }); return { ok: true }; },
+		"POST /api/sessions/([0-9a-f-]{36})/notice": (data, m) => { if (!registry.get(m[1])) throw Object.assign(new Error("Unknown session."), { status: 404 }); postNotice(views.get(m[1]), m[1], String(data.text ?? ""), data.level, "pi-hub notice"); return { ok: true }; },
 		// pi-hub progress: a long job's done/total bar above the chat; the page hides it once finished or stale.
 		"POST /api/sessions/([0-9a-f-]{36})/progress": (data, m) => {
 			if (!registry.get(m[1])) throw Object.assign(new Error("Unknown session."), { status: 404 });
@@ -429,7 +431,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 					const sessionView = await view(page[1]);
 					if (endpoint === "rows") return send(200, await sessionView.page(url.searchParams.get("before") ?? undefined));
 					if (endpoint === "row") return send(200, await sessionView.row(url.searchParams.get("id") ?? ""));
-					const extras = { ...await pageApi.extras(page[1], url.searchParams.get("target")), build: currentBuild(), progress: progressOf(page[1]) };
+					const extras = { ...await pageApi.extras(page[1], url.searchParams.get("target")), build: currentBuild(), progress: progressOf(page[1]), notices: readNotices(page[1]) };
 					if (endpoint !== "events") return send(200, sessionView.snapshot(extras));
 					if (device) {
 						const open = streams.get(device) ?? new Set(); streams.set(device, open.add(response));

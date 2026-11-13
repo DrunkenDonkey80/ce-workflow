@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | parked | prompt <id> <text> | session <id> | fork <id> <name> | subtitle <id> [text] | wake <id> | schedule add message|script --text|--command <s> [--in m|--at time] [--every m] [--until time] [--runs n] | schedule list | schedule cancel <id> | commands add|list|remove [--folder f] [--name n] [--kind prompt|run] [--text t] [--help h] [--local] [--menu] [--actions <json>] | ask <question> [--option o]... [--context c] [--text t] [--multiple] [--no-freeform] [--raw] | ask --json <ask_user json|-> | notice <text> | progress <done> <total> [label] | progress --clear | remote on|off | pair approve|reject | autostart on|off|status
+// pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | parked | prompt <id> <text> | session <id> | fork <id> <name> | subtitle <id> [text] | wake <id> | schedule add message|script --text|--command <s> [--in m|--at time] [--every m] [--until time] [--runs n] | schedule list | schedule cancel <id> | commands add|list|remove [--folder f] [--name n] [--kind prompt|run] [--text t] [--help h] [--local] [--menu] [--actions <json>] | ask <question> [--option o]... [--context c] [--text t] [--multiple] [--no-freeform] [--raw] | ask --json <ask_user json|-> | notice [--warning|--error] <text> | progress <done> <total> [label] | progress --clear | remote on|off | pair approve|reject | autostart on|off|status
 import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync, execSync, spawn } from "node:child_process";
 import http from "node:http";
@@ -327,7 +327,8 @@ try {
 		const words = rest.filter((arg, at) => !arg.startsWith("--") && !VALUED.includes(rest[at - 1]?.slice(2) ?? ""));
 		const session = values("session")[0] ?? process.env.PI_HUB_SESSION;
 		if (!session) throw new Error("Not run by a hub command button: pass --session <hub id>.");
-		if (verb === "notice") { await call(`/api/sessions/${session}/notice`, { text: words.join(" ") }); }
+		// --warning / --error stay in the chat timeline (time, source); a plain notice is a passing toast.
+		if (verb === "notice") { await call(`/api/sessions/${session}/notice`, { text: words.join(" "), level: rest.includes("--error") ? "error" : rest.includes("--warning") ? "warning" : "info" }); }
 		else {
 			const json = values("json")[0];
 			const form = json !== undefined ? JSON.parse(json === "-" ? readFileSync(0, "utf8") : json) : {
@@ -355,7 +356,7 @@ try {
 		console.log(rest[0] === "approve" ? "Device paired." : "Device rejected.");
 	} else if (verb === "autostart" && ["on", "off", "status"].includes(rest[0] ?? "status")) console.log(autostart(rest[0] ?? "status"));
 	else {
-		console.log("Usage: pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | parked | prompt <id> <text> | session <id> | fork <id> <name> | subtitle <id> [text] | wake <id> | schedule add message|script --text|--command <s> [--in m|--at time] [--every m] [--until time] [--runs n] | schedule list | schedule cancel <id> | commands add|list|remove [--folder f] [--name n] [--kind prompt|run] [--text t] [--help h] [--local] [--menu] [--actions <json>] | ask <question> [--option o]... [--context c] [--text t] [--multiple] [--no-freeform] [--raw] | ask --json <ask_user json|-> | notice <text> | progress <done> <total> [label] | progress --clear | remote on|off | pair approve|reject | autostart on|off|status");
+		console.log("Usage: pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | parked | prompt <id> <text> | session <id> | fork <id> <name> | subtitle <id> [text] | wake <id> | schedule add message|script --text|--command <s> [--in m|--at time] [--every m] [--until time] [--runs n] | schedule list | schedule cancel <id> | commands add|list|remove [--folder f] [--name n] [--kind prompt|run] [--text t] [--help h] [--local] [--menu] [--actions <json>] | ask <question> [--option o]... [--context c] [--text t] [--multiple] [--no-freeform] [--raw] | ask --json <ask_user json|-> | notice [--warning|--error] <text> | progress <done> <total> [label] | progress --clear | remote on|off | pair approve|reject | autostart on|off|status");
 		process.exitCode = verb === "help" || verb === "--help" ? 0 : 2;
 	}
 } catch (error) {

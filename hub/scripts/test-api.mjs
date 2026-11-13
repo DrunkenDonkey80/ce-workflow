@@ -525,19 +525,25 @@ try {
 	assert.equal(notifiedFrames.at(-1).length, 2000, "notifications are bounded like hub notices");
 	hub.host.live.get(id).rpc.emit("ui", { type: "extension_ui_request", method: "notify", message: {} });
 	assert.equal(notifiedFrames.length, 2, "malformed notifications are ignored");
+	// Warnings and errors are kept per session and come with every snapshot (the page shows them in the timeline); info is not.
+	const keptNotices = (await get(id, "snapshot")).body.notices;
+	assert.deepEqual(keptNotices.map(({ text, level, source }) => [text, level, source]), [[keptNotices[0].text, "warning", "hub"], ["Plan3: Choose a Plan3 plan.", "error", "session"]]);
+	assert.match(keptNotices[0].text, /Kept the previous model/, "hub notices are kept as warnings");
 	view.publish = beforeNotify;
 
 	// A run button's script asks through pi-hub ask (shim on PATH, PI_HUB_SESSION set) and gets the answer: no model turn.
 	const noticed = [], withDialogs = view.publish;
 	view.publish = (event, value) => { if (event === "notice") noticed.push(value.text); withDialogs(event, value); };
 	const hubPost = (route, data) => fetch(`${origin}${route}`, { method: "POST", headers: { "x-hub-key": localKey, "content-type": "application/json", connection: "close" }, body: JSON.stringify(data) }).then(r => r.json());
-	await hubPost("/api/commands", { action: "add", folder, name: "Deploy", kind: "run", text: "pi-hub ask \"Deploy where?\" --option staging --option prod > answer.txt && pi-hub notice \"Deployed\"" });
+	await hubPost("/api/commands", { action: "add", folder, name: "Deploy", kind: "run", text: "pi-hub ask \"Deploy where?\" --option staging --option prod > answer.txt && pi-hub notice \"Deployed\" && pi-hub notice --warning \"Disk low\"" });
 	assert.deepEqual((await post(id, "run", { name: "Deploy" })).body, { ok: true, started: true });
 	const asked = await until(async () => frames.findLast(frame => frame[0] === "dialog" && frame[1].question === "Deploy where?")?.[1]);
 	assert.deepEqual(asked.options, [{ title: "staging" }, { title: "prod" }]);
 	assert.deepEqual((await get(id, "snapshot")).body.dialogs.map(form => form.askId), [asked.askId]);
 	assert.deepEqual((await post(id, "answer", { askId: asked.askId, selections: ["prod"] })).body, { accepted: true });
 	await until(() => noticed.includes("Deployed"));
+	await until(() => noticed.includes("Disk low"));
+	assert.deepEqual((await get(id, "snapshot")).body.notices.slice(2).map(({ text, level, source }) => [text, level, source]), [["Disk low", "warning", "pi-hub notice"]], "pi-hub notice --warning is kept; a plain notice is not");
 	assert.equal(fs.readFileSync(path.join(folder, "answer.txt"), "utf8").trim(), "prod");
 	// Extra clicks: a bound Shift action runs instead; a menu script lists actions on right-click and gets the picked one back.
 	const script = "node -e \"const e = process.env; if (e.PI_HUB_CLICK === 'menu' && !e.PI_HUB_ACTION) console.log('Fast\\nSlow'); else require('fs').writeFileSync('click.txt', e.PI_HUB_CLICK + ' ' + (e.PI_HUB_ACTION ?? '-'))\"";

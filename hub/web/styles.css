@@ -590,6 +590,11 @@ dialog.annotate { width: min(1400px, 96vw); max-height: 96dvh; padding: 12px 14p
 .message-blocks { margin-bottom: 4px; }
 .message.final { background: var(--final-bg); border-left: 3px solid var(--accent); padding: 8px 12px; border-radius: 6px; }
 .message.final > .row-full { display: none; }
+/* Kept hub warnings/errors in the timeline (every chat view). */
+.message.notice { --tone: var(--warning); background: color-mix(in srgb, var(--tone) 10%, transparent); border-left: 3px solid var(--tone); padding: 6px 12px; border-radius: 6px; }
+.message.notice.error { --tone: var(--error); }
+.message.notice > .notice-label { display: block; color: var(--tone); font-size: 13px; }
+.message.notice > .row-full { display: none; }
 /* Compact keeps prompts and final replies; Thinking drops only tool blocks. While working both keep the latest tool call
    (and Compact the live thinking) so the run is visibly moving. */
 .chat-compact .message .block, .chat-compact .message-blocks, .chat-compact .message.assistant:not(.final), .chat-compact #activity:not(.working) .thinking-row, .chat-compact #activity .tool-row:not(.latest),

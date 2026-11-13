@@ -56,7 +56,7 @@ export class SessionView {
 	private queue: Record<"steering" | "followUp", string[]> = { steering: [], followUp: [] };
 	private sequence = 0;
 	hydrated = false;
-	private readonly session: { file: () => string | undefined; idle: () => boolean; subagents?: () => unknown[]; viewers?: (count: number) => void; forms?: () => Record<string, unknown>[] };
+	private readonly session: { notice?: (text: string) => void; file: () => string | undefined; idle: () => boolean; subagents?: () => unknown[]; viewers?: (count: number) => void; forms?: () => Record<string, unknown>[] };
 
 	constructor(session: SessionView["session"]) {
 		this.session = session;
@@ -66,6 +66,7 @@ export class SessionView {
 	}
 
 	readonly publish = (event: string, value: any) => {
+		if (event === "cache_miss") return this.session.notice?.(value);
 		// D11: no file watcher; the Files tab refreshes after tools that can change files.
 		if (event === "tool" && ["write", "edit", "bash"].includes(value?.name) && value.state !== "running") this.publish("files", {});
 		const frame = `id: ${++this.sequence}\nevent: ${event}\ndata: ${JSON.stringify(value)}\n\n`;

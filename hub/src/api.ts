@@ -31,6 +31,7 @@ import type { Pool } from "./pool.ts";
 import type { ModelRef, ParkedModels } from "./pi-sdk.ts";
 import type { SessionHost } from "./sessions.ts";
 import type { SessionView } from "./view.ts";
+import { postNotice } from "./notices.ts";
 import type { Scheduler } from "./scheduler.ts";
 import { commandMenu, runCommand, type Commands } from "./commands.ts";
 import type { createLinks } from "./link.ts";
@@ -664,13 +665,13 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	});
 	host.on("switched", (id: string) => { views.get(id)?.close(); views.delete(id); }); // the pages reconnect to the new session's chat
 	host.on("closed", (id: string, requestId: string) => views.get(id)?.publish("dialog_closed", { askId: requestId }));
-	host.on("notice", (id: string, text: string) => views.get(id)?.publish("notice", { text }));
+	host.on("notice", (id: string, text: string) => postNotice(views.get(id), id, text, "warning", "hub"));
 	host.on("ui", (id: string, request: RpcRecord) => {
 		const view = views.get(id), form = view && toForm(request);
 		if (form) view.publish("dialog", form);
-		if (view && request.method === "notify" && typeof request.message === "string") view.publish("notice", { text: request.message.slice(0, 2000) });
+		if (request.method === "notify" && typeof request.message === "string") postNotice(view, id, request.message, request.notifyType); // kept even with no page open
 		if (!view || request.method !== "setStatus") return;
-		if (request.statusKey === "pi-hub:notice") { const text = parse(request.statusText)?.text; if (typeof text === "string") view.publish("notice", { text: text.slice(0, 2000) }); }
+		if (request.statusKey === "pi-hub:notice") { const text = parse(request.statusText)?.text; if (typeof text === "string") postNotice(view, id, text, parse(request.statusText)?.level); }
 		if (request.statusKey === "pi-hub:state") {
 			const state = parse(request.statusText);
 			if (state && "plan" in state) view.publish("plan", state.plan ?? null); // null: the plan finished or was closed

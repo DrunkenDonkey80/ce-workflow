@@ -855,6 +855,16 @@ try {
  assert.equal(await evaluate("localStorage.getItem(\"plan3-chat\")"), "compact");
  await browser("click", "#chat-compact");
  assert.equal(await evaluate("document.getElementById(\"chat-compact\").textContent"), "Full", "the third click returns to Full");
+ // Kept warnings/errors are timeline rows in every chat view, labelled, with time and source; info stays a toast only.
+ publish("notice", { text: "Disk low", level: "warning", at: Date.now(), source: "pi-hub notice" });
+ publish("notice", { text: "Just info", level: "info", at: Date.now(), source: "session" });
+ await browser("wait", "--fn", "!!document.querySelector('#messages .message.notice.warning')");
+ assert.equal(await evaluate("document.querySelectorAll('#messages .message.notice').length"), 1, "info notices do not enter the timeline");
+ assert.match(await evaluate("document.querySelector('#messages .message.notice.warning').innerText"), /Warning[\s\S]*Disk low[\s\S]*pi-hub notice/);
+ for (const mode of ["Full", "Thinking", "Compact"]) {
+  assert.equal(await evaluate("document.querySelector('#messages .message.notice.warning').checkVisibility()"), true, mode + " shows kept warnings");
+  await browser("click", "#chat-compact");
+ }
  // Cache misses survive every chat filter, including a tool-only/non-final reply. Off by default, remembered per device.
  const warning = "Cache miss: 30,000 tokens re-billed (~$0.08)";
  publish("delta", { id: "assistant_cache", role: "assistant", offset: 0, text: "Hidden intermediate reply", streaming: false, cacheMiss: warning });
