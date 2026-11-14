@@ -476,4 +476,38 @@ for (const [status, category] of [
 	);
 }
 
+// Codex saved resets: count from wham/usage, earliest live expiry from the credits list;
+// no count = no second request, a failed list keeps the count.
+{
+	const codex = PRODUCTION_PROVIDERS.find((provider) => provider.id === "codex");
+	const iso = (ms) => new Date(now() + ms).toISOString();
+	const run = (count, credits) => {
+		const urls = [];
+		return codex.fetchQuota(stored("fixture-token"), {
+			fetchImpl: async (url) => {
+				urls.push(url);
+				if (url.endsWith("/wham/usage"))
+					return jsonResponse({ ...payloads["chatgpt.com"], rate_limit_reset_credits: { available_count: count } });
+				return credits ? jsonResponse({ credits }) : jsonResponse({}, 500);
+			},
+			signal: new AbortController().signal,
+			now,
+		}).then((windows) => ({ urls, saved: windows.find((window) => window.id === "resets") }));
+	};
+	const none = await run(0, []);
+	assert.equal(none.saved, undefined);
+	assert.equal(none.urls.length, 1, "no saved resets, no credits request");
+	const listed = await run(2, [
+		{ status: "available", expires_at: iso(9 * 86_400_000) },
+		{ status: "redeemed", expires_at: iso(86_400_000) },
+		{ status: "available", expires_at: iso(-1000) },
+		{ status: "available", expires_at: iso(3 * 86_400_000) },
+	]);
+	assert.equal(listed.saved.text, "2 saved resets");
+	assert.equal(listed.saved.resetsAt, now() + 3 * 86_400_000, "earliest live available expiry");
+	const failed = await run(1, undefined);
+	assert.equal(failed.saved.text, "1 saved reset");
+	assert.equal(failed.saved.resetsAt, undefined, "failed list keeps the count");
+}
+
 console.log("usage providers ok");

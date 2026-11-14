@@ -4,11 +4,15 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+## 0.9.5 — 2026-11-14
+
 ### Added
+- Hub usage: Codex accounts with saved (banked) rate-limit resets show how many are left and when the earliest one expires.
 - Hub: while the agent works, the send button reads **Steer** (what it always did: the agent reads your message after its current tool calls). Hold Ctrl and it turns into **Queue**: Ctrl+click or Ctrl+Enter sends the message after the agent finishes instead. On a phone, long-press it to pick Steer or Queue (right-click works too).
-- Hub: warnings and errors no longer vanish after 10 seconds. They stay in the chat as Warning/Error rows with their time and source, in every chat view, and survive refresh, reconnect, parking and hub restarts (the last 50 per session; never sent to the model). This covers extension warnings, hub notices, live cache misses and "Prompt cache expired…" compactions. `pi-hub notice --warning|--error <text>` keeps a script's message; a plain `pi-hub notice` is still a passing toast.
+- Hub: warnings and errors no longer vanish after 10 seconds. They stay in the chat as Warning/Error rows with their time and source, in every chat view, and survive refresh, reconnect, parking and hub restarts (the last 50 per session; never sent to the model). This covers extension warnings, hub notices and "Prompt cache expired…" compactions. `pi-hub notice --warning|--error <text>` keeps a script's message; a plain `pi-hub notice` is still a passing toast.
 
 ### Fixed
+- Hub: cache misses appear only as a red line when the cache-miss checkbox is enabled, without a duplicate Warning card; old duplicate cards are hidden too.
 - Hub: the plan list under the plan title uses the screen height and a wider menu, so more plans fit without scrolling and their titles are cut less.
 - Hub: a question popup no longer slides under the top bar, and its – button minimizes it to a "Waiting for your answer" button under the top bar (your answer is kept); opening a file from it minimizes it too, so the file is not hidden behind it.
 

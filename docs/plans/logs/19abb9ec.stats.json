@@ -1,12 +1,12 @@
 {
  "version": 1,
- "activeMs": 2365775,
- "runs": 2,
- "waitingMs": 943679,
- "toolWallMs": 1502011,
+ "activeMs": 3688630,
+ "runs": 9,
+ "waitingMs": 965485,
+ "toolWallMs": 1870074,
  "compactions": {
-  "count": 1,
-  "ms": 27051
+  "count": 2,
+  "ms": 56692
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
@@ -19,37 +19,48 @@
    "cacheWrite": 249551,
    "cost": 5.275357799999999,
    "errors": 0
+  },
+  "openai-codex/gpt-6-astra:high": {
+   "replies": 68,
+   "thinkingMs": 649160,
+   "actingMs": 172524,
+   "input": 645255,
+   "output": 21160,
+   "cacheRead": 6173568,
+   "cacheWrite": 0,
+   "cost": 13.684118000000003,
+   "errors": 0
   }
  },
  "tools": {
   "bash": {
-   "count": 99,
-   "ms": 449803,
-   "maxMs": 41180,
-   "failures": 6
+   "count": 146,
+   "ms": 752113,
+   "maxMs": 226963,
+   "failures": 14
   },
   "write": {
-   "count": 4,
-   "ms": 8,
-   "maxMs": 3,
+   "count": 8,
+   "ms": 17,
+   "maxMs": 6,
    "failures": 0
   },
   "edit": {
-   "count": 12,
-   "ms": 91,
-   "maxMs": 18,
+   "count": 22,
+   "ms": 234,
+   "maxMs": 83,
    "failures": 1
   },
   "subagents_enable": {
-   "count": 1,
-   "ms": 1,
+   "count": 2,
+   "ms": 2,
    "maxMs": 1,
    "failures": 0
   },
   "subagent": {
-   "count": 1,
-   "ms": 180,
-   "maxMs": 180,
+   "count": 2,
+   "ms": 546,
+   "maxMs": 366,
    "failures": 0
   },
   "plan3": {
@@ -59,7 +70,7 @@
    "failures": 1
   },
   "compaction_note": {
-   "count": 1,
+   "count": 2,
    "ms": 0,
    "maxMs": 0,
    "failures": 0
@@ -71,36 +82,66 @@
    "failures": 2
   },
   "codemode": {
-   "count": 5,
-   "ms": 57683,
-   "maxMs": 44560,
-   "failures": 2
+   "count": 33,
+   "ms": 404238,
+   "maxMs": 243973,
+   "failures": 3
   },
   "read": {
-   "count": 3,
-   "ms": 58,
-   "maxMs": 53,
+   "count": 47,
+   "ms": 1018,
+   "maxMs": 133,
    "failures": 0
   },
   "lens_diagnostics": {
+   "count": 4,
+   "ms": 20517,
+   "maxMs": 13928,
+   "failures": 0
+  },
+  "intercom": {
+   "count": 3,
+   "ms": 1963,
+   "maxMs": 1957,
+   "failures": 0
+  },
+  "jev_evidence": {
    "count": 1,
-   "ms": 4553,
-   "maxMs": 4553,
+   "ms": 6748,
+   "maxMs": 6748,
+   "failures": 0
+  },
+  "schedule": {
+   "count": 2,
+   "ms": 857,
+   "maxMs": 446,
+   "failures": 0
+  },
+  "project_report": {
+   "count": 1,
+   "ms": 103,
+   "maxMs": 103,
+   "failures": 0
+  },
+  "pi_lens_activate_tools": {
+   "count": 1,
+   "ms": 2,
+   "maxMs": 2,
    "failures": 0
   }
  },
  "categories": {
   "shell": {
-   "count": 90,
-   "ms": 349440,
+   "count": 133,
+   "ms": 361222,
    "maxMs": 41180,
-   "failures": 4
+   "failures": 11
   },
   "test": {
-   "count": 9,
-   "ms": 100363,
-   "maxMs": 30114,
-   "failures": 2
+   "count": 13,
+   "ms": 390891,
+   "maxMs": 226963,
+   "failures": 3
   }
  },
  "commands": {
@@ -661,6 +702,234 @@
    "ms": 24462,
    "maxMs": 24462,
    "failures": 0
+  },
+  "bash\u0000git status --short && git log -6 --oneline": {
+   "count": 1,
+   "ms": 133,
+   "maxMs": 133,
+   "failures": 0
+  },
+  "bash\u0000find \"C:/Users/Flex/.pi/agent/sessions\" -name \"*01a1cc64*\" ; rg -n \"Cache miss:|re-billed\" \"hub\" \"extensions\" \"scripts\"; rg --files -g \"*cache*\" -g \"*GLOSSARY*\" -g \"*adr*\" \"docs\" \"scripts\"": {
+   "count": 1,
+   "ms": 342,
+   "maxMs": 342,
+   "failures": 0
+  },
+  "bash\u0000node -e \"const fs=require(\\\"fs\\\"); const p=\\\"C:/Users/Flex/.pi/agent/sessions/--C--soft-git-ce-workflow--/2026-11-11T20-54-53-628Z_01a1cc64-63bc-7053-b1ae-1203749b93f5.jsonl\\\";const es=fs.readFileSync": {
+   "count": 1,
+   "ms": 105,
+   "maxMs": 105,
+   "failures": 0
+  },
+  "bash\u0000ls \"C:/Users/Flex/.pi/agent/sessions/--C--soft-git-ce-workflow--/2026-11-11T20-54-53-628Z_01a1cc64-63bc-7053-b1ae-1203749b93f5\"; rg -n \"cache|knowledge\" \"extensions/work-models.ts\"": {
+   "count": 1,
+   "ms": 95,
+   "maxMs": 95,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/cache-remote-audit.mjs\"": {
+   "count": 1,
+   "ms": 131,
+   "maxMs": 131,
+   "failures": 1
+  },
+  "bash\u0000rg -n \"cache|payload|diagnostic|trace\" \"C:/SOFT/git/pi-provider-claude-ex\" -g \"*.ts\" -g \"AGENTS.md\" -g \"*README*\"; rg -n \"context_with_system|context\\\"\" \"extensions/work-models.ts\"; rg --files \"C:/Use": {
+   "count": 1,
+   "ms": 236,
+   "maxMs": 236,
+   "failures": 1
+  },
+  "bash\u0000node -e \"const fs=require(\\\"fs\\\");const es=fs.readFileSync(\\\"C:/Users/Flex/.pi/agent/sessions/--C--soft-git-ce-workflow--/2026-11-11T20-54-53-628Z_01a1cc64-63bc-7053-b1ae-1203749b93f5.jsonl\\\",\\\"utf8\\\"": {
+   "count": 5,
+   "ms": 485,
+   "maxMs": 121,
+   "failures": 1
+  },
+  "bash\u0000rg -n \"registerContext|systemSafe|imageCompaction|stripProcessed|transforms\" \"extensions/work-models.ts\"; rg --files \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works\" -g \"*": {
+   "count": 1,
+   "ms": 189,
+   "maxMs": 189,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"cache_control|cacheControl|breakpoint|thinking|image\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-ai/dist/api/anthropic-messages.js\"": {
+   "count": 1,
+   "ms": 66,
+   "maxMs": 66,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"export|project\\(\" \"extensions/work-vision.ts\"; rg -n \"cache|prefix|context_with_system\" \"scripts/test-work-context.mjs\"; rg --files \"C:/Users/Flex/.pi/agent\" -g \"*log*\" -g \"!node_modules/**\" -g": {
+   "count": 1,
+   "ms": 220,
+   "maxMs": 220,
+   "failures": 0
+  },
+  "bash\u0000node -e \"const fs=require(\\\"fs\\\");const e=fs.readFileSync(\\\"C:/Users/Flex/.pi/agent/sessions/--C--soft-git-ce-workflow--/2026-11-11T20-54-53-628Z_01a1cc64-63bc-7053-b1ae-1203749b93f5.jsonl\\\",\\\"utf8\\\")": {
+   "count": 1,
+   "ms": 98,
+   "maxMs": 98,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"function buildSessionContext|export.*buildSessionContext|system_message\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist/core/session-manager.j": {
+   "count": 1,
+   "ms": 124,
+   "maxMs": 124,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"export|convertToLlm\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist/core/messages.js\"; rg -n \"getModel\" \"C:/Users/Flex/.pi/agent/install/relea": {
+   "count": 1,
+   "ms": 161,
+   "maxMs": 161,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"anthropic|sessionId|onPayload|thinkingLevel\" \"C:/SOFT/git/pi-provider-claude-ex/index.ts\"; rg -n \"prefix_binding|input_transformations|thinking_dropped\" \"C:/Users/Flex/.pi/agent/install/release": {
+   "count": 1,
+   "ms": 157,
+   "maxMs": 157,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"prefix|cache|thinking|thread\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/CHANGELOG.md\" | head -55; rg -n \"thinkingLevelMessages|providerThinkin": {
+   "count": 1,
+   "ms": 160,
+   "maxMs": 160,
+   "failures": 1
+  },
+  "bash\u0000rg -n \"prefixHash|prefixCount|rememberThread|setThread\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-ai/dist/api/anthropic-messages.js\"; rg -n \"providerThinkingLevel": {
+   "count": 1,
+   "ms": 97,
+   "maxMs": 97,
+   "failures": 0
+  },
+  "bash\u0000node -e \"const fs=require(\\\"fs\\\");const d=JSON.parse(fs.readFileSync(\\\"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-ai/dist/providers/data/anthropic.json\\\",\\\"utf8\\\"))": {
+   "count": 2,
+   "ms": 147,
+   "maxMs": 74,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/cache-prefix-replay.mjs\"": {
+   "count": 4,
+   "ms": 2437,
+   "maxMs": 907,
+   "failures": 0
+  },
+  "bash\u0000git status --short; rg -n \"supportsMessageThreads|compat|reload\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/docs/models-configuration.md\"; node -e \"co": {
+   "count": 1,
+   "ms": 153,
+   "maxMs": 153,
+   "failures": 0
+  },
+  "bash\u0000node -e \"console.log(JSON.stringify(Object.fromEntries(Object.entries(process.env).filter(([k])=>/^PI_.*(HUB|SESSION|AGENT_DIR|CONFIG)/.test(k)&&!/(KEY|TOKEN|SECRET)/.test(k))),null,2))\"; rg -n \"refre": {
+   "count": 1,
+   "ms": 134,
+   "maxMs": 134,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"reload|set_model|get_state\" \"./hub/src/routes\" \"./hub/src\" -g \"*session*\" -g \"*rpc*\" -g \"*command*\" -g \"*server*\" | head -70; rg -n \"port|token\" \"./hub/scripts/pi-hub.mjs\" | head -20; ls \"C:/Us": {
+   "count": 1,
+   "ms": 190,
+   "maxMs": 190,
+   "failures": 1
+  },
+  "bash\u0000rg --files \"./hub\" -g \"*cli*\" -g \"*server*\" -g \"*route*\" -g \"README*\"; rg -n \"constructor|static create|modelsJsonPath|async refresh\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@eare": {
+   "count": 1,
+   "ms": 132,
+   "maxMs": 132,
+   "failures": 1
+  },
+  "bash\u0000rg -n \"reload|/api/sessions|/sessions/.*rpc\" \"./hub/src\" -g \"*.ts\" -g \"!tests\" | head -75; rg -n \"port|token|127.0.0.1\" \"./hub/README.md\"": {
+   "count": 1,
+   "ms": 133,
+   "maxMs": 133,
+   "failures": 0
+  },
+  "bash\u0000node --input-type=module -e \"import {ModelRuntime} from \\\"file:///C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist/core/model-runtime.js\\\"; import asser": {
+   "count": 1,
+   "ms": 650,
+   "maxMs": 650,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"configPath|markerPath|GET /api\" \"./hub/src/hub.ts\" | head -22; rg --files \"./scripts\" -g \"*cache*\" -g \"*audit*\"; ls \"C:/Users/Flex/.pi/agent/pi-control-hub\"": {
+   "count": 1,
+   "ms": 116,
+   "maxMs": 116,
+   "failures": 0
+  },
+  "bash\u0000node --input-type=module -e \"import fs from \\\"node:fs\\\";const dir=\\\"C:/Users/Flex/.pi/agent/pi-control-hub/\\\",config=JSON.parse(fs.readFileSync(dir+\\\"config.json\\\",\\\"utf8\\\")),marker=JSON.parse(fs.read": {
+   "count": 2,
+   "ms": 3504,
+   "maxMs": 3404,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"Cache miss:|cacheMiss|lostTokens|rebilled\" \"./extensions/work-usage.ts\" \"./scripts/benchmark-context-cache-live.mjs\"; rg -n \"case .state|model:|get_state|getModels\" \"./hub/src/api.ts\" | head -3": {
+   "count": 1,
+   "ms": 158,
+   "maxMs": 158,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"Cache miss:|re-billed|cacheMiss\" \"./extensions\" -g \"*.ts\"": {
+   "count": 1,
+   "ms": 69,
+   "maxMs": 69,
+   "failures": 1
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/cache-thread-trial.mjs\"": {
+   "count": 1,
+   "ms": 467,
+   "maxMs": 467,
+   "failures": 0
+  },
+  "bash\u0000git status --short; rg -n \"cache.miss|Cache miss|re-billed|cacheMiss\" \"./hub\" -g \"*.ts\" -g \"*.mjs\"": {
+   "count": 1,
+   "ms": 122,
+   "maxMs": 122,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"source.*cache|notice:|notices|cache_miss\" \"./hub/src/sessions.ts\" \"./hub/src/notices.ts\" \"./hub/web/app.ts\" \"./hub/scripts/test-browser.mjs\"; rg --files \"./hub\" -g \"AGENTS.md\"; git branch --sho": {
+   "count": 1,
+   "ms": 144,
+   "maxMs": 144,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"notice:.*cache|source:.*cache|\\\"cache\\\"|new SessionView|readNotices|postNotice\" \"./hub/src/hub.ts\" \"./hub/src/api.ts\" \"./hub/scripts/test-notices.mjs\"; rg -n \"process.env|process.argv|FILTER|CA": {
+   "count": 1,
+   "ms": 142,
+   "maxMs": 142,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"readNotices|postNotice|kept warning|notices|Disk low\" \"./hub/scripts\" -g \"test-*.mjs\"; rg -n \"cache_miss|notice:\" \"./hub\" -g \"*.ts\" -g \"*.mjs\"": {
+   "count": 1,
+   "ms": 107,
+   "maxMs": 107,
+   "failures": 0
+  },
+  "bash\u0000node \"./hub/scripts/test-chat-files.mjs\"; node \"./hub/scripts/test-view.mjs\"": {
+   "count": 1,
+   "ms": 804,
+   "maxMs": 804,
+   "failures": 1
+  },
+  "bash\u0000node \"./hub/scripts/test-chat-files.mjs\" && node \"./hub/scripts/test-view.mjs\"": {
+   "count": 1,
+   "ms": 62627,
+   "maxMs": 62627,
+   "failures": 0
+  },
+  "bash\u0000git diff --check; git diff -- \"hub/src/chat.ts\" \"hub/src/view.ts\" \"hub/src/hub.ts\" \"hub/src/notices.ts\" \"hub/scripts/test-chat-files.mjs\" \"hub/scripts/test-view.mjs\"": {
+   "count": 1,
+   "ms": 124,
+   "maxMs": 124,
+   "failures": 0
+  },
+  "bash\u0000node \"./hub/scripts/test-browser.mjs\"": {
+   "count": 1,
+   "ms": 226963,
+   "maxMs": 226963,
+   "failures": 0
+  },
+  "bash\u0000git diff --check; git status --short; git show \"HEAD:hub/src/view.ts\" | head -42": {
+   "count": 1,
+   "ms": 188,
+   "maxMs": 188,
+   "failures": 0
   }
  },
  "steps": {
@@ -715,12 +984,14 @@
    "failures": 6
   },
   "(none)": {
-   "ms": 63206,
+   "ms": 1239175,
    "testMs": 0,
-   "replies": 6,
+   "replies": 74,
    "models": {
-    "anthropic/claude-opus-5-5:high": 6
-   }
+    "anthropic/claude-opus-5-5:high": 6,
+    "openai-codex/gpt-6-astra:high": 68
+   },
+   "failures": 4
   }
  },
  "spans": [
@@ -731,6 +1002,34 @@
   {
    "start": "2026-11-13T07:50:40.031Z",
    "ms": 45938
+  },
+  {
+   "start": "2026-11-14T15:37:22.029Z",
+   "ms": 455258
+  },
+  {
+   "start": "2026-11-14T15:47:37.780Z",
+   "ms": 290612
+  },
+  {
+   "start": "2026-11-14T15:54:03.664Z",
+   "ms": 12354
+  },
+  {
+   "start": "2026-11-14T15:54:40.155Z",
+   "ms": 5955
+  },
+  {
+   "start": "2026-11-14T15:57:36.306Z",
+   "ms": 12943
+  },
+  {
+   "start": "2026-11-14T16:01:56.667Z",
+   "ms": 6832
+  },
+  {
+   "start": "2026-11-14T16:29:24.673Z",
+   "ms": 509260
   }
  ],
  "hints": []

@@ -137,7 +137,6 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 			subagents: () => { const list = (host.live.get(id)?.published.state as { subagents?: unknown } | undefined)?.subagents; return Array.isArray(list) ? list : []; },
 			viewers: count => { const live = host.live.get(id); if (live) live.viewers = count; viewers(id, count); },
 			forms: () => pageApi.forms(id),
-			notice: text => postNotice(views.get(id), id, text, "warning", "cache"),
 		}));
 		const live = host.live.get(id);
 		if (!value.hydrated) await value.hydrate(live ? (await live.rpc.send({ type: "get_messages" })).data?.messages : undefined);

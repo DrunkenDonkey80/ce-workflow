@@ -26,15 +26,23 @@ fs.mkdirSync(folder);
  const entries = [reply(0, 0, 30000), { type: "usage", kind: "cache_warm", timestamp: new Date(t + 359000).toISOString(), provider: "p", model: "m", usage: usage(0, 30000) }, reply(360, 30000, 0), { type: "compaction", timestamp: new Date(t + 361000).toISOString() }, reply(362, 30000, 0), { type: "branch_summary", timestamp: new Date(t + 363000).toISOString() }, reply(364, 30000, 0)];
  fs.writeFileSync(file, entries.map(entry => JSON.stringify(entry)).join("\n") + "\n");
  assert.equal((await branchMessages(file)).length, 7);
- const kept = [], view = new SessionView({ file: () => file, idle: () => true, notice: text => kept.push(text) }); await view.hydrate();
+ const view = new SessionView({ file: () => file, idle: () => true }); await view.hydrate();
  assert.equal(view.snapshot().chat.length, 4, "reset/warm markers do not become visible rows");
  assert.equal(view.snapshot().chat[1].cacheMiss, "Cache miss: 30,000 tokens re-billed (~$0.08)", "warming updated the idle clock");
  assert(!view.snapshot().chat[2].cacheMiss && !view.snapshot().chat[3].cacheMiss, "compaction and branch summary reset the baseline");
- // A live miss is also a kept warning notice; misses found while reading history are not re-announced.
- assert.deepEqual(kept, []);
+ // Live misses retain the same inline annotation as history.
  for (const entry of [reply(400, 0, 30000), reply(800, 30000, 0)]) view.feed({ type: "message_end", message: entry.message });
- assert.deepEqual(kept, ["Cache miss after 7m idle: 30,000 tokens re-billed (~$0.08)"]);
+ assert.equal(view.snapshot().chat.at(-1).cacheMiss, "Cache miss after 7m idle: 30,000 tokens re-billed (~$0.08)");
  view.close();
+}
+
+// Old duplicate cache cards disappear on reload without hiding other saved warnings.
+{
+ const { readNotices } = await import("../src/notices.ts");
+ const dir = path.join(root, "pi-control-hub", "notices"); fs.mkdirSync(dir, { recursive: true });
+ const other = { text: "Disk low", level: "warning", at: 2, source: "session" };
+ fs.writeFileSync(path.join(dir, "legacy.json"), JSON.stringify([{ text: "Cache miss: 30,000 tokens re-billed", level: "warning", at: 1, source: "cache" }, other]));
+ assert.deepEqual(readNotices("legacy"), [other], "legacy cache notices must not duplicate inline warnings");
 }
 
 // A tree session: 50 messages on the current branch plus one abandoned branch entry that must not show.

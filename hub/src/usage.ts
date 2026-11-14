@@ -154,7 +154,7 @@ function whamWindow(value, fallback, now) {
 function codexParser(payload, now) {
 	const rate = table(payload).rate_limit;
 	if (!rate || typeof rate !== "object") throw new QuotaError("unavailable");
-	return complete(
+	const windows = complete(
 		[
 			whamWindow(rate.primary_window, "5h", now),
 			whamWindow(rate.secondary_window, "7d", now),
@@ -162,6 +162,27 @@ function codexParser(payload, now) {
 			.filter(Boolean)
 			.sort((a, b) => Number(b.id === "5h") - Number(a.id === "5h")),
 	);
+	// Saved (banked) resets: the count rides on this payload; codexResets adds the expiry.
+	const saved = table(table(payload).rate_limit_reset_credits).available_count;
+	if (finite(saved) && saved > 0)
+		windows.push({ id: "resets", label: "resets", usedPercent: 0, text: `${saved} saved reset${saved === 1 ? "" : "s"}` });
+	return windows;
+}
+
+// Earliest expiry of the saved resets; asked only when there are some, and best effort:
+// a failure here keeps the count and the windows.
+async function codexResets(windows, auth, options, headers) {
+	const saved = windows.find((w) => w.id === "resets");
+	if (!saved) return windows;
+	try {
+		const list = table(await requestJson("https://chatgpt.com/backend-api/wham/rate-limit-reset-credits", headers(auth), options)).credits;
+		const ends = (Array.isArray(list) ? list : [])
+			.filter((c) => table(c).status === "available")
+			.map((c) => Date.parse(table(c).expires_at))
+			.filter((at) => at > options.now());
+		if (ends.length) saved.resetsAt = Math.min(...ends);
+	} catch { /* count only */ }
+	return windows;
 }
 
 function claudeParser(payload) {
@@ -492,21 +513,27 @@ function provider({
 	});
 }
 
+const codexHeaders = (auth) => {
+	const headers = authHeaders(auth, { "user-agent": "codex-cli" });
+	const source = table(auth?.auth?.headers);
+	for (const [key, value] of Object.entries(source))
+		if (key.toLowerCase() === "chatgpt-account-id")
+			headers["chatgpt-account-id"] = value;
+	return headers;
+};
+const codexUsage = provider({
+	id: "codex",
+	label: "Codex",
+	piProviderId: "openai-codex",
+	url: "https://chatgpt.com/backend-api/wham/usage",
+	parser: codexParser,
+	headers: codexHeaders,
+});
+
 export const PRODUCTION_PROVIDERS = Object.freeze([
-	provider({
-		id: "codex",
-		label: "Codex",
-		piProviderId: "openai-codex",
-		url: "https://chatgpt.com/backend-api/wham/usage",
-		parser: codexParser,
-		headers: (auth) => {
-			const headers = authHeaders(auth, { "user-agent": "codex-cli" });
-			const source = table(auth?.auth?.headers);
-			for (const [key, value] of Object.entries(source))
-				if (key.toLowerCase() === "chatgpt-account-id")
-					headers["chatgpt-account-id"] = value;
-			return headers;
-		},
+	Object.freeze({
+		...codexUsage,
+		fetchQuota: async (auth, options) => codexResets(await codexUsage.fetchQuota(auth, options), auth, options, codexHeaders),
 	}),
 	// Poll at the normal cadence while the pool cache serves us (a file read costs
 	// nothing); fall back to the slow, rate-limited direct cadence otherwise.
@@ -769,7 +796,8 @@ export function createUsage({ dataDir, hidden = () => [], auth = () => piAuth(),
 				// Refills within 48 h become marks on the 7d bar; the active account shows as the pool's "→" row.
 				const soon = text.filter(w => w.id.startsWith("refill-") && w.resetsAt && w.resetsAt > at && w.resetsAt - at <= 48 * 3_600_000)
 					.map(w => ({ left: Math.round(100 - w.usedPercent), in: formatDuration(w.resetsAt! - at) }));
-				const notes = text.filter(w => !w.color && !w.id.startsWith("refill-") && w.id !== "active").map(w => w.text);
+				const notes = text.filter(w => !w.color && !w.id.startsWith("refill-") && w.id !== "active")
+					.map(w => w.id === "resets" && w.resetsAt && w.resetsAt > at ? `${w.text}, next expires in ${formatDuration(w.resetsAt - at)}` : w.text);
 				return week ? [{ id: entry.id, label: entry.label, window: week.label, left: Math.round(100 - week.usedPercent), color: quotaColor(week.usedPercent), resets, bars, warnings, notes, soon }] : [];
 			});
 			return { summary, accounts: hidden().includes("claude") ? [] : poolAccountLines() };

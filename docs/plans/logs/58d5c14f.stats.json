@@ -1,50 +1,50 @@
 {
  "version": 1,
- "activeMs": 5305186,
- "runs": 11,
+ "activeMs": 7783788,
+ "runs": 17,
  "waitingMs": 0,
- "toolWallMs": 3145117,
+ "toolWallMs": 4409142,
  "compactions": {
-  "count": 5,
-  "ms": 119130
+  "count": 7,
+  "ms": 180044
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
-   "replies": 271,
-   "thinkingMs": 1176846,
-   "actingMs": 548164,
-   "input": 696,
-   "output": 168217,
-   "cacheRead": 27259791,
-   "cacheWrite": 1159127,
-   "cost": 14.6147172,
+   "replies": 414,
+   "thinkingMs": 1743641,
+   "actingMs": 776135,
+   "input": 1116,
+   "output": 238141,
+   "cacheRead": 39842023,
+   "cacheWrite": 2382786,
+   "cost": 24.649618599999997,
    "errors": 0
   }
  },
  "tools": {
   "bash": {
-   "count": 198,
-   "ms": 2738321,
+   "count": 315,
+   "ms": 3853397,
    "maxMs": 600151,
-   "failures": 7
+   "failures": 11
   },
   "read": {
-   "count": 48,
-   "ms": 1065,
-   "maxMs": 558,
+   "count": 60,
+   "ms": 2226,
+   "maxMs": 974,
    "failures": 0
   },
   "edit": {
-   "count": 53,
-   "ms": 1943,
+   "count": 64,
+   "ms": 2164,
    "maxMs": 1048,
-   "failures": 2
+   "failures": 3
   },
   "compaction_note": {
-   "count": 3,
+   "count": 5,
    "ms": 0,
    "maxMs": 0,
-   "failures": 0
+   "failures": 1
   },
   "plan3": {
    "count": 19,
@@ -59,8 +59,8 @@
    "failures": 0
   },
   "lens_diagnostics": {
-   "count": 3,
-   "ms": 48025,
+   "count": 7,
+   "ms": 66193,
    "maxMs": 35928,
    "failures": 0
   },
@@ -69,18 +69,30 @@
    "ms": 143946,
    "maxMs": 31475,
    "failures": 2
+  },
+  "intercom": {
+   "count": 5,
+   "ms": 16,
+   "maxMs": 9,
+   "failures": 1
+  },
+  "write": {
+   "count": 1,
+   "ms": 5,
+   "maxMs": 5,
+   "failures": 0
   }
  },
  "categories": {
   "shell": {
-   "count": 171,
-   "ms": 514434,
+   "count": 270,
+   "ms": 990066,
    "maxMs": 253053,
-   "failures": 6
+   "failures": 10
   },
   "test": {
-   "count": 27,
-   "ms": 2223887,
+   "count": 45,
+   "ms": 2863331,
    "maxMs": 600151,
    "failures": 1
   }
@@ -92,28 +104,10 @@
    "maxMs": 143,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && wc -l \"scripts/test-link.mjs\" && cat \"scripts/test-link.mjs\"": {
-   "count": 1,
-   "ms": 64,
-   "maxMs": 64,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && rg -n \"links\\.|links:\" \"src/api.ts\" \"src/hub.ts\" | cut -c1-260; rg -n \"function formatAttachments\" -A14 \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-intercom/index.ts\"; rg -n \"attachment": {
    "count": 1,
    "ms": 170,
    "maxMs": 170,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && sed -n \"312,334p\" \"src/api.ts\" | cut -c1-260; rg -n \"openHubLinks\" \"web/app.ts\"": {
-   "count": 1,
-   "ms": 88,
-   "maxMs": 88,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"remote\\.record|link\\.session|link\\.remote|\\.session\\b\" \"src/link.ts\" | cut -c1-200": {
-   "count": 1,
-   "ms": 96,
-   "maxMs": 96,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs'); let a=fs.readFileSync('src/api.ts','utf8'); a=a.replace('case \\\"link\\\": return links.link(session, hub, String(data.record ?? \\\"\\\"));','case \\\"link\\\": r": {
@@ -140,12 +134,6 @@
    "maxMs": 4271,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && sed -n \"170,176p\" \"scripts/test-link.mjs\"": {
-   "count": 1,
-   "ms": 41,
-   "maxMs": 41,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && sed -i \"175s/C:\\\\\\\\w\\\\\\\\emailupload/C:\\\\\\\\\\\\\\\\w\\\\\\\\\\\\\\\\emailupload/\" \"scripts/test-link.mjs\" && sed -n \"175p\" \"scripts/test-link.mjs\" && node --test \"scripts/test-link.mjs\" 2>&1 | rg -v ": {
    "count": 1,
    "ms": 3468,
@@ -156,12 +144,6 @@
    "count": 2,
    "ms": 20643,
    "maxMs": 13147,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"comm: [12]|from \\\"../src/link.ts\\\"\" \"scripts/test-remote.mjs\" | cut -c1-120": {
-   "count": 1,
-   "ms": 73,
-   "maxMs": 73,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && sed -n \"1,20p\" \"scripts/test-remote.mjs\" | rg -n \"^import\" ; node -e \" const fs=require('fs');let t=fs.readFileSync('scripts/test-remote.mjs','utf8'); const lines=t.split('\\n'); for(let ": {
@@ -180,12 +162,6 @@
    "count": 1,
    "ms": 60983,
    "maxMs": 60983,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && git diff --stat -- hub/src/hub.ts hub/src/link.ts hub/scripts/test-link.mjs hub/scripts/test-remote.mjs hub/src/api.ts && git diff -U0 -- hub/src/api.ts | rg \"^@@\"": {
-   "count": 1,
-   "ms": 113,
-   "maxMs": 113,
    "failures": 0
   },
   "bash\u0000cd \".\" && git diff -U0 -- hub/src/api.ts | awk \"/^@@ -472/{skip=1} /^@@ -328/{skip=0} !skip\" > \"$TEMP/api-mine.patch\" && cat \"$TEMP/api-mine.patch\" | cut -c1-120 && git apply --cached --unidiff-zero \"": {
@@ -212,12 +188,6 @@
    "maxMs": 172,
    "failures": 0
   },
-  "bash\u0000cd \".\" && git diff -U0 -- hub/web/app.ts hub/web/styles.css | rg \"^(@@|\\+\\+\\+)\" | cut -c1-150": {
-   "count": 1,
-   "ms": 110,
-   "maxMs": 110,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && git diff -U1 -- hub/web/app.ts | sed -n \"1,40p\" | cut -c1-220; git diff -U1 -- hub/web/styles.css hub/web/index.html | cut -c1-200 | head -40": {
    "count": 1,
    "ms": 125,
@@ -242,12 +212,6 @@
    "maxMs": 179,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && sed -n \"46,62p\" \"src/hub.ts\" | cut -c1-200; rg -n \"^import\" \"src/hub.ts\" | rg \"link\"": {
-   "count": 1,
-   "ms": 98,
-   "maxMs": 98,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && rg -n \"DELIVER_MS|function call|fetchRequest|case \\\"deliver\\\"|case \\\"ping\\\"|async function serve|function forward|wakeAndSend|const tell|^export const|^import|timeout\" \"src/link.ts\" | cu": {
    "count": 1,
    "ms": 118,
@@ -258,18 +222,6 @@
    "count": 1,
    "ms": 187,
    "maxMs": 187,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"savePastedImage\" -A22 \"src/images.ts\" | head -40; sed -n \"1,80p\" \"scripts/test-link.mjs\" | cut -c1-220": {
-   "count": 1,
-   "ms": 110,
-   "maxMs": 110,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && sed -n \"402,500p\" \"src/link.ts\" | cut -c1-200; rg -n \"const link = |const remote = |async function link|async function remote\" \"scripts/test-remote.mjs\" | cut -c1-250": {
-   "count": 1,
-   "ms": 116,
-   "maxMs": 116,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && rg -n \"\\\"./link.ts\\\"|await body\\(request, PAGE_BODY\\)\" \"src/hub.ts\" | cut -c1-200": {
@@ -284,12 +236,6 @@
    "maxMs": 214,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && rg -n \"linkRequest|PAGE_BODY|413\" \"scripts/test-remote.mjs\" | cut -c1-260": {
-   "count": 1,
-   "ms": 92,
-   "maxMs": 92,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && node --test \"scripts/test-remote.mjs\" 2>&1 | rg -v \"^ℹ|Experimental|trace-warnings\" | tail -25": {
    "count": 1,
    "ms": 61029,
@@ -300,12 +246,6 @@
    "count": 1,
    "ms": 118,
    "maxMs": 118,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"info.model|const hubs = \\{\\}|if \\(offline.has\\(url\\)\\)\" \"scripts/test-link.mjs\" | cut -c1-200": {
-   "count": 1,
-   "ms": 78,
-   "maxMs": 78,
    "failures": 0
   },
   "bash\u0000cd \".\" && git diff --stat -- hub/src hub/scripts && git diff -U0 -- hub/src/hub.ts | rg \"^[-+][^-+]\" | cut -c1-160": {
@@ -326,24 +266,6 @@
    "maxMs": 157,
    "failures": 0
   },
-  "bash\u0000cd \".\" && rg -n -i \"hub link|Hub links|~hub|pair\" hub/README.md | cut -c1-220 | head -20": {
-   "count": 1,
-   "ms": 95,
-   "maxMs": 95,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && git diff --stat -- CHANGELOG.md; sed -n \"270p\" CHANGELOG.md | cut -c1-600": {
-   "count": 1,
-   "ms": 83,
-   "maxMs": 83,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && git status --short | head -30; git log --oneline -3 -- hub/scripts/test-browser.mjs": {
-   "count": 1,
-   "ms": 114,
-   "maxMs": 114,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && git diff -- CHANGELOG.md | rg \"^[-+]\" | cut -c1-120; rg -n -i \"hub links|links\\b.*sessions|remoteSessions|/links\" hub/scripts/test-browser.mjs | head | cut -c1-200": {
    "count": 1,
    "ms": 131,
@@ -356,22 +278,10 @@
    "maxMs": 150,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && sed -n \"2084,2125p\" web/app.ts | cut -c1-260; rg -n \"^async function post|^function post|const post = \" -A4 web/app.ts | cut -c1-220": {
-   "count": 1,
-   "ms": 93,
-   "maxMs": 93,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && rg -n \"setup\" scripts/changelog-shot.mjs | cut -c1-220; rg -n \"openSessionMenu\\(\" web/app.ts | cut -c1-220": {
    "count": 1,
    "ms": 123,
    "maxMs": 123,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && sed -n \"2030,2042p\" web/app.ts | cut -c1-200; rg -n \"sessionMenu = |id=\\\"session-menu\\\"\" web/app.ts web/index.html | cut -c1-200": {
-   "count": 1,
-   "ms": 116,
-   "maxMs": 116,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && cat > \"$TEMP/hl-setup.js\" <<'EOF' const real = window.fetch, json = value => new Response(JSON.stringify(value), { status: 200, headers: { \"content-type\": \"application/json\" } }); const ": {
@@ -398,12 +308,6 @@
    "maxMs": 258,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && rg -n \"linked: |standins|linksOf\" src web/app.ts | cut -c1-260": {
-   "count": 1,
-   "ms": 77,
-   "maxMs": 77,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && rg -n \"createLinks\\(\" -A6 src/hub.ts | cut -c1-300; rg -n \"cleanSessions|inFolder|sessions: inFolder|live\" src/link.ts | cut -c1-260": {
    "count": 1,
    "ms": 124,
@@ -416,22 +320,10 @@
    "maxMs": 182,
    "failures": 0
   },
-  "bash\u0000cd \"$HOME/.pi/agent/pi-control-hub\" && node -e \"const l=JSON.parse(require('fs').readFileSync('links.json','utf8'));console.log(JSON.stringify(l,null,1).slice(0,3000))\"; ls": {
-   "count": 1,
-   "ms": 92,
-   "maxMs": 92,
-   "failures": 0
-  },
   "bash\u0000cd \"$HOME/.pi/agent/pi-control-hub\" && node -e \"const s=JSON.parse(require('fs').readFileSync('sessions.json','utf8'));const list=Array.isArray(s)?s:(s.sessions??s.records??Object.values(s));console.l": {
    "count": 1,
    "ms": 146,
    "maxMs": 146,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"live = false|live: false|woken|resuming\" scripts/test-link.mjs | cut -c1-240; sed -n \"333,340p\" src/link.ts": {
-   "count": 1,
-   "ms": 96,
-   "maxMs": 96,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && node --test \"scripts/test-link.mjs\" 2>&1 | rg -v \"^ℹ\" | tail -20": {
@@ -446,12 +338,6 @@
    "maxMs": 803,
    "failures": 0
   },
-  "bash\u0000cd \".\" && rg -n \"^## |^### \" CHANGELOG.md | head -8; git diff --stat -- CHANGELOG.md": {
-   "count": 1,
-   "ms": 92,
-   "maxMs": 92,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && git diff -- hub/web/app.ts | rg \"^[-+]\" | cut -c1-140": {
    "count": 1,
    "ms": 191,
@@ -464,28 +350,10 @@
    "maxMs": 301,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && rg -n -i \"parked\" web/app.ts src/api.ts src/hub.ts | rg -i \"plan|question|review|finish|disabled|hidden|live\" | cut -c1-260 | head -40": {
-   "count": 1,
-   "ms": 92,
-   "maxMs": 92,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && rg -n \"published\\b|function published|const published\" hub/src/api.ts | cut -c1-220 | head; rg -n \"finishable\" --glob \"!**/node_modules/**\" --glob \"!docs/**\" -l . | head -20": {
    "count": 1,
    "ms": 134,
    "maxMs": 134,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && rg -n \"finishable|bias\" extensions/plan3.ts | cut -c1-260 | head -30": {
-   "count": 1,
-   "ms": 101,
-   "maxMs": 101,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && rg -n \"isPlanning|finishProblems\" extensions --glob \"*.ts\" | rg \"export|import|function|const isPlanning|const finishProblems\" | cut -c1-220; sed -n \"1,12p;40,75p\" hub/src/api.ts | cut -c1-2": {
-   "count": 1,
-   "ms": 113,
-   "maxMs": 113,
    "failures": 0
   },
   "bash\u0000cd \".\" && rg -n \"listPlans|currentPlan\" hub/src/api.ts | head -3 | cut -c1-200; sed -n \"600,660p\" extensions/plan3.ts; sed -n \"1,38p\" extensions/plan3.ts | rg -n \"^import\" | cut -c1-200": {
@@ -494,70 +362,10 @@
    "maxMs": 192,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && rg -n \"finishable|planning\\b|state.plan\\b|state\\.plan\\?\" web/app.ts | cut -c1-260 | head -30": {
-   "count": 1,
-   "ms": 69,
-   "maxMs": 69,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"\\\"plans\\\"|case \\\"plans\\\"|/api/plans|api/command\\b|\\\"command\\\"\" src/api.ts src/hub.ts | cut -c1-260 | head": {
-   "count": 1,
-   "ms": 73,
-   "maxMs": 73,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && rg -n \"extras\\(\" hub/src/*.ts | cut -c1-200; rg -n \"open:|started\" extensions/plan3.ts | rg -n \"listPlans|parsePlan|open:|started:\" | head | cut -c1-220; rg -n \"^export (async )?function (li": {
    "count": 1,
    "ms": 146,
    "maxMs": 146,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"modes\" src/host.ts src/registry.ts src/hub.ts 2>/dev/null | cut -c1-240 | head": {
-   "count": 1,
-   "ms": 71,
-   "maxMs": 71,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"modes\" src --glob \"*.ts\" | rg -v \"^src/api.ts:(55|118)\" | cut -c1-240 | head": {
-   "count": 1,
-   "ms": 88,
-   "maxMs": 88,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && rg -n \"hubBias\" extensions/plan3.ts | cut -c1-220": {
-   "count": 1,
-   "ms": 96,
-   "maxMs": 96,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"publish\\(\\\"plan\\\"|\\\"plan\\\", |snapshot\\b.*park|on\\(\\\"exit\\\"|parked\\b.*publish\" src --glob \"*.ts\" | cut -c1-240 | head": {
-   "count": 1,
-   "ms": 74,
-   "maxMs": 74,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && sed -n \"144,160p\" src/hub.ts | cut -c1-260; sed -n \"655,675p\" src/api.ts | cut -c1-260": {
-   "count": 1,
-   "ms": 86,
-   "maxMs": 86,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && rg -n \"finishable|parked\" hub/scripts/test-api.mjs | cut -c1-260 | head -20; sed -n \"286,300p\" extensions/plan3.ts | cut -c1-200": {
-   "count": 1,
-   "ms": 116,
-   "maxMs": 116,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"plan3.md|docs/plans|snapshot = |const snapshot\" scripts/test-api.mjs | cut -c1-220 | head; sed -n \"274,280p\" scripts/test-api.mjs | cut -c1-260": {
-   "count": 1,
-   "ms": 110,
-   "maxMs": 110,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && sed -n \"25,40p\" scripts/test-api.mjs | cut -c1-260; rg -n \"writePlan\\(|plan\\(\\\"\" scripts/test-api.mjs | head -5 | cut -c1-200": {
-   "count": 1,
-   "ms": 115,
-   "maxMs": 115,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && node --test \"scripts/test-api.mjs\" 2>&1 | rg -v \"^ℹ|Experimental|trace-warnings\" | tail -25": {
@@ -578,12 +386,6 @@
    "maxMs": 9212,
    "failures": 0
   },
-  "bash\u0000cd \".\" && git status --short && git diff --stat -- extensions/plan3.ts hub/src/api.ts hub/scripts/test-api.mjs CHANGELOG.md": {
-   "count": 1,
-   "ms": 96,
-   "maxMs": 96,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && git add extensions/plan3.ts hub/src/api.ts hub/scripts/test-api.mjs CHANGELOG.md && git commit -q -m \"Hub: parked sessions keep the plan action row; a click wakes them\" && git log --oneline ": {
    "count": 1,
    "ms": 206,
@@ -601,18 +403,6 @@
    "ms": 239,
    "maxMs": 239,
    "failures": 0
-  },
-  "bash\u0000cd \".\" && git diff --name-only origin/master HEAD | rg -v \"^docs/\"; sed -n \"5,23p\" CHANGELOG.md | cut -c1-120": {
-   "count": 1,
-   "ms": 105,
-   "maxMs": 105,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && ls scripts hub/scripts | rg -i \"night|design-render|design|explore|compaction-audit|typecheck\" ; rg -n \"\\\"(typecheck|check|lint)[^\\\"]*\\\":\" package.json hub/package.json": {
-   "count": 1,
-   "ms": 108,
-   "maxMs": 108,
-   "failures": 1
   },
   "bash\u0000cd \".\" && for t in scripts/test-run-budget.mjs scripts/test-compare-benchmark-runs.mjs scripts/test-work-knowledge-retrieval.mjs scripts/test-work-plan3-night.mjs scripts/test-work-design.mjs scripts/": {
    "count": 1,
@@ -662,42 +452,6 @@
    "maxMs": 134,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && rg -n \"^import .*(playwright|puppeteer|chrome)\" scripts/test-browser.mjs | head -3": {
-   "count": 1,
-   "ms": 82,
-   "maxMs": 82,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"import|launch|chrome|msedge\" scripts/test-browser.mjs | head -12 | cut -c1-200": {
-   "count": 1,
-   "ms": 81,
-   "maxMs": 81,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && T=\"$(cygpath -w /tmp 2>/dev/null || echo C:/Users/Flex/AppData/Local/Temp)\"; f=\"$LOCALAPPDATA/Temp/tbl.html\"; { printf '<meta name=\"viewport\" content=\"width=device-width\"><link rel=\"styl": {
-   "count": 1,
-   "ms": 112,
-   "maxMs": 112,
-   "failures": 1
-  },
-  "bash\u0000ls \"/c/Program Files/Google/Chrome/Application/chrome.exe\" \"/c/Program Files (x86)/Google/Chrome/Application/chrome.exe\" \"/c/Program Files/Microsoft/Edge/Application/msedge.exe\" 2>/dev/null": {
-   "count": 1,
-   "ms": 58,
-   "maxMs": 58,
-   "failures": 1
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"execFile\\w*\\(|spawn\\(\" scripts/test-browser.mjs | head -5 | cut -c1-220": {
-   "count": 1,
-   "ms": 76,
-   "maxMs": 76,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"agent-browser|browser\\b.*=|cdp|headless\" scripts/test-browser.mjs | head -6 | cut -c1-220": {
-   "count": 1,
-   "ms": 68,
-   "maxMs": 68,
-   "failures": 0
-  },
   "bash\u0000B=\"$APPDATA/npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe\"; f=\"$LOCALAPPDATA/Temp/tbl.html\"; { printf '<link rel=\"stylesheet\" href=\"file:///./hub/web/styles.css\"><body style=\"width:34": {
    "count": 1,
    "ms": 687,
@@ -722,12 +476,6 @@
    "maxMs": 129,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && rg -n \"systemLoad|topPrograms|\\\"load\\\"|load-cpu|load-memory|id=\\\"load\" src web --glob \"*.{ts,html,css}\" | cut -c1-240": {
-   "count": 1,
-   "ms": 74,
-   "maxMs": 74,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && sed -n \"390,396p\" src/api.ts | cut -c1-200; rg -n \"^import\" src/api.ts | rg \"fs|child\" ; sed -n \"436,442p\" web/styles.css | cut -c1-260; sed -n \"26,31p\" web/index.html; node -e \"require(": {
    "count": 1,
    "ms": 219,
@@ -738,12 +486,6 @@
    "count": 1,
    "ms": 152,
    "maxMs": 152,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && sed -n \"262,268p;410,416p\" web/styles.css | cut -c1-260": {
-   "count": 1,
-   "ms": 55,
-   "maxMs": 55,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && sed -i \"s#<div id=\\\"load-cpu\\\" class=\\\"load\\\"#<div id=\\\"load-cpu\\\" class=\\\"load\\\" data-label=\\\"CPU\\\"#; s#<div id=\\\"load-memory\\\" class=\\\"load\\\"#<div id=\\\"load-memory\\\" class=\\\"load\\\" dat": {
@@ -794,12 +536,6 @@
    "maxMs": 1141,
    "failures": 0
   },
-  "bash\u0000cd \".\" && rg -n \"readBoundedText|readBounded\\w*\\(\" --glob \"!node_modules\" extensions hub/src | cut -c1-240": {
-   "count": 1,
-   "ms": 116,
-   "maxMs": 116,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && rg -n \"from \\\"\\./plan3-files\\.ts\\\"|from \\\"\\.\\./\\.\\./extensions/plan3-files\\.ts\\\"|plan3-files\" --glob \"!node_modules\" --glob \"*.ts\" extensions hub/src | cut -c1-240": {
    "count": 1,
    "ms": 199,
@@ -810,12 +546,6 @@
    "count": 1,
    "ms": 164,
    "maxMs": 164,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && rg -n \"DIAGRAM_BYTES\" extensions hub/src | cut -c1-200; sed -n \"85,115p\" extensions/plan3-diagram.ts | cut -c1-260": {
-   "count": 1,
-   "ms": 111,
-   "maxMs": 111,
    "failures": 0
   },
   "bash\u0000cd \".\" && rg -n \"diagramPath\\(|loadDiagram\\(\" extensions hub/src | rg -v \"^extensions\\\\\\\\plan3-diagram.ts:(9|10)\" | cut -c1-240": {
@@ -830,18 +560,6 @@
    "maxMs": 5796,
    "failures": 0
   },
-  "bash\u0000cd \".\" && rg -n -i \"bounded regular\" node_modules/pi-subagents/src/runs/shared/worktree-cleanup-apply.js | cut -c1-260": {
-   "count": 1,
-   "ms": 97,
-   "maxMs": 97,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && sed -n \"340,352p;672,684p\" src/api.ts | cut -c1-300": {
-   "count": 1,
-   "ms": 79,
-   "maxMs": 79,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && rg -n \"stats\\.json|\\.stats\\b\" extensions hub/src --glob \"*.ts\" | cut -c1-240 | head -20; ls -la docs/plans/logs/ | sort -k5 -n | tail -5": {
    "count": 1,
    "ms": 916,
@@ -854,12 +572,6 @@
    "maxMs": 154,
    "failures": 0
   },
-  "bash\u0000cd \".\" && rg -n \"\\\"/api/message\\\"|api/message\" extensions hub/src --glob \"*.ts\" | cut -c1-240": {
-   "count": 1,
-   "ms": 100,
-   "maxMs": 100,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && find docs/plans -name \"*.md\" -printf \"%s %p\\n\" | sort -n | tail -4; rg -n \"async function displayedWebTarget|function resolveWebTarget\" -A8 extensions/plan3.ts | cut -c1-220 | head -30": {
    "count": 1,
    "ms": 674,
@@ -870,18 +582,6 @@
    "count": 1,
    "ms": 231,
    "maxMs": 231,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && rg -n \"function forwardDiagramChat|function diagramChatMessage\" -A14 extensions/*.ts | cut -c1-230 | head -45": {
-   "count": 1,
-   "ms": 104,
-   "maxMs": 104,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"post\\(\\\"message\\\"\" web/*.ts | cut -c1-260": {
-   "count": 1,
-   "ms": 97,
-   "maxMs": 97,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && rg -n \"function diagramTarget|const diagramTarget|^let target|let target\\b|comments:\" web/*.ts | cut -c1-260; rg -n \"leftTab|left-panel|activeTab|panelTab\" web/app.ts | head -20 | cut -c": {
@@ -914,18 +614,6 @@
    "maxMs": 123,
    "failures": 0
   },
-  "bash\u0000cd \".\" && sed -n \"95,106p\" hub/scripts/test-browser.mjs | cut -c1-260; sed -n \"1025,1060p\" scripts/test-work-plan3.mjs | cut -c1-240": {
-   "count": 1,
-   "ms": 79,
-   "maxMs": 79,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && rg -n \"bFile\\s*=|b0b0b0b0\" scripts/test-work-plan3.mjs | head -8 | cut -c1-260; sed -n \"1060,1080p\" scripts/test-work-plan3.mjs | cut -c1-200": {
-   "count": 1,
-   "ms": 96,
-   "maxMs": 96,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && rg -n \"^import .*readFile|readFile,\" scripts/test-work-plan3.mjs | head -3 | cut -c1-200": {
    "count": 1,
    "ms": 218,
@@ -938,28 +626,10 @@
    "maxMs": 2328,
    "failures": 0
   },
-  "bash\u0000rg -n \"AssertionError|Error|bounded|c7|c8\" /tmp/p3red.log | head -8 | cut -c1-300": {
-   "count": 1,
-   "ms": 75,
-   "maxMs": 75,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && timeout 600 node scripts/test-work-plan3.mjs > /tmp/p3.log 2>&1; echo \"exit=$?\"; tail -5 /tmp/p3.log | cut -c1-300": {
    "count": 1,
    "ms": 9251,
    "maxMs": 9251,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && rg -n \"notify\\s*[:=(]|notifications\\b|notices\\b\" scripts/test-work-plan3.mjs | head -8 | cut -c1-200": {
-   "count": 1,
-   "ms": 99,
-   "maxMs": 99,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && sed -n \"106,114p\" scripts/test-browser.mjs | cut -c1-240; rg -n \"collapse-left|sentMessages|messagesSent|lastMessage\" scripts/test-browser.mjs | head -10 | cut -c1-200": {
-   "count": 1,
-   "ms": 108,
-   "maxMs": 108,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && sed -n \"385,402p\" scripts/test-browser.mjs | cut -c1-260; rg -n \"messages\\.at\\(-1\\)\" scripts/test-browser.mjs | head -8 | cut -c1-220": {
@@ -968,46 +638,10 @@
    "maxMs": 127,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && rg -n \"fill\\\", \\\"#message-input\\\"\" scripts/test-browser.mjs | head -4 | cut -c1-240; rg -n \"\\\"click\\\", \\\"#send\\\"|press\\\", \\\"Enter\\\"\" scripts/test-browser.mjs | head -3 | cut -c1-200": {
-   "count": 1,
-   "ms": 113,
-   "maxMs": 113,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && timeout 600 node scripts/test-browser.mjs > /tmp/tb.log 2>&1 && echo ok || { echo FAIL; rg -n \"AssertionError|\\\"error\\\"|expected|actual|at file\" /tmp/tb.log | head -10 | cut -c1-300; }": {
    "count": 1,
    "ms": 59849,
    "maxMs": 59849,
-   "failures": 0
-  },
-  "bash\u0000sed -n \"1,20p\" /tmp/tb.log | cut -c1-300": {
-   "count": 1,
-   "ms": 65,
-   "maxMs": 65,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"draft-recovery').hidden && !document.getElementById\\('send'\\).disabled\" scripts/test-browser.mjs | cut -c1-120; sed -n \"155,175p\" scripts/test-browser.mjs | cut -c1-260": {
-   "count": 1,
-   "ms": 104,
-   "maxMs": 104,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n -F \"draft-recovery').hidden && \" scripts/test-browser.mjs | cut -c1-200;": {
-   "count": 1,
-   "ms": 87,
-   "maxMs": 87,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"draft-retry\\\"\\)\\.addEventListener|request\\.target|\\.request\\b.*target|ReferenceMessage =\" web/*.ts | cut -c1-260": {
-   "count": 1,
-   "ms": 93,
-   "maxMs": 93,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"target\" src/design-*.ts ../extensions/design-bundles.ts 2>/dev/null | rg -i \"references|submission|bundle\" | head -10 | cut -c1-240": {
-   "count": 1,
-   "ms": 108,
-   "maxMs": 108,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && cp scripts/test-browser.mjs /tmp/tb-backup.mjs && node -e \" const fs=require('fs');const f='scripts/test-browser.mjs';let s=fs.readFileSync(f,'utf8'); s=s.replace(\\`await browser(\\\"click": {
@@ -1022,12 +656,6 @@
    "maxMs": 61655,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && rg -n \"async function post\\b|const post\\b\" -A6 web/app.ts | cut -c1-260": {
-   "count": 1,
-   "ms": 82,
-   "maxMs": 82,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && sed -i \"s/\\[undefined, \\\"product\\\"\\].includes(body.target)/[null, \\\"product\\\"].includes(body.target)/; s/(await chatSend(\\\"plain while collapsed\\\")).target, undefined,/(await chatSend(\\\"": {
    "count": 1,
    "ms": 439,
@@ -1038,24 +666,6 @@
    "count": 1,
    "ms": 67457,
    "maxMs": 67457,
-   "failures": 0
-  },
-  "bash\u0000sed -n \"5,8p\" /tmp/tb.log | cut -c1-400": {
-   "count": 1,
-   "ms": 72,
-   "maxMs": 72,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"pending\\.request|typeof .*\\.target === \\\"string\\\"|request\\?\\.target\" web/app.ts | cut -c1-300": {
-   "count": 1,
-   "ms": 92,
-   "maxMs": 92,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"function savedReferenceRequest\" -A8 web/app.ts | cut -c1-300": {
-   "count": 1,
-   "ms": 75,
-   "maxMs": 75,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && (timeout 600 node scripts/test-browser.mjs > /tmp/tb.log 2>&1 && echo browser ok || { echo FAIL; sed -n \"6,7p\" /tmp/tb.log | cut -c1-400; rg -n \"AssertionError\" -A3 /tmp/tb.log | head -6": {
@@ -1076,58 +686,16 @@
    "maxMs": 119,
    "failures": 0
   },
-  "bash\u0000cd \".\" && rg -n \"api/message\" extensions/*.ts hub/src/*.ts | cut -c1-200": {
-   "count": 1,
-   "ms": 111,
-   "maxMs": 111,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && rg -n \"async function postWeb|function forwardDiagramChat|function diagramChatMessage|function displayedWebTarget|function resolveWebTarget|function notifyWeb\" extensions/*.ts | cut -c1-200": {
-   "count": 1,
-   "ms": 96,
-   "maxMs": 96,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && rg -n \"export (async )?function (listPlans|resolvePlan|summarize)\\b\" extensions/*.ts | cut -c1-160; sed -n \"327,330p\" extensions/plan3-diagram.ts": {
-   "count": 1,
-   "ms": 86,
-   "maxMs": 86,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && ls docs/plans/*.md docs/plans/done/*.md | wc -l; du -ch docs/plans/*.md docs/plans/done/*.md | tail -1; node -e \" const t=Date.now();import('./extensions/plan3.ts').then(async m=>{const a=Da": {
    "count": 1,
    "ms": 401,
    "maxMs": 401,
    "failures": 0
   },
-  "bash\u0000cd \".\" && rg -n \"pi\\.on\\(\\\"\" extensions/plan3.ts | cut -c1-180; rg -n \"refresh\\(\" extensions/plan3.ts | wc -l": {
-   "count": 1,
-   "ms": 105,
-   "maxMs": 105,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && rg -n \"\\.on\\(\\\"[a-z_]+\\\"\" extensions/plan3.ts | cut -c1-200": {
-   "count": 1,
-   "ms": 96,
-   "maxMs": 96,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && rg -n \"on\\(\\s*\\\"|on\\?\\.\\(\\\"\" extensions/plan3.ts | rg -v \"events\" | cut -c1-200": {
-   "count": 1,
-   "ms": 101,
-   "maxMs": 101,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && rg -n \"post\\(\\\"message\\\"|function sendSubmission|async function sendMessage|post\\(\\\"drop\\\"\" web/app.ts | cut -c1-220; rg -n \"post\\(\\\"\" web/app.ts | wc -l; rg -n \"post\\(\\\"[a-z]+\\\", \\{\" -o": {
    "count": 1,
    "ms": 192,
    "maxMs": 192,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"null, not a missing key\" -A1 web/app.ts | cut -c1-260": {
-   "count": 1,
-   "ms": 106,
-   "maxMs": 106,
    "failures": 0
   },
   "bash\u0000cd \".\" && sed -i \"s/\\[null, \\\"product\\\"\\].includes(body.target)/[undefined, \\\"product\\\"].includes(body.target)/; s/(await chatSend(\\\"plain while collapsed\\\")).target, null,/(await chatSend(\\\"plain whi": {
@@ -1142,22 +710,10 @@
    "maxMs": 48065,
    "failures": 0
   },
-  "bash\u0000cd \".\" && rg -n \"different brief\" extensions/*.ts hub/src/*.ts | cut -c1-200; sed -n \"18,24p\" extensions/design-bundles.ts | cut -c1-240": {
-   "count": 1,
-   "ms": 114,
-   "maxMs": 114,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && git diff e4707e52~1 --stat -- hub/web/app.ts && git diff e4707e52~1 -- hub/web/app.ts | rg \"^[+-] \" | cut -c1-220; cd hub && (timeout 900 node scripts/test-browser.mjs > /tmp/tb.log 2>&1 && ": {
    "count": 1,
    "ms": 48687,
    "maxMs": 48687,
-   "failures": 0
-  },
-  "bash\u0000tail -c 1500 /tmp/probe.log; echo; sed -n \"1,8p\" /tmp/tb.log | cut -c1-300": {
-   "count": 1,
-   "ms": 73,
-   "maxMs": 73,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && git diff --stat -- scripts/test-browser.mjs; for i in 1 2; do timeout 900 node scripts/test-browser.mjs > /tmp/tb$i.log 2>&1 && echo \"run $i ok\" || { echo \"run $i FAIL\"; sed -n \"7p\" /tmp": {
@@ -1196,12 +752,6 @@
    "maxMs": 119,
    "failures": 0
   },
-  "bash\u0000cd \".\" && git diff -U1 -- extensions/plan3.ts > /tmp/p3.diff && node -e \" const s=require('fs').readFileSync('/tmp/p3.diff','utf8');const [head,...hunks]=s.split(/^(?=@@)/m); require('fs').writeFileSy": {
-   "count": 1,
-   "ms": 116,
-   "maxMs": 116,
-   "failures": 1
-  },
   "bash\u0000cd \".\" && git diff -U1 -- extensions/plan3.ts > p3.tmp.diff && node -e \" const fs=require('fs');const s=fs.readFileSync('p3.tmp.diff','utf8');const [head,...hunks]=s.split(/^(?=@@)/m); fs.writeFileSyn": {
    "count": 2,
    "ms": 850,
@@ -1220,12 +770,6 @@
    "maxMs": 146,
    "failures": 0
   },
-  "bash\u0000cd \".\" && git log --oneline origin/master -1; git rev-list --left-right --count origin/master...master": {
-   "count": 1,
-   "ms": 89,
-   "maxMs": 89,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && cat > move.tmp.mjs <<'EOF' import { readFileSync, writeFileSync } from \"node:fs\"; export const move = text => { const nl = text.includes(\"\\r\\n\") ? \"\\r\\n\" : \"\\n\"; const lines = text.split(/\\r": {
    "count": 1,
    "ms": 387,
@@ -1236,6 +780,522 @@
    "count": 1,
    "ms": 217,
    "maxMs": 217,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"Send answer\" web/*.ts web/*.html | cut -c1-200; rg -n \"ask-dialog|id=\\\"ask\" web/index.html | cut -c1-200": {
+   "count": 1,
+   "ms": 136,
+   "maxMs": 136,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"createPromptView\\(\" web/app.ts | cut -c1-200; rg -n \"prompt-dialog|<dialog\" web/index.html | cut -c1-200; rg -n \"#prompt-dialog|dialog\\.compact|^dialog|dialog\\[open\\]|file-viewer|": {
+   "count": 1,
+   "ms": 231,
+   "maxMs": 231,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"dialog-close|--prompt-head|topbar-h|\\.topbar \\{|#prompt\" web/styles.css | cut -c1-260; rg -n \"promptView\\.|\\\"prompt\\\"\\)\" web/app.ts | cut -c1-200": {
+   "count": 1,
+   "ms": 167,
+   "maxMs": 167,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"topbar-h|app-top\" web/app.ts web/styles.css | cut -c1-220; sed -n \"262,272p\" web/styles.css | cut -c1-200": {
+   "count": 1,
+   "ms": 119,
+   "maxMs": 119,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n \"655,660p;284p\" web/styles.css | cut -c1-300; rg -n \"prompt\" scripts/test-browser.mjs | head -30 | cut -c1-200": {
+   "count": 1,
+   "ms": 135,
+   "maxMs": 135,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && (timeout 900 node scripts/test-browser.mjs > /tmp/tb.log 2>&1 && echo browser ok || { echo FAIL; rg -n \"Error\" -A6 /tmp/tb.log | head -14 | cut -c1-300; })": {
+   "count": 1,
+   "ms": 223267,
+   "maxMs": 223267,
+   "failures": 0
+  },
+  "\u0000(other)": {
+   "count": 110,
+   "ms": 9995,
+   "maxMs": 116,
+   "failures": 6
+  },
+  "bash\u0000cd \".\" && git diff -- hub/web/app.ts hub/web/styles.css | rg \"^[+-]\\s\" | cut -c1-90 && cat > cl.tmp.mjs <<'EOF' import { readFileSync, writeFileSync } from \"node:fs\"; const file = process.argv[2], tex": {
+   "count": 1,
+   "ms": 183,
+   "maxMs": 183,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && sed -i \"s/if (fixed < 0 || fixed > release) throw new Error(\\\"no Unreleased Fixed\\\");/const bullet = '- Hub: a question popup no longer slides under the top bar, and its – button minimizes i": {
+   "count": 1,
+   "ms": 535,
+   "maxMs": 535,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git log --oneline -4 && git status --short && git diff --stat -- CHANGELOG.md": {
+   "count": 1,
+   "ms": 146,
+   "maxMs": 146,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && cp scripts/test-browser.mjs /tmp/tb-backup.mjs && node -e \" const fs=require('fs');const f='scripts/test-browser.mjs';let s=fs.readFileSync(f,'utf8'); const anchor='await browser(\\\"click": {
+   "count": 1,
+   "ms": 30860,
+   "maxMs": 30860,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');const f='scripts/test-browser.mjs';let s=fs.readFileSync(f,'utf8'); const anchor='await browser(\\\"click\\\", \\\"#prompt-restore\\\");'; s=s.replace(anchor, \\`": {
+   "count": 1,
+   "ms": 208374,
+   "maxMs": 208374,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"50,62p\" hub/web/app.ts | cut -c1-400; echo ---; rg -n \"notice\" hub/src/hub.ts hub/src/api.ts | cut -c1-260 | head -40; echo ---; rg -n \"Prompt cache expired\" --glob \"!node_modules\" -": {
+   "count": 1,
+   "ms": 184,
+   "maxMs": 184,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"660,680p\" hub/src/api.ts | cut -c1-400; echo ---; rg -n \"Prompt cache expired\" -B3 -A3 extensions/work-models.ts | cut -c1-300; echo ---; rg -n \"listen\\(\\\"notice\\\"\" -A3 hub/web/app.t": {
+   "count": 1,
+   "ms": 185,
+   "maxMs": 185,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"emit\\(\\\"notice\\\"\" src/*.ts | cut -c1-250; rg -n \"notifyType|request\\.method === \\\"notify\\\"\" src/*.ts | cut -c1-200; rg -n \"function renderChat|function renderMessages|function ren": {
+   "count": 1,
+   "ms": 220,
+   "maxMs": 220,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n \"1,60p\" src/cache-miss.ts | cut -c1-250; echo ---; rg -n \"cache-miss|cacheMiss\" src/*.ts web/*.ts | grep -v \"^src/cache-miss.ts\" | cut -c1-250": {
+   "count": 1,
+   "ms": 126,
+   "maxMs": 126,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"notifyType\" hub/src/*.ts ~/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist/modes/rpc/*.js 2>/dev/null | head -5 | cut -c1-220; echo ---; rg -n \"chec": {
+   "count": 1,
+   "ms": 382,
+   "maxMs": 382,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"92,102p\" ~/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist/modes/rpc/rpc-mode.js; sed -n \"80,165p\" hub/src/view.ts | cut -c1-260; rg -n \"hubDataDir": {
+   "count": 1,
+   "ms": 144,
+   "maxMs": 144,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"^const chat\\b|^let chat\\b|const chat = new Map|function chatView\" web/app.ts | cut -c1-200; sed -n \"3026,3040p\" web/app.ts | cut -c1-260; rg -n \"chat-compact|chat-final|chat-[a-z]": {
+   "count": 1,
+   "ms": 249,
+   "maxMs": 249,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"\\.attach\\(\" src/*.ts | cut -c1-260; sed -n \"186,192p\" src/hub.ts | cut -c1-300; sed -n \"320,332p\" src/cli.ts | cut -c1-260": {
+   "count": 1,
+   "ms": 176,
+   "maxMs": 176,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n \"645,653p\" src/api.ts | cut -c1-260; sed -n \"425,440p\" src/hub.ts | cut -c1-260; rg -n \"^import\" src/api.ts src/hub.ts | rg \"registry|view\" | cut -c1-200": {
+   "count": 1,
+   "ms": 160,
+   "maxMs": 160,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"pi-hub:notice\" ../extensions/*.ts src/*.ts | cut -c1-240": {
+   "count": 1,
+   "ms": 455,
+   "maxMs": 455,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"notice\" src/cli.ts | rg -i \"usage|pi-hub notice\" | cut -c1-260; rg -n \"pi-hub notice\" ../README.md README.md ../docs/*.md 2>/dev/null | head -5 | cut -c1-200": {
+   "count": 1,
+   "ms": 193,
+   "maxMs": 193,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n \"664,676p\" src/api.ts | cut -c1-260; rg -n \"const id =\" src/chat.ts | head -8 | cut -c1-200; rg -n \"^\\.message[ .{,]\" web/styles.css | head -12 | cut -c1-220": {
+   "count": 1,
+   "ms": 183,
+   "maxMs": 183,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"new SessionView\" hub/src/*.ts | cut -c1-300; rg -n \"emit\\(\\\"notice\\\"\" hub/src/*.ts | cut -c1-200; rg -n \"\\-\\-warn|--error\" hub/web/styles.css | head -4 | cut -c1-160; rg -n \"notify\\(\"": {
+   "count": 1,
+   "ms": 273,
+   "maxMs": 273,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' import re,io def sub(path, old, new, count=1): s=open(path,encoding=\"utf-8\").read() assert s.count(old)==count, (path, old, s.count(old)) s=s.replace(old,new); open(path,\"w\"": {
+   "count": 1,
+   "ms": 164,
+   "maxMs": 164,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"state.more = value|more: value\" web/app.ts | cut -c1-200; rg -n \"notices = value.notices\" web/app.ts": {
+   "count": 1,
+   "ms": 118,
+   "maxMs": 118,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"notice\" hub/scripts/test-browser.mjs | head -20 | cut -c1-220; rg -n \"\\\"(test|typecheck|check)[^\\\"]*\\\":\" package.json hub/package.json 2>/dev/null | cut -c1-200 | head; rg -ln \"notice": {
+   "count": 1,
+   "ms": 181,
+   "maxMs": 181,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"notice\" scripts/test-api.mjs | head -20 | cut -c1-260; rg -n \"HUB_DATA|hubDataDir|PI_HUB_HOME|XDG\" src/registry.ts scripts/test-api.mjs | head -6 | cut -c1-200": {
+   "count": 1,
+   "ms": 155,
+   "maxMs": 155,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && python - <<'EOF' p=\"scripts/test-api.mjs\"; s=open(p,encoding=\"utf-8\").read() old=''' assert.equal(notifiedFrames.length, 2, \"malformed notifications are ignored\");\\n''' new=old+''' // Wa": {
+   "count": 1,
+   "ms": 23186,
+   "maxMs": 23186,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && python - <<'EOF' p=\"scripts/test-api.mjs\"; s=open(p,encoding=\"utf-8\").read() old='''assert.deepEqual(keptNotices.map(({ text, level, source }) => [text, level, source]), [[\"Plan3: Choose": {
+   "count": 1,
+   "ms": 26370,
+   "maxMs": 26370,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -ln \"Cache miss|cacheMiss\" scripts/ | head; rg -n \"Cache miss\" scripts/*.mjs | head -5 | cut -c1-220": {
+   "count": 1,
+   "ms": 166,
+   "maxMs": 166,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && python - <<'EOF' p=\"scripts/test-view.mjs\"; s=open(p,encoding=\"utf-8\").read() old=''' const view = new SessionView({ file: () => file, idle: () => true }); await view.hydrate();''' new='": {
+   "count": 1,
+   "ms": 60990,
+   "maxMs": 60990,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node --test scripts/test-chat-files.mjs 2>&1 | grep -B2 -A12 \"AssertionError\" | head -30; git stash -q && node --test scripts/test-chat-files.mjs 2>&1 | grep -E \"^ℹ (pass|fail)\"; git sta": {
+   "count": 1,
+   "ms": 2632,
+   "maxMs": 2632,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n \"110,125p\" scripts/test-chat-files.mjs | cut -c1-260": {
+   "count": 1,
+   "ms": 1397,
+   "maxMs": 1397,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && python - <<'EOF' p=\"scripts/test-chat-files.mjs\"; s=open(p,encoding=\"utf-8\").read() old=''' assert.match(events.at(-1).value.cacheMiss, /30,000/);''' new=''' assert.match(events.findLast": {
+   "count": 1,
+   "ms": 2379,
+   "maxMs": 2379,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n \"846,866p\" scripts/test-browser.mjs | cut -c1-320": {
+   "count": 1,
+   "ms": 120,
+   "maxMs": 120,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && python - <<'EOF' p=\"scripts/test-browser.mjs\"; s=open(p,encoding=\"utf-8\").read() old=''' // Cache misses survive every chat filter, including a tool-only/non-final reply. Off by default,": {
+   "count": 1,
+   "ms": 56772,
+   "maxMs": 56772,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && grep -n \"Warning\\[\" scripts/test-browser.mjs | cut -c1-200; (timeout 900 node --test scripts/test-browser.mjs > ../browser-test.log 2>&1; echo EXIT $? >> ../browser-test.log); tail -3 ..": {
+   "count": 1,
+   "ms": 222192,
+   "maxMs": 222192,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add CHANGELOG.md extensions/work-models.ts hub/src/notices.ts hub/src/api.ts hub/src/chat.ts hub/src/cli.ts hub/src/hub.ts hub/src/view.ts hub/web/app.ts hub/web/styles.css hub/scripts/t": {
+   "count": 1,
+   "ms": 310,
+   "maxMs": 310,
+   "failures": 0
+  },
+  "bash\u0000which pi-hub; head -5 \"$(which pi-hub)\" 2>/dev/null | cut -c1-200; pi-hub status 2>&1 | head -5 | cut -c1-200": {
+   "count": 1,
+   "ms": 537,
+   "maxMs": 537,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git fetch -q origin && git status -sb | head -8 && git log --oneline HEAD..origin/master | head -20": {
+   "count": 1,
+   "ms": 667,
+   "maxMs": 667,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git pull --rebase --autostash 2>&1 | tail -6; git status -sb | head -6; git log --oneline -4": {
+   "count": 1,
+   "ms": 954,
+   "maxMs": 954,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff CHANGELOG.md | cut -c1-200": {
+   "count": 1,
+   "ms": 1181,
+   "maxMs": 1181,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' import re p=\"CHANGELOG.md\"; s=open(p,encoding=\"utf-8\").read() s,n=re.subn(r\"<<<<<<< HEAD\\n(.*?)=======\\n(.*?)>>>>>>> [^\\n]*\\n\", lambda m: m.group(1)+\"\\n\"+m.group(2), s, flag": {
+   "count": 1,
+   "ms": 437,
+   "maxMs": 437,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status -sb | head -8; git diff --name-only --diff-filter=U": {
+   "count": 1,
+   "ms": 143,
+   "maxMs": 143,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls .git/rebase-merge 2>/dev/null | head; cat .git/rebase-merge/done 2>/dev/null; cat .git/rebase-merge/git-rebase-todo 2>/dev/null; git log --oneline -3": {
+   "count": 1,
+   "ms": 140,
+   "maxMs": 140,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && GIT_EDITOR=true git rebase --continue 2>&1 | tail -8; git status -sb | head -8; git log --oneline -4": {
+   "count": 1,
+   "ms": 136,
+   "maxMs": 136,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git ls-files -u | head; GIT_EDITOR=true git rebase --continue 2>&1 | head -12": {
+   "count": 1,
+   "ms": 133,
+   "maxMs": 133,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff --cached --check | head; rg -n \"^(<<<<<<<|>>>>>>>|=======$)\" CHANGELOG.md hub/web/app.ts hub/web/prompts.ts hub/web/styles.css hub/scripts/test-browser.mjs | head; ls .git/MERGE_MSG": {
+   "count": 1,
+   "ms": 315,
+   "maxMs": 315,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && git commit -q -F .git/MERGE_MSG 2>&1 | tail -3; GIT_EDITOR=true git rebase --continue 2>&1 | tail -4; git status -sb | head -6; git log --oneline -4": {
+   "count": 1,
+   "ms": 273,
+   "maxMs": 273,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat .git/rebase-merge/done; echo ---; cat .git/rebase-merge/git-rebase-todo; echo ---; GIT_EDITOR=true GIT_TRACE=0 git rebase --continue; echo EXIT $?; git status -sb | head -6": {
+   "count": 1,
+   "ms": 208,
+   "maxMs": 208,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git rebase --quit && git cherry-pick 097e5b02 2>&1 | tail -3; git status -sb | head -6; git log --oneline -3; git stash list | head -3": {
+   "count": 1,
+   "ms": 323,
+   "maxMs": 323,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"5,20p\" CHANGELOG.md | cut -c1-90": {
+   "count": 1,
+   "ms": 1366,
+   "maxMs": 1366,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' import re p=\"CHANGELOG.md\"; s=open(p,encoding=\"utf-8\").read() s,n=re.subn(r\"<<<<<<< HEAD\\n(.*?)=======\\n(.*?)>>>>>>> [^\\n]*\\n\", lambda m: m.group(2)+\"\\n\"+m.group(1), s, flag": {
+   "count": 1,
+   "ms": 1684,
+   "maxMs": 1684,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git stash show --stat \"stash@{0}\"; git diff --stat": {
+   "count": 1,
+   "ms": 173,
+   "maxMs": 173,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git restore --source=\"stash@{0}\" -- hub/src/usage.ts hub/scripts/test-usage-providers.mjs && git diff --quiet \"stash@{0}\" -- hub/src/usage.ts hub/scripts/test-usage-providers.mjs && echo RES": {
+   "count": 1,
+   "ms": 847,
+   "maxMs": 847,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n \"2939p\" web/app.ts | cut -c1-240; git log -L2939,2939:web/app.ts --oneline -1 | head -1": {
+   "count": 1,
+   "ms": 224,
+   "maxMs": 224,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"Resolve questions\" web/*.ts | head -5 | cut -c1-220; rg -n \"\\\"Queue\\\"|'Queue'|>Queue<|Queue\\b\" web/app.ts web/index.html | head -20 | cut -c1-260": {
+   "count": 1,
+   "ms": 159,
+   "maxMs": 159,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"streamingBehavior|steer|followUp|follow_up\" web/app.ts | head -20 | cut -c1-240; rg -n \"plan-picker|plan-select|id=\\\"plan\\\"\" web/index.html web/app.ts | head -8 | cut -c1-200": {
+   "count": 1,
+   "ms": 142,
+   "maxMs": 142,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"queued|streamingBehavior|followUp\" src/api.ts src/sessions.ts | head -20 | cut -c1-260": {
+   "count": 1,
+   "ms": 297,
+   "maxMs": 297,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"endpoint === \\\"message\\\"|case \\\"message\\\"\" src/api.ts | head; rg -n \"prompt\\(id: string|async prompt\\(\" src/sessions.ts | head -3": {
+   "count": 1,
+   "ms": 182,
+   "maxMs": 182,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"steer\" extensions/plan3*.ts extensions/hub*.ts 2>/dev/null | head -12 | cut -c1-260; rg -ln \"\\\"/api/message\\\"|api/message\" extensions | head": {
+   "count": 1,
+   "ms": 138,
+   "maxMs": 138,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"forwardDiagramChat\\(\" extensions/*.ts | cut -c1-300; sed -n \"875,900p\" extensions/plan3.ts | cut -c1-280": {
+   "count": 1,
+   "ms": 130,
+   "maxMs": 130,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"Resolve questions\" hub/web extensions -g \"*.ts\" | head -4 | cut -c1-220; rg -n \"contextmenu|longPress|long-press\" hub/web/app.ts | head -10 | cut -c1-220; rg -n \"\\\"send\\\"\\)\\.addEventL": {
+   "count": 1,
+   "ms": 205,
+   "maxMs": 205,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n \"1594,1612p\" web/app.ts | cut -c1-300; sed -n \"2086,2096p\" web/app.ts | cut -c1-260; sed -n \"1410,1425p\" web/app.ts | cut -c1-200; rg -n \"message-form|\\\"submit\\\"\" web/app.ts | hea": {
+   "count": 1,
+   "ms": 150,
+   "maxMs": 150,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"key === \\\"Enter\\\"\" web/app.ts | head -8 | cut -c1-260; sed -n \"1453,1454p\" web/app.ts | cut -c1-200; rg -n \"function showMenu\" web/app.ts": {
+   "count": 1,
+   "ms": 139,
+   "maxMs": 139,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"function deliverReferenceBundle\" -A12 extensions/*.ts | rg -n \"keys|only|data\\.\" | head -8 | cut -c1-240; rg -n \"function freezeReferenceBundle\" -A15 hub/src/*.ts | rg \"keys|only\\(\" |": {
+   "count": 1,
+   "ms": 187,
+   "maxMs": 187,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' def sub(path, old, new): s=open(path,encoding=\"utf-8\").read(); assert s.count(old)==1,(path,old); open(path,\"w\",encoding=\"utf-8\",newline=\"\").write(s.replace(old,new)) sub(\"e": {
+   "count": 1,
+   "ms": 579,
+   "maxMs": 579,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"wo:cold-cache\" -A8 extensions/work-models.ts | rg -n \"sendUserMessage|deliverAs|isIdle|handled\" | head -8 | cut -c1-240": {
+   "count": 1,
+   "ms": 117,
+   "maxMs": 117,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n \"1402,1405p\" web/app.ts | cut -c1-240; sed -n \"141,144p\" web/app.ts | cut -c1-200; rg -n \"\\\\\\$\\(\\\"send\\\"\\)\" web/app.ts | cut -c1-160": {
+   "count": 1,
+   "ms": 140,
+   "maxMs": 140,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && python - <<'EOF' def sub(path, old, new): s=open(path,encoding=\"utf-8\").read(); assert s.count(old)==1,(path,old); open(path,\"w\",encoding=\"utf-8\",newline=\"\").write(s.replace(old,new)) p=": {
+   "count": 1,
+   "ms": 291,
+   "maxMs": 291,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"^\\[hidden\\]|\\[hidden\\] *\\{\" web/styles.css | head -3 | cut -c1-120; rg -n \"plan-menu\" web/app.ts | head -5 | cut -c1-200": {
+   "count": 1,
+   "ms": 131,
+   "maxMs": 131,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && python - <<'EOF' p=\"web/styles.css\"; s=open(p,encoding=\"utf-8\").read() old='''.plan-list { display: grid; gap: 2px; overflow: auto; } /* Plans fill the screen height (the actions stay be": {
+   "count": 1,
+   "ms": 180,
+   "maxMs": 180,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && git diff -U0 web/app.ts | grep \"^@@\" ; sed -n \"1376,1390p\" scripts/test-browser.mjs | cut -c1-300; rg -n \"\\\"/api/message\\\"|route === \\\"message\\\"|endpoint === \\\"message\\\"|messages.push|po": {
+   "count": 1,
+   "ms": 159,
+   "maxMs": 159,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"api/message\" scripts/test-browser.mjs | head -6 | cut -c1-260; rg -n \"queued: \" scripts/test-browser.mjs | head -4 | cut -c1-260": {
+   "count": 1,
+   "ms": 294,
+   "maxMs": 294,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n \"100,110p\" scripts/test-browser.mjs | cut -c1-260": {
+   "count": 1,
+   "ms": 155,
+   "maxMs": 155,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && python - <<'EOF' p=\"scripts/test-browser.mjs\"; s=open(p,encoding=\"utf-8\").read() def sub(old,new): global s; assert s.count(old)==1,old; s=s.replace(old,new) sub('''return { accepted: tr": {
+   "count": 1,
+   "ms": 168,
+   "maxMs": 168,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -i \"s/document.querySelectorAll('#session-menu button')\\]/document.querySelectorAll('.session-menu:not([hidden]) button')]/\" scripts/test-browser.mjs && rg -c \"session-menu:not\" scri": {
+   "count": 1,
+   "ms": 152,
+   "maxMs": 152,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"menuItem = |function menuItem\" web/app.ts | head -2 | cut -c1-200; (timeout 900 node --test scripts/test-browser.mjs > ../browser-test.log 2>&1; echo EXIT $? >> ../browser-test.lo": {
+   "count": 1,
+   "ms": 229588,
+   "maxMs": 229588,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' p=\"scripts/test-work-plan3-web.mjs\"; s=open(p,encoding=\"utf-8\").read() old=''' assert.equal(submitted.at(-1).options.deliverAs, \"steer\", \"a busy send not held by an early co": {
+   "count": 1,
+   "ms": 306,
+   "maxMs": 306,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node \"scripts/test-work-plan3-web.mjs\" 2>&1 | grep -m1 -A8 \"Error\" | cut -c1-240; git stash -q; node \"scripts/test-work-plan3-web.mjs\" >/dev/null 2>&1; echo BASE $?; git stash pop -q": {
+   "count": 1,
+   "ms": 1674,
+   "maxMs": 1674,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env | grep -E \"^PI_(SESSION|HUB_SESSION|MODEL|VERSION)[A-Z_]*=\" | cut -c1-200; node -p \"require('./package.json').version\"; git log --oneline -1; sed -n \"50,64p\" scripts/test-work-plan3-web.": {
+   "count": 1,
+   "ms": 257,
+   "maxMs": 257,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' p=\"scripts/test-work-plan3-web.mjs\"; s=open(p,encoding=\"utf-8\").read() old='assert.deepEqual(asked, [\"wo:cold-cache\", \"wo:cold-cache\", \"wo:cold-cache\"], \"busy sends' assert ": {
+   "count": 1,
+   "ms": 1469,
+   "maxMs": 1469,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' p=\"CHANGELOG.md\"; s=open(p,encoding=\"utf-8\").read() old=\"## Unreleased\\n\\n### Added\\n\" assert s.count(old)==1 s=s.replace(old, old+\"- Hub: while the agent works, the send bu": {
+   "count": 1,
+   "ms": 361,
+   "maxMs": 361,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n \"1834p\" web/app.ts | cut -c1-260; git log -L1834,1834:web/app.ts --oneline -1 | head -1": {
+   "count": 1,
+   "ms": 576,
+   "maxMs": 576,
    "failures": 0
   }
  },
@@ -1276,13 +1336,13 @@
    "failures": 1
   },
   "(none)": {
-   "ms": 3736478,
-   "testMs": 2071378,
-   "replies": 196,
+   "ms": 5665891,
+   "testMs": 2710822,
+   "replies": 339,
    "models": {
-    "anthropic/claude-opus-5-5:high": 196
+    "anthropic/claude-opus-5-5:high": 339
    },
-   "failures": 9
+   "failures": 16
   }
  },
  "spans": [
@@ -1329,6 +1389,30 @@
   {
    "start": "2026-11-13T14:37:27.072Z",
    "ms": 1179657
+  },
+  {
+   "start": "2026-11-13T21:34:23.560Z",
+   "ms": 386870
+  },
+  {
+   "start": "2026-11-13T21:40:50.455Z",
+   "ms": 1255500
+  },
+  {
+   "start": "2026-11-13T22:04:17.736Z",
+   "ms": 5987
+  },
+  {
+   "start": "2026-11-14T15:26:19.484Z",
+   "ms": 191713
+  },
+  {
+   "start": "2026-11-14T15:29:45.651Z",
+   "ms": 570004
+  },
+  {
+   "start": "2026-11-14T15:48:02.232Z",
+   "ms": 7614
   }
  ],
  "hints": []

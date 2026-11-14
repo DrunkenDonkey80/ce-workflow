@@ -121,7 +121,7 @@ assert.equal(mirror.page(mirror.snapshot()[10].id).more, false);
  assert(!live.snapshot().at(-1).cacheMiss, "no warning before usage is final");
  hooks.get("message_end")({ message: miss });
  assert.match(events.findLast(item => item.event === "delta").value.cacheMiss, /30,000/);
- assert.match(events.at(-1).event === "cache_miss" && events.at(-1).value, /30,000/, "a live miss also goes out as cache_miss (a kept warning)");
+ assert(!events.some(item => item.event === "cache_miss" || item.event === "notice"), "cache misses only annotate the reply, never emit a duplicate warning");
  assert.equal(live.page().rows.at(-1).cacheMiss, live.row("assistant_360001").cacheMiss);
  const entries = [first, miss].map(message => ({ type: "message", message }));
  live.reset(); live.hydrate({ sessionManager: { getBranch: () => entries } });

@@ -10,7 +10,7 @@ export const levelOf = (value: unknown): Notice["level"] => value === "warning" 
 
 // shortcut: a removed session's file stays (a few KB at most); sweep the folder if it ever grows.
 export function readNotices(id: string): Notice[] {
-	try { const list = JSON.parse(readFileSync(file(id)!, "utf8")); return Array.isArray(list) ? list : []; } catch { return []; }
+	try { const list = JSON.parse(readFileSync(file(id)!, "utf8")); return Array.isArray(list) ? list.filter(notice => notice?.source !== "cache") : []; } catch { return []; }
 }
 
 /** Publishes a notice to the session's open pages; warnings and errors are kept for later pages too. */
