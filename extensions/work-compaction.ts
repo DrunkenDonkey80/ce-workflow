@@ -102,6 +102,21 @@ export function replayCost(estimate) {
 	return (message) => Math.max(Number(estimate(message)) || 0, message?.role === "assistant" ? Number(message.usage?.output) || 0 : 0);
 }
 
+// Target total context, not 50k of history on top of the prompt and summary.
+export function retainedHistoryBudget(messages, keepRecentTokens, summaryTokens, estimate) {
+	let prefix = 0, system = 0, scale = 1;
+	for (const message of messages) {
+		const usage = message?.role === "assistant" && message.usage;
+		const prompt = usage ? (Number(usage.input) || 0) + (Number(usage.cacheRead) || 0) + (Number(usage.cacheWrite) || 0) : 0;
+		if (prompt > 0 && prefix > 0) scale = Math.max(1, prompt / prefix);
+		const tokens = Math.max(0, Number(estimate(message)) || 0);
+		prefix += tokens;
+		if (message.role === "system") system += tokens;
+	}
+	// shortcut: estimated overhead; use exact provider token counts when exposed. The last tool group must survive.
+	return Math.max(0, Math.min(keepRecentTokens, Math.floor(50_000 - (system + summaryTokens) * scale)));
+}
+
 const CUT_ROLES = new Set(["user", "assistant", "bashExecution", "custom", "branchSummary", "compactionSummary"]);
 
 /**
@@ -110,7 +125,7 @@ const CUT_ROLES = new Set(["user", "assistant", "bashExecution", "custom", "bran
  */
 export function tightenPreparation(preparation, entries, keepRecentTokens, estimate, toMessages) {
 	const start = entries?.findIndex?.((entry) => entry?.id === preparation?.firstKeptEntryId) ?? -1;
-	if (start < 0 || !(keepRecentTokens > 0)) return preparation;
+	if (start < 0 || !(keepRecentTokens >= 0)) return preparation;
 	const messagesOf = (index) => (entries[index].type === "compaction" ? [] : toMessages(entries[index]) ?? []);
 	// chars/4 undercounts Claude 1.3-1.7x (code ~2x). A reply's billed prompt is everything before it, so the exact tail
 	// from a reply on is the last prompt plus what follows it, minus that reply's prompt. The estimate stays the floor
@@ -132,7 +147,10 @@ export function tightenPreparation(preparation, entries, keepRecentTokens, estim
 		// unless nothing would be left to keep after it.
 		const cutPointFrom = (from) => { while (from < entries.length && !messagesOf(from).some((message) => CUT_ROLES.has(message?.role))) from += 1; return from; };
 		cut = cutPointFrom(index + 1);
-		if (cut >= entries.length) cut = cutPointFrom(index);
+		if (cut >= entries.length) {
+			cut = index;
+			while (cut > start && !messagesOf(cut).some(message => CUT_ROLES.has(message?.role))) cut -= 1;
+		}
 		break;
 	}
 	if (cut <= start || cut >= entries.length) return preparation;
@@ -154,15 +172,11 @@ export function contextFilterCutIndex(
 	estimateTokens = (message) =>
 		Math.ceil(JSON.stringify(message ?? {}).length / 4),
 ) {
-	let keptTokens = 0;
-	let cutIndex = null;
-	for (let index = messages.length - 1; index > 0; index -= 1) {
-		keptTokens += Math.max(1, Number(estimateTokens(messages[index])) || 0);
-		if (keptTokens < keepRecentTokens) continue;
-		while (index > 0 && messages[index]?.role === "toolResult") index -= 1;
-		cutIndex = index > 0 ? index : null;
-		break;
-	}
+	// All entry points use the same measured-tail selector; this adapter only maps message indices.
+	const entries = messages.map((message, id) => ({ id, message }));
+	const cutFrom = (start, budget) => tightenPreparation({ firstKeptEntryId: start }, entries, budget,
+		estimateTokens, entry => [entry.message]).firstKeptEntryId;
+	const cutIndex = cutFrom(0, keepRecentTokens);
 	if (!cutIndex) return null;
 	let turnStart = messages.findLastIndex((message) => message?.role === "user");
 	if (turnStart < 1)
@@ -170,14 +184,7 @@ export function contextFilterCutIndex(
 			["custom", "bashExecution", "compactionSummary"].includes(message?.role),
 		);
 	if (turnStart < 1 || turnStart >= cutIndex) return cutIndex;
-	const currentTurnTokens = messages
-		.slice(turnStart)
-		.reduce(
-			(total, message) =>
-				total + Math.max(1, Number(estimateTokens(message)) || 0),
-			0,
-		);
-	return currentTurnTokens <= maxCurrentTurnTokens ? turnStart : cutIndex;
+	return cutFrom(turnStart, maxCurrentTurnTokens) === turnStart ? turnStart : cutIndex;
 }
 
 export function compactionThreshold({

@@ -33,7 +33,7 @@ import {
 	runExtensionScout,
 	updateExtensionScoutProgress,
 } from "./work-extension-scout.ts";
-import { COMPACTION_PROFILES, compactionThreshold, compactionInputBytes, contextFilterCutIndex, replayCost, tightenPreparation, contentText, addCost, filesFromOps, formatCompactionSummary, COMPACTION_NOTE_TOOL, COMPACTION_NOTE_MAX, latestCompactionNote } from "./work-compaction.ts";
+import { COMPACTION_PROFILES, compactionThreshold, compactionInputBytes, contextFilterCutIndex, replayCost, retainedHistoryBudget, tightenPreparation, contentText, addCost, filesFromOps, formatCompactionSummary, COMPACTION_NOTE_TOOL, COMPACTION_NOTE_MAX, latestCompactionNote } from "./work-compaction.ts";
 import { compactMemory } from "./work-compaction-memory.ts";
 import { createVisionBridge, splitLevel } from "./work-vision.ts";
 import { createJevTools, jevStatus } from "./jev-tools.ts";
@@ -1528,13 +1528,23 @@ function resetContextFilter() {
 	contextFilterState.snapshot = null;
 }
 
-// Pi cuts by visible text (its 20k default kept ~38k on Claude); recut to this extension's keep budget by real reply
-// cost, and carry the files of the messages that moved into the summary. It only tightens: Pi's cut is the ceiling.
+function compactionRetentionBudget(ctx, messages, native: { keepRecentTokens?: number } = {}) {
+	let current = DEFAULT_CONTEXT;
+	try { current = contextSettings(readEffectiveSettings(ctx.cwd)); } catch { /* unreadable settings: the default */ }
+	const full = ctx.sessionManager?.buildSessionProjection?.().messages;
+	return retainedHistoryBudget(messages.some(message => message.role === "system") ? messages : full ?? messages,
+		native.keepRecentTokens ?? current.keepRecentTokens, Math.ceil(current.maxSummaryChars / 4), estimateContextMessageTokens);
+}
+
+// Manual and boundary compaction share the measured-tail selector and total-context budget.
 export function realCostPreparation(event, ctx) {
 	const preparation = event.preparation;
-	let keep = DEFAULT_CONTEXT.keepRecentTokens;
-	try { keep = Number(contextSettings(readEffectiveSettings(ctx.cwd)).keepRecentTokens) || keep; } catch { /* unreadable settings: the default */ }
-	const tight = tightenPreparation(preparation, event.branchEntries, keep, estimateContextMessageTokens, entryMessages);
+	const projection = ctx.sessionManager?.buildSessionProjection?.();
+	const entries = projection?.entries?.map(entry => ({ ...entry.sourceEntry, projectedMessages: entry.messages })) ?? event.branchEntries;
+	const toMessages = entry => entry.projectedMessages ?? entryMessages(entry);
+	const messages = projection?.messages ?? (entries ?? []).flatMap(toMessages);
+	const keep = compactionRetentionBudget(ctx, messages, preparation.settings);
+	const tight = tightenPreparation(preparation, entries, keep, estimateContextMessageTokens, toMessages);
 	if (tight === preparation) return preparation;
 	const files = filesFromOps(preparation.fileOps), moved = contextFilterFileOps(tight.moved);
 	return { ...tight, fileOps: { readFiles: [...files.read, ...moved.read], modifiedFiles: [...files.modified, ...moved.modified] } };
@@ -1605,11 +1615,11 @@ async function prepareContextFilter(event, ctx) {
 	const { threshold, state, current } = snapshot;
 	// Preserve a complete current turn only when it fits the retention budget,
 	// not half the model window (which can be 500k on a 1M-window model).
-	const maxCurrentTurnTokens = threshold.effectiveKeepRecentTokens;
+	const keep = compactionRetentionBudget(ctx, messages, { keepRecentTokens: threshold.effectiveKeepRecentTokens });
 	const cutIndex = contextFilterCutIndex(
 		messages,
-		threshold.effectiveKeepRecentTokens,
-		maxCurrentTurnTokens,
+		keep,
+		keep,
 		estimateContextMessageTokens,
 	);
 	if (!cutIndex) return false;
@@ -1705,7 +1715,8 @@ export async function buildBoundaryCompaction(event, ctx, mode, summarize = gene
 	const settings = workExtensionPi?.getSettings?.() ?? {};
 	const native = { reserveTokens: 16_384, keepRecentTokens: DEFAULT_CONTEXT.keepRecentTokens, ...settings.compaction,
 		...settings.compaction?.modelOverrides?.[`${ctx.model?.provider}/${ctx.model?.id}`] };
-	let cut = contextFilterCutIndex(messages, native.keepRecentTokens, native.keepRecentTokens, estimateContextMessageTokens);
+	const keep = compactionRetentionBudget(ctx, messages, native);
+	let cut = contextFilterCutIndex(messages, keep, keep, estimateContextMessageTokens);
 	let offset = 0;
 	let firstKeptEntryId;
 	for (const entry of entries) {

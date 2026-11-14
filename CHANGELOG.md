@@ -4,6 +4,11 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+## 0.9.4 — 2026-11-14
+
+### Fixed
+- Manual and automatic compaction now use the same measured history budget. Large tool results and intercom messages no longer leave an oversized old tail behind; the 50k total-context target includes prompt/tools and summary overhead. The newest indivisible tool group and protected summary remain intact when they exceed that target.
+
 ### Changed
 - Hub: on another device (phone, remote page), file links now also work for any file in your home folder changed in the last 5 days, such as a fresh release ZIP in `~/Documents/Releases`, not only Downloads. Hidden folders (`.ssh`, `.pi`, ...) and secret-looking names stay blocked.
 

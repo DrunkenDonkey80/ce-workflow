@@ -8,6 +8,7 @@ import {
 	latestCompactionNote,
 	COMPACTION_NOTE_MAX,
 	replayCost,
+	retainedHistoryBudget,
 	tightenPreparation,
 	addCost,
 } from "../extensions/work-compaction.ts";
@@ -54,6 +55,28 @@ import {
 	assert.equal(tightenPreparation(prepared, dense, 15_000, cost, toMessages).firstKeptEntryId, "a2", "the tail from a2 is 10.1k real");
 	assert.equal(tightenPreparation(prepared, dense, 25_000, cost, toMessages), prepared, "a 20.1k real tail fits 25k");
 	assert.equal(tightenPreparation({ ...prepared, firstKeptEntryId: "gone" }, entries, 12_000, cost, toMessages).firstKeptEntryId, "gone");
+	for (const history of [entries, dense]) {
+		for (const keep of [20_000, 5_000, 8_000, 12_000, 15_000, 25_000, 100_000, 0]) {
+			const manual = tightenPreparation(prepared, history, keep, cost, toMessages);
+			const cut = contextFilterCutIndex(history.map(entry => entry.message), keep, keep, cost);
+			assert.equal(history[cut ?? 0].id, manual.firstKeptEntryId, `manual and boundary cuts agree at ${keep} tokens`);
+		}
+	}
+	const hugeLastResult = [...entries.slice(0, -1), { id: "huge-last-result", type: "message", message: { role: "toolResult", content: "x".repeat(160_000) } }];
+	assert.equal(tightenPreparation(prepared, hugeLastResult, 1_000, cost, toMessages).firstKeptEntryId, "a3", "an oversized final result keeps only its assistant group, not the whole history");
+	const custom = [...entries.slice(0, 1), { id: "large-custom", type: "message", message: { role: "custom", content: "x".repeat(160_000) } }, ...entries.slice(1)];
+	const customCut = contextFilterCutIndex(custom.map(entry => entry.message), 30_000, 30_000, cost);
+	assert.equal(custom[customCut].id, "a1", "oversized custom message goes into the summary, not the kept tail");
+}
+
+{
+	const estimate = message => message.tokens;
+	const messages = [{ role: "system", tokens: 19_000 }, { role: "user", tokens: 1_000 },
+		{ role: "assistant", tokens: 100, usage: { input: 1_000, cacheRead: 38_000, cacheWrite: 1_000 } }];
+	assert.equal(retainedHistoryBudget(messages, 30_000, 4_000, estimate), 4_000, "50k total includes measured prompt overhead and summary reserve");
+	assert.equal(retainedHistoryBudget([], 30_000, 8_000, estimate), 30_000, "history cap still applies with no overhead");
+	assert.equal(retainedHistoryBudget([{ role: "system", tokens: 60_000 }], 30_000, 8_000, estimate), 0, "oversized fixed prompt leaves only the last indivisible turn");
+	assert.equal(retainedHistoryBudget(messages, 1_000, 4_000, estimate), 1_000, "smaller model-specific retention is respected");
 }
 
 assert.equal(latestCompactionNote([]), "");

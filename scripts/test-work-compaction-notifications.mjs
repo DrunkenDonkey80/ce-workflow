@@ -17,6 +17,7 @@ import workModelsExtension, {
 	launchKnowledgeDiscoverer,
 	noteExcludedModels,
 	registerContextHandlers,
+	realCostPreparation,
 	requestContextFilter,
 	systemSafeContext,
 	researchCompactionTrigger,
@@ -1067,7 +1068,7 @@ try {
 	assert.equal(oversizedRequest[0].content.length, 130_000);
 	resetContextFilter();
 	const activeMessages = [
-		{ role: "assistant", content: `old ${"x".repeat(130_000)}` },
+		{ role: "assistant", content: [{ type: "text", text: `old ${"x".repeat(130_000)}` }] },
 		{ role: "assistant", content: [{ type: "text", text: "old answer" }] },
 		{ role: "user", content: "current turn" },
 		{
@@ -1090,7 +1091,7 @@ try {
 		{ role: "assistant", content: [{ type: "text", text: "used giant" }] },
 		{
 			role: "assistant",
-			content: [{ type: "text", text: "y".repeat(100_000) }], // ~25k tokens: the giant result still falls inside the 30k kept tail
+			content: [{ type: "text", text: "y".repeat(80_000) }], // ~20k tokens: the giant result and reply fit inside the 30k kept tail
 		},
 	];
 	requestContextFilter(activeCtx);
@@ -1781,7 +1782,12 @@ try {
 		return { text: "Native checkpoint", usage: { input: 10, output: 5 } };
 	});
 	assert.equal(nativeDraft.type, "compaction");
-	assert.equal(nativeDraft.firstKeptEntryId, "boundary-6", "retention keeps tool calls and results together");
+	assert.equal(nativeDraft.firstKeptEntryId, "boundary-8", "an oversized tool pair is summarized together, not retained over budget");
+	const manualBoundary = realCostPreparation({ branchEntries: boundary.context.contextEntries.map(entry => entry.sourceEntry),
+		preparation: { firstKeptEntryId: "boundary-6", messagesToSummarize: boundaryMessages.slice(0, 6), settings: { keepRecentTokens: 30_000 } } }, nativeCtx);
+	assert.equal(manualBoundary.firstKeptEntryId, nativeDraft.firstKeptEntryId, "manual and native boundary use the same cut");
+	assert(manualBoundary.messagesToSummarize.includes(boundaryMessages[6]));
+	assert(manualBoundary.messagesToSummarize.includes(boundaryMessages[7]), "both halves reach the summarizer");
 	assert.equal(nativeDraft.usage.output, 5);
 	const giantNativeMessages = [{ role: "user", content: `BEGIN ${"Requirements 😀 and decisions. ".repeat(24_000)} END` }];
 	const originalGiantNative = JSON.stringify(giantNativeMessages);
@@ -1867,9 +1873,9 @@ try {
 	assert.equal(fullAuto?.entries?.[0]?.type, "compaction", "Ultrafull publishes a real Pi checkpoint at its threshold");
 	assert.equal(fullAuto.entries[0].details.compactionMode, "ultrafull");
 	assert.equal(fullAuto.entries[0].details.compactionModel, "test/summary");
-	assert.deepEqual(fullAuto.entries[0].details.files.read, ["source.md"]);
+	assert.deepEqual(fullAuto.entries[0].details.files.read, ["recent.md", "source.md"]);
 	assert.match(fullAuto.entries[0].summary, /Original request/);
-	assert.equal(fullAuto.entries[0].firstKeptEntryId, "boundary-6", "the recent tool pair stays together");
+	assert.equal(fullAuto.entries[0].firstKeptEntryId, nativeDraft.firstKeptEntryId, "Ultrafull, native and manual compaction use the same cut");
 	assert.equal(fullCalls, 1);
 	assert.equal(fullAuto.entries[0].usage.output, 5);
 	const fullSettings = JSON.parse(readFileSync(modeSettingsFile, "utf8"));
