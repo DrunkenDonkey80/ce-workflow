@@ -6,7 +6,15 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
  const draftKey = id => "ask-draft:" + id; let saveDraft = () => {};
  const forget = id => { try { localStorage.removeItem(draftKey(id)); } catch { /* private mode */ } };
  addEventListener("pagehide", () => saveDraft());
- function remove(id) { forget(id); pending.delete(id); if (active?.askId === id) { active = null; dialog.close(); } show(); }
+ // Minimize hides the popup (answers kept) behind a pill under the top bar; the pill brings it back.
+ const pill = node("button", { type: "button", id: "prompt-restore", hidden: true, title: "Show the question again" }); document.body.append(pill);
+ const shrink = node("button", { type: "button", className: "prompt-minimize", title: "Minimize; a button under the top bar brings it back" }, "–"); shrink.setAttribute("aria-label", "Minimize");
+ const bar = node("div", { className: "prompt-minimize-bar" }); bar.append(shrink); dialog.prepend(bar);
+ function minimize() { if (!active || !dialog.open) return; saveDraft(); dialog.close(); pill.textContent = "▲ Waiting for your answer: " + (active.title ?? active.questions?.[0]?.question ?? active.question ?? "question"); pill.hidden = false; }
+ shrink.addEventListener("click", minimize);
+ pill.addEventListener("click", () => { pill.hidden = true; if (active) { dialog.show(); form.querySelector<HTMLElement>("input,textarea,button")?.focus(); } });
+ const drop = () => { active = null; dialog.close(); pill.hidden = true; };
+ function remove(id) { forget(id); pending.delete(id); if (active?.askId === id) drop(); show(); }
  async function answer(payload) {
   if (!active || sending) return;
   const id = active.askId; sending = true;
@@ -153,7 +161,8 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
   dialog.show(); form.querySelector<HTMLElement>("input,textarea,button")?.focus();
  }
  return {
-  sync(asks) { for (const id of pending.keys()) if (!asks.some(ask => ask.askId === id)) { forget(id); pending.delete(id); } for (const ask of asks) pending.set(ask.askId, ask); if (active && !pending.has(active.askId)) { active = null; dialog.close(); } show(); },
+  sync(asks) { for (const id of pending.keys()) if (!asks.some(ask => ask.askId === id)) { forget(id); pending.delete(id); } for (const ask of asks) pending.set(ask.askId, ask); if (active && !pending.has(active.askId)) drop(); show(); },
+  minimize,
   pending(ask) { pending.set(ask.askId, ask); show(); },
   closed: remove,
   get busy() { return !!active; },

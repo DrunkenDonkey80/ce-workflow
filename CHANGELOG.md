@@ -12,6 +12,9 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ### Changed
 - Hub: on another device (phone, remote page), file links now also work for any file in your home folder changed in the last 5 days, such as a fresh release ZIP in `~/Documents/Releases`, not only Downloads. Hidden folders (`.ssh`, `.pi`, ...) and secret-looking names stay blocked.
 
+### Fixed
+- Hub: a question popup no longer slides under the top bar, and its – button minimizes it to a "Waiting for your answer" button under the top bar (your answer is kept); opening a file from it minimizes it too, so the file is not hidden behind it.
+
 ## 0.9.3 — 2026-11-13
 
 ### Added

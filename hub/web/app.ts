@@ -373,7 +373,7 @@ document.addEventListener("touchmove", event => { if (phone.matches && event.tou
 // The top bar sizes Think and the usage bars to the chat panel below them.
 new ResizeObserver(() => document.body.style.setProperty("--chat-px", $("chat").offsetWidth + "px")).observe($("chat"));
 // The session sidebar starts below the full-width top bar.
-new ResizeObserver(() => document.body.style.setProperty("--topbar-h", document.querySelector<HTMLElement>(".topbar")!.offsetHeight + "px")).observe(document.querySelector(".topbar")!);
+new ResizeObserver(() => { const bar = document.querySelector<HTMLElement>(".topbar")!; document.body.style.setProperty("--topbar-h", bar.offsetHeight + "px"); document.body.style.setProperty("--topbar-bottom", bar.offsetTop + bar.offsetHeight + "px"); }).observe(document.querySelector(".topbar")!);
 const splitter = $("splitter"); let resize;
 // The chat width survives reloads and restarts.
 // The chat width survives reloads and restarts per session and tab (applyLayout).
@@ -1168,7 +1168,7 @@ function showExplored(value) {
   history.pushState({ explore: true }, "");
  }
  const was = filesView.key; if (was) void post("unview", { key: was }).catch(() => undefined); // the hub stops watching what it showed
- filesView.explore(value);
+ filesView.explore(value); promptView.minimize(); // a file opened from a question shows beside it, not under it
  if (phone.matches) setMobile("files"); else { setTab("files"); setLeft("full"); resizeChat(280); }
  showNotice(value.open ? "" : `${value.name}: ${value.files.length} files` + (value.truncated ? " (first 5000 shown)" : ""));
 }

@@ -997,6 +997,12 @@ try {
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#prompt-form .prompt-option a')].map(a => a.getAttribute('href'))"), ["https://example.com/a"], "links in options work like in chat");
  assert.equal(await evaluate("document.querySelectorAll('#prompt-form textarea').length"), 1, "one text box, like the terminal");
  await browser("click", "#prompt-form input[value=Blue]"); await browser("fill", "#prompt-form textarea", "Matches the boxes");
+ assert(await evaluate("document.getElementById('prompt').getBoundingClientRect().top >= document.querySelector('.topbar').getBoundingClientRect().bottom"), "the question opens below the top bar, never under it");
+ // Minimize hides the question behind a pill; the pill brings it back with the answer kept.
+ await browser("click", "#prompt .prompt-minimize");
+ assert.deepEqual(await evaluate("[document.getElementById('prompt').open, document.getElementById('prompt-restore').hidden, document.getElementById('prompt-restore').textContent]"), [false, false, "▲ Waiting for your answer: Pick a colour"]);
+ await browser("click", "#prompt-restore");
+ assert.deepEqual(await evaluate("[document.getElementById('prompt').open, document.getElementById('prompt-restore').hidden, document.querySelector('#prompt-form textarea').value]"), [true, true, "Matches the boxes"]);
  await browser("click", "#prompt-form button[type=submit]");
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open");
  assert.deepEqual(answers.at(-1).selections, ["Blue"]); assert.equal(answers.at(-1).comment, "Matches the boxes", "with an option chosen the text is the comment");
