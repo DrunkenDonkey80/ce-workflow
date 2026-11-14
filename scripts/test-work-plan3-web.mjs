@@ -55,8 +55,10 @@ assert.equal(submitted.at(-1).message, "hello");
 	assert.equal(submitted.at(-1).message, "warm", "a warm cache sends directly");
 	forwardDiagramChat(coldApi, { isIdle: () => false }, contextDiagram, "busy", [], () => {});
 	assert.equal(submitted.at(-1).options.deliverAs, "steer", "a busy send not held by an early compaction steers");
+	assert.equal(forwardDiagramChat(coldApi, { isIdle: () => false }, contextDiagram, "later", [], () => {}, undefined, true).followUp, true);
+	assert.equal(submitted.at(-1).options.deliverAs, "followUp", "Queue (Ctrl on the page) waits for the agent to finish");
 	forwardDiagramChat(coldApi, { isIdle: () => true }, contextDiagram, "/plan3 review 12345678", [], () => {});
-	assert.deepEqual(asked, ["wo:cold-cache", "wo:cold-cache", "wo:cold-cache"], "busy sends ask too (an early compaction holds them); commands never do");
+	assert.deepEqual(asked, ["wo:cold-cache", "wo:cold-cache", "wo:cold-cache", "wo:cold-cache"], "busy sends ask too (an early compaction holds them); commands never do");
 }
 forwardDiagramChat(sendApi, { isIdle: () => false }, contextDiagram, "/plan3 review 12345678", [], () => {});
 assert.equal(submitted.at(-1).message, "/plan3 review 12345678");

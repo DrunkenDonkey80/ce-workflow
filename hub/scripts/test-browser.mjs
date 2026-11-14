@@ -105,7 +105,7 @@ function stub(endpoint, body) {
  if (endpoint === "/api/message") {
   if (rejectMessage) { rejectMessage = false; throw fail(503, "Session temporarily unavailable"); }
   messages.push(body); const row = { id: "user_" + messages.length, role: "user", text: body.text, at: new Date().toISOString(), streaming: false };
-  chatRows.set(row.id, row); publish("message", row); return { accepted: true, queued: activity.working };
+  chatRows.set(row.id, row); publish("message", row); return { accepted: true, queued: activity.working, ...(activity.working && body.queue ? { followUp: true } : {}) };
  }
  if (endpoint === "/api/bias") { publish("plan", { id: "12345678", title: sample.title, done: 2, total: 5, focus: "S03", bias: body.level }); return { ok: true }; }
  // G-01: the real endpoint opens ask_user pre-filled with the saved directions and settles on the answer.
@@ -1382,8 +1382,22 @@ try {
  { const row = { id: "after_grow", role: "assistant", text: "Still following", streaming: false }; chatRows.set(row.id, row); publish("message", row); }
  await browser("wait", "[data-id=after_grow]");
  assert(await evaluate("(() => { const list = document.getElementById('feed'); return list.scrollHeight - list.scrollTop - list.clientHeight < 4 && document.getElementById('to-bottom').hidden; })()"), "late growth does not unpin the chat");
+ assert.equal(await evaluate("document.getElementById('send').textContent"), "Steer", "while working Send steers");
  await browser("fill", "#message-input", "Queued follow-up"); await browser("click", "#send");
  await browser("wait", "--fn", "document.getElementById(\"notice\").textContent.includes(\"steers\")");
+ assert.equal(messages.at(-1).queue, undefined, "a plain click steers");
+ // Holding Ctrl turns it into Queue; Ctrl+click and the long-press/right-click menu queue (after the agent finishes).
+ await evaluate("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Control', ctrlKey: true }))");
+ assert.equal(await evaluate("document.getElementById('send').textContent"), "Queue");
+ await evaluate("window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Control' }))");
+ assert.equal(await evaluate("document.getElementById('send').textContent"), "Steer");
+ await browser("fill", "#message-input", "After you finish"); await evaluate("document.getElementById('send').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true }))");
+ await browser("wait", "--fn", "document.getElementById(\"notice\").textContent.startsWith(\"Queued\")");
+ assert.equal(messages.at(-1).queue, true, "Ctrl+click queues");
+ await browser("fill", "#message-input", "Picked from the menu"); await evaluate("document.getElementById('send').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))");
+ await evaluate("[...document.querySelectorAll('.session-menu:not([hidden]) button')].find(b => b.textContent.startsWith('Queue')).click()");
+ await browser("wait", "--fn", "document.getElementById(\"messages\").textContent.includes(\"Picked from the menu\")");
+ assert.equal(messages.at(-1).queue, true, "the menu's Queue queues");
  // Queue and tool rows below the newest message grow the one scroll area: a reader at the end stays at the end.
  activity = { working: true, tools: [], queue: [], hasPendingMessages: false, error: undefined, thinking: "" }; publish("activity", activity);
  await browser("wait", "--fn", "document.querySelectorAll('#activity details').length === 0");

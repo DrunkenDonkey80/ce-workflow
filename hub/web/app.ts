@@ -140,7 +140,7 @@ function renderShell() {
  for (const id of ["git-pull", "git-commit", "git-push", "env-var", "drawer-env-var"]) ($(id) as HTMLButtonElement).disabled = busy;
  for (const button of document.querySelectorAll<HTMLButtonElement>(".session-git-action")) button.disabled = busy; // the sidebar copies (the drawer on phones)
  renderCommands(status?.commands ?? [], busy);
- $("send").disabled = !state.connected || messageSending || !!pendingSubmission; $("send").textContent = state.activity.working ? "Queue" : "Send";
+ $("send").disabled = !state.connected || messageSending || !!pendingSubmission; renderSendLabel();
  ($("draft-retry") as HTMLButtonElement).disabled = !state.connected || messageSending;
  $("stop").hidden = !state.activity.working; $("stop").disabled = !state.connected;
  const waiting = state.connected && state.activity.dialog && !promptView.busy ? "Pi is waiting for a terminal dialog: " + state.activity.dialog : "";
@@ -1401,7 +1401,7 @@ $("message-input").addEventListener("keydown", event => {
   if (stepSession(event.shiftKey ? -1 : 1)) event.preventDefault();
   return;
  }
- if (event.key === "Enter" && !event.shiftKey && !event.isComposing && !touchKeyboard.matches) { event.preventDefault(); $("composer").requestSubmit(); }
+ if (event.key === "Enter" && !event.shiftKey && !event.isComposing && !touchKeyboard.matches) { event.preventDefault(); queueNext = event.ctrlKey || event.metaKey; $("composer").requestSubmit(); }
  // Escape: a recalled prompt goes back to the draft, typed text is cleared (Ctrl+Z brings it back), and only an empty box stops the run.
  if (event.key === "Escape") {
   const input = $("message-input") as HTMLTextAreaElement;
@@ -1450,8 +1450,21 @@ function showHistory(at: number, caret: number) {
  box.setSelectionRange(caret === -1 ? box.value.length : caret, caret === -1 ? box.value.length : caret);
  box.dispatchEvent(new Event("input"));
 }
+// While the agent works, Send steers it (like Enter in Pi); Ctrl+click / Ctrl+Enter queues instead (like Alt+Enter: after it finishes).
+// The button reads Queue while Ctrl is held; on touch a long press offers Steer or Queue.
+let queueNext = false, ctrlHeld = false, sendPress = 0, sendPressed = false;
+function renderSendLabel() { $("send").textContent = !state.activity.working ? "Send" : ctrlHeld ? "Queue" : "Steer"; $("send").title = state.activity.working ? "Steer: the agent reads it after its current tool calls. Ctrl+click or Ctrl+Enter: Queue, sent after it finishes. Long-press: choose." : ""; }
+for (const type of ["keydown", "keyup"]) window.addEventListener(type, (event: KeyboardEvent) => { const held = event.ctrlKey || event.metaKey; if (held !== ctrlHeld) { ctrlHeld = held; renderSendLabel(); } });
+window.addEventListener("blur", () => { ctrlHeld = false; renderSendLabel(); });
+const sendAs = (queue: boolean) => { queueNext = queue; $("composer").requestSubmit(); };
+const sendMenu = () => { if (state.activity.working && !($("send") as HTMLButtonElement).disabled) showMenu($("send"), [["Steer (after its current tool calls)", () => sendAs(false)], ["Queue (after it finishes)", () => sendAs(true)]]); };
+$("send").addEventListener("click", event => { if (sendPressed) { sendPressed = false; event.preventDefault(); return; } queueNext = event.ctrlKey || event.metaKey; });
+$("send").addEventListener("contextmenu", event => { if (!state.activity.working) return; event.preventDefault(); sendMenu(); });
+$("send").addEventListener("pointerdown", event => { sendPressed = false; if (event.pointerType === "touch" && state.activity.working) sendPress = window.setTimeout(() => { sendPressed = true; sendMenu(); }, 500); });
+for (const end of ["pointerup", "pointercancel", "pointermove"]) $("send").addEventListener(end, () => clearTimeout(sendPress));
 $("composer").addEventListener("submit", async event => {
  event.preventDefault();
+ const queue = queueNext; queueNext = false;
  if ($("message-input").value.trim() === "/wo design") {
   $("message-input").value = historyAt === -1 ? "" : historyDraft;
   historyAt = -1; $("message-input").classList.remove("editing-last", "from-history"); $("message-input").title = ""; renderHistoryNav(); saveDraft(); openLibrary(); return;
@@ -1472,7 +1485,7 @@ $("composer").addEventListener("submit", async event => {
  const sent = editLines.filter(item => text.split("\n").includes(item.line)), parts = new Map();
  for (const item of sent) parts.set(item.target, [...new Set([...(parts.get(item.target) ?? []), ...item.ids])]);
  // A diagram's context (its @mentions) rides along only while its tab is on screen; a collapsed or hidden panel sends plain chat.
- const message = { text, target: $("canvas").getClientRects().length ? diagramTarget() : undefined, ...(parts.size ? { diagrams: [...parts].map(([target, ids]) => ({ target, ids })) } : {}), ...(refs.length ? { references: { submission: crypto.randomUUID(), refs: refs.map(ref => ({ ref: ref!.ref, revision: ref!.revision })) } } : {}) };
+ const message = { text, ...(queue && !refs.length ? { queue: true } : {}), target: $("canvas").getClientRects().length ? diagramTarget() : undefined, ...(parts.size ? { diagrams: [...parts].map(([target, ids]) => ({ target, ids })) } : {}), ...(refs.length ? { references: { submission: crypto.randomUUID(), refs: refs.map(ref => ({ ref: ref!.ref, revision: ref!.revision })) } } : {}) };
  pendingSubmission = { text, refs: [...selectedReferenceIds], at: Date.now(), ...message.references ? { request: message as ReferenceMessage } : {} };
  // Sending jumps to the newest message; later rows keep following from the bottom.
  toBottom();
@@ -1490,7 +1503,7 @@ async function sendSubmission(saved: NonNullable<typeof pendingSubmission>, mess
   selectedReferenceIds = selectedReferenceIds.filter(id => !saved.refs.includes(id));
   if (draftEdits === submittedEdits && $("message-input").value === saved.text) $("message-input").value = "";
   renderMentions();
-  if (noticeVersion === noticeBefore) showNotice(result.queued ? "Sent; it steers the running agent." : "Message sent.", true);
+  if (noticeVersion === noticeBefore) showNotice(result.followUp ? "Queued; it goes after the agent finishes." : result.queued ? "Sent; it steers the running agent." : "Message sent.", true);
  } catch (error) {
   // Reference retries keep the exact envelope even on refusal; never turn uncertainty into a fresh launch ID.
   if (!saved.request && Number.isInteger(error.status) && error.status >= 400 && error.status < 500 && error.status !== 408 && draftEdits === submittedEdits) pendingSubmission = undefined;

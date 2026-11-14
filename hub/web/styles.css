@@ -452,7 +452,9 @@ h2 { font-size: 15px; font-weight: 600; }
 .bar-text { overflow: hidden; text-overflow: ellipsis; min-width: 0; } .bar-count { flex: none; }
 .bar-group { flex: 0 1 auto; } .bar-group .bar { flex: 0 1 auto; }
 .workspace-title { flex: 0 1 auto !important; max-width: 22%; }
-.plan-list { display: grid; gap: 2px; max-height: 50vh; overflow: auto; }
+/* Plans use the screen height (the actions stay visible below them) and the titles get room. */
+.plan-list { display: grid; gap: 2px; max-height: max(50vh, calc(100dvh - 330px)); overflow: auto; }
+#plan-menu { max-height: calc(100dvh - 60px); max-width: min(640px, 92vw); }
 #plan-menu hr { width: 100%; border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
 .bar { --fill: 0%; --bar: var(--accent); text-align: center; border: 1px solid var(--bar); border-radius: 6px; padding: 6px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
  background: linear-gradient(to right, color-mix(in srgb, var(--bar) 30%, var(--panel)) var(--fill), var(--panel) var(--fill)); }

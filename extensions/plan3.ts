@@ -879,7 +879,7 @@ export default function plan3(pi) {
 			return pickForHub(ctx, process.env.PI_HUB_SESSION, data.set, data.n);
 		}
 		if (endpoint !== "/api/message") throw new WebError(501, "This session endpoint is not attached yet.");
-		if (Object.keys(data).some(key => !["target", "text", "comments", "diagrams", "bundle"].includes(key))) throw new WebError(400, "Invalid message fields.");
+		if (Object.keys(data).some(key => !["target", "text", "comments", "diagrams", "bundle", "queue"].includes(key)) || data.queue !== undefined && data.queue !== true) throw new WebError(400, "Invalid message fields.");
 		// The page sends a target only while a diagram tab is in view, and only an @mention or comment uses it:
 		// any other message never reads the plan or diagram files.
 		// A diagram that fails to load costs its context, never the message.
@@ -891,7 +891,7 @@ export default function plan3(pi) {
 		const target = !usesDiagram ? undefined : await resolveWebTarget(await displayedWebTarget(data.target ?? undefined));
 		const diagram = target ? forChat(target) : emptyDiagram({ kind: "product" });
 		const send = (context) => {
-			if (data.bundle === undefined) return forwardDiagramChat(pi, ctx, context, data.text, data.comments, notifyWeb);
+			if (data.bundle === undefined) return forwardDiagramChat(pi, ctx, context, data.text, data.comments, notifyWeb, undefined, data.queue === true);
 			// Validate diagram/comment context before granting launch permission.
 			diagramChatMessage(context, data.text, data.comments);
 			return deliverReferenceBundle(ctx.cwd, process.env.PI_HUB_SESSION ?? "", data.bundle, data, (references, uncertain) =>
