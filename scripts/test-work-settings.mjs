@@ -10,6 +10,8 @@ function assert(ok, message) {
 	if (!ok) throw new Error(message);
 }
 
+// Terminal dialogs under test: a hub-launched parent Pi must not route them to the hub channel.
+delete process.env.PI_HUB;
 const previousConfigDir = process.env.PI_CODING_AGENT_DIR;
 const previousAskUserContextExpanded = process.env.PI_ASK_USER_CONTEXT_EXPANDED;
 const globalDir = mkdtempSync(path.join(tmpdir(), "work-global-settings-"));
@@ -214,6 +216,46 @@ try {
 	assert(scopedRows.includes("Vision Test") && !scopedRows.includes("Text Only"), "typing filters the scoped checklist");
 	assert(JSON.stringify(JSON.parse(readFileSync(globalSettingsFile(), "utf8")).enabledModels) === "[\"test/vision\"]", "scoped models persist as Pi enabledModels");
 	delete globalThis[Symbol.for("ce-workflow.scoped-models")];
+
+	// Mapping agent: None by default, model+effort in one value, project None wins, clear inherits both.
+	const NONE = "__none_model__";
+	const mappingCtx = (actions) => ({ ...ctx, modelRegistry: { getAvailable: async () => [{ provider: "test", id: "text-only", name: "Text Only" }] }, ui: customUi(actions) });
+	assert(mod.mappingModelSettings(cwd) === NONE, "mapping agent defaults to None, never the session model");
+	await invoke("work-settings", "", mappingCtx([
+		{ target: "Mapping agent:", key: "enter" },
+		{ target: "Text Only", key: "enter" },
+		{ key: "escape" },
+		{ key: "escape" },
+	]));
+	assert(mod.mappingModelSettings(cwd) === NONE && !JSON.parse(readFileSync(globalSettingsFile(), "utf8")).workOrchestrator?.mappingModel,
+		"escaping the mapping effort step saves nothing");
+	await invoke("work-settings", "", mappingCtx([
+		{ target: "Mapping agent:", key: "enter" },
+		{ target: "Text Only", key: "enter" },
+		{ target: "High", key: "enter" },
+		{ expectText: "Mapping agent: [Text Only", key: "escape" },
+	]));
+	assert(mod.mappingModelSettings(cwd) === "test/text-only:high", "global mapping model and effort persist as one value");
+	await invoke("work-settings", "", mappingCtx([
+		{ key: "\t" },
+		{ target: "Mapping agent:", key: "enter" },
+		{ target: "None", key: "enter" },
+		{ key: "escape" },
+	]));
+	assert(mod.mappingModelSettings(cwd) === NONE && JSON.parse(readFileSync(settingsFile(), "utf8")).workOrchestrator.mappingModel === NONE,
+		"project None overrides a global mapping model");
+	// Another session writes while the menu is open; clearing the override must not restore the menu snapshot.
+	await invoke("work-settings", "", mappingCtx([
+		{ key: "\t" },
+		{ target: "Mapping agent:", key: "delete", capture: () => writeSettings({ theme: "concurrent", workOrchestrator: { mappingModel: NONE } }) },
+		{ key: "escape" },
+	]));
+	const clearedProject = JSON.parse(readFileSync(settingsFile(), "utf8"));
+	assert(clearedProject.theme === "concurrent" && !clearedProject.workOrchestrator, "clearing the override keeps a concurrent write");
+	assert(mod.mappingModelSettings(cwd) === "test/text-only:high", "clearing the project override inherits global model and effort together");
+	for (const bad of ["garbage", "test/text-only", "test/text-only:ultra", "has space/m:low", 42, null])
+		assert(mod.mappingModelSettings(cwd, { workOrchestrator: { mappingModel: bad } }) === NONE, `malformed mapping value ${bad} fails closed to None`);
+	writeGlobalSettings({});
 	// Return to default so subsequent settings assertions remain independent.
 	writeSettings({});
 	writeGlobalSettings({});

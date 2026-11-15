@@ -1112,6 +1112,11 @@ const visionLabel = (ref, names = undefined) => { if (ref === NONE_MODEL) return
 export function imageModelSettings(cwd, settings = readEffectiveSettings(cwd)) {
 	return String(settings.workOrchestrator?.imageModel ?? NONE_MODEL);
 }
+// "provider/id:effort" or None (default). Malformed values fail closed to None; never falls back to the session model.
+export function mappingModelSettings(cwd, settings = readEffectiveSettings(cwd)) {
+	const value = settings.workOrchestrator?.mappingModel;
+	return typeof value === "string" && /^[^/\s:]+\/[^\s:]+:(off|minimal|low|medium|high|xhigh|max)$/.test(value) ? value : NONE_MODEL;
+}
 
 
 export function compactionModelSettings(cwd, settings = readEffectiveSettings(cwd)) {
@@ -4211,6 +4216,7 @@ function workSettingsStatus(ctx) {
 		`Vision model: ${visionLabel(visionModel)}`,
 		`Alternative vision model: ${visionLabel(visionAltModelSettings(ctx.cwd, settings))}`,
 		`Image generation model: ${imageModelSettings(ctx.cwd, settings) === NONE_MODEL ? "None" : imageModelSettings(ctx.cwd, settings)}`,
+		`Mapping agent: ${visionLabel(mappingModelSettings(ctx.cwd, settings))}`,
 	].join("\n"), "info");
 }
 
@@ -4243,6 +4249,7 @@ function hasProjectOverride(settings, item) {
 	if (item.kind === "visionAltModel") return owns(block, "visionAltModel");
 	if (item.kind === "imageModel") return owns(block, "imageModel");
 	if (item.kind === "designModel") return owns(block, "designModel");
+	if (item.kind === "mappingModel") return owns(block, "mappingModel");
 	if (item.kind === "reviewAfterPlan" || item.kind === "reviewBeforeCommit") return owns(block, item.kind);
 	return false;
 }
@@ -4486,6 +4493,11 @@ async function workSettingsLoop(ctx, pi = undefined) {
 				description: "Model and effort of the hub sessions the design tool opens (design-1, design-2, ...); their agent builds and refines the design itself, so pick a strong model.",
 			},
 {
+				kind: "mappingModel", value: "mappingModel",
+				label: `Mapping agent: [${visionLabel(mappingModelSettings(ctx.cwd, settings), names)}] ${SUBMENU_ARROW}`,
+				description: "None: no project map. A model (a cheap one is fine) keeps a local map of what is where; the main agent checks it before adding code. Project None turns it off here.",
+			},
+{
 				kind: "reset",
 				value: SETTINGS_RESET,
 				label:
@@ -4547,8 +4559,10 @@ async function workSettingsLoop(ctx, pi = undefined) {
 			continue;
 		}
 		if (selected.action === "clear") {
-			if (clearProjectOverride(projectSettings, pick)) {
-				writeSettings(ctx.cwd, projectSettings);
+			// Re-read: the menu snapshot may predate another session's write.
+			const fresh = readSettings(ctx.cwd);
+			if (clearProjectOverride(fresh, pick)) {
+				writeSettings(ctx.cwd, fresh);
 				ctx.ui.notify(`${pick.settingLabel ?? pick.label}: using global`, "info");
 			}
 			continue;
@@ -4702,6 +4716,27 @@ async function workSettingsLoop(ctx, pi = undefined) {
 			continue;
 		}
 
+		if (pick.kind === "mappingModel") {
+			const current = splitLevel(mappingModelSettings(ctx.cwd, settings));
+			const project = scope === "project";
+			const selected = await chooseModel(ctx, "Mapping agent", current.model, project, project,
+				project ? undefined : { label: "None", description: "No project map" },
+				{ noneDescription: "No project map here, even when the global setting has one" });
+			if (selected === undefined) continue;
+			let value = selected;
+			if (![INHERIT_MODEL, NONE_MODEL].includes(selected)) {
+				const level = await choose(ctx, "Mapping agent: choose effort", THINKING_LEVELS.map((item) => ({ value: item, label: item, description: "Effort of map updates" })), current.level ?? "low", { forceCustom: true });
+				if (level === undefined) continue;
+				value = `${selected}:${level}`;
+			}
+			// Fresh read right before the write so changes made while the picker was open survive.
+			settings = readScopedSettings(ctx.cwd, scope);
+			settings.workOrchestrator ??= {};
+			if (selected === INHERIT_MODEL) delete settings.workOrchestrator.mappingModel;
+			else settings.workOrchestrator.mappingModel = value;
+			writeScopedSettings(ctx.cwd, scope, settings);
+			continue;
+		}
 		if (pick.kind === "designModel") {
 			const current = splitLevel(settings.workOrchestrator?.designModel ?? INHERIT_MODEL);
 			const selected = await chooseModel(ctx, "Design session model", current.model, false, scope === "project",
