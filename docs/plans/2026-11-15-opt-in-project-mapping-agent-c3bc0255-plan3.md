@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-15
-updated: 2026-11-15T21:20:24.896Z
+updated: 2026-11-15T21:26:36.778Z
 reviewed: 2026-11-15
 started: 2026-11-15T21:13:02.675Z
 ---
@@ -132,14 +132,7 @@ Project report is stale and only 23% covered; verify every selected owner agains
 ### Phase 2: Settings and maintenance [code]
 
 - [x] **P3-02** Mapping agent setting added (workOrchestrator.mappingModel "provider/id:effort", None default, malformed fails closed to None, project None wins, clear inherits model+effort, clear re-reads settings instead of writing the menu snapshot); commit 9ee519c0.
-- [ ] **P3-03** Implement bounded read-only maintenance and atomic publication; prove cancellation, freshness and concurrency regressions with sensitive tests.
-  - Add a focused .ts owner rather than expanding work-models into another large subsystem. Reuse native execution and confined, bounded, locked atomic storage primitives.
-  - Use the outside-worktree local cache defined in contract 3, an owned format version and source fingerprints. Keep map contents and referenced freshness metadata an indivisible published generation; preserve the prior good generation on failure. In a fixture repository without ignore rules, publication leaves git status --porcelain and source fingerprints unchanged.
-  - Coalesce changes; one live mapper per checkout; no locks held across model calls. Read policy, lease, generation and pending changes inside the lock when deciding what to claim or publish. Late results cannot restore disabled or superseded state.
-  - Build a bounded project index with expandable module sections and explicit coverage, not a flat symbol dump. Incremental work updates affected sections and referenced neighbors; broad changes trigger a bounded rebuild with honest partial status.
-  - Test first build, no changes, add/delete/rename, dirty Git changes, external changes, branch switch, non-Git roots, huge/binary/generated files, symlink escape, malformed/oversized results, corrupt local cache and supported-format migration.
-  - Use barrier-controlled competing sessions to prove one claim, no lost pending update, stale-read rejection and late-result rejection after disable. Test lost spawn acknowledgement as unknown, never automatic duplicate launch.
-  - Add the dedicated planned runner scripts/test-work-project-map.mjs; verify-package.mjs:113 auto-discovers test-work-*.mjs, so no test registry edit is needed. Record its command after it exists. Reuse existing lifecycle fixtures where appropriate and prove semantic mutation sensitivity, not a full sweep. If a mapper profile is chosen, update verify-package.mjs:37-40's exact utility-agent roster and deliberately decide whether package discovery should advertise it; no profile/roster change is needed for an in-process implementation.
+- [x] **P3-03** extensions/work-project-map.ts: projectRoot/mapLocation (outside-worktree cache, drive/home refused), single-snapshot scan (git ls-files or bounded walk; generated/credential/binary/huge/symlink excluded and listed), tool-free registryComplete, createProjectMapper (refresh with in-process join, locked claim/publish by job id, pending re-run, disable, waitForIdle, status); commit 32acd699.
 
 ### Phase 3: Main-agent guidance and verification [code]
 
