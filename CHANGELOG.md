@@ -2,7 +2,7 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 1.0.0 — 2026-11-15
 
 ### Added
 - `/wo → Settings` has an opt-in **Mapping agent** (None by default). Pick a model and it keeps a local map of what is where in the project, stored outside the repo, so the main agent checks for existing code before writing new code. The first prompt waits for the initial map (Escape skips it); with a model set, the same row shows the map status and can rebuild the map. Time and token savings are not measured yet.
