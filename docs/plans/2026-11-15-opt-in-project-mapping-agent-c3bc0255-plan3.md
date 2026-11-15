@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-15
-updated: 2026-11-15T21:37:44.947Z
+updated: 2026-11-15T21:41:20.424Z
 reviewed: 2026-11-15
 started: 2026-11-15T21:13:02.675Z
 ---
@@ -137,7 +137,7 @@ Project report is stale and only 23% covered; verify every selected owner agains
 ### Phase 3: Main-agent guidance and verification [code]
 
 - [x] **P3-04** Idle inputs (interactive/RPC/extension) are held in place inside the awaited input hook until the first map exists (no replay, so text/images/expansion stay Pi's); Continue-without/Cancel/Retry dialogs, headless bounded deadline with deterministic error; stable sections["project-map"] set/deleted; background refresh at session_start/agent_settled with no auto-retry after failure; Settings row gains Rebuild/status; None disables; off in PI_SUBAGENT_CHILD (commit 84f769c8).
-- [ ] **P3-06** Isolate non-mapping live tests and benchmarks from global mapper settings; prove zero mapping calls unless a fixture explicitly opts in.
+- [x] **P3-06** projectMapScope also returns off when PI_WORK_PROJECT_MAP=off; every live script that spawns Pi defaults it with ??= "off" (fixtures opt in with =on); test-work-settings proves a global model maps a Git checkout but not under off, and guards new live scripts (commit 6ee31eaf).
 - [ ] **P3-05** Exercise the real settings UI, run changed-path LSP and targeted checks, and report rollout limits without optimization claims.
   - Drive real settings persistence and model/effort/None/cancel/clear flows in C-settings, which executes workSettingsLoop and shared dialog components. The hub test-browser stub does not execute that loop. For visual checks, capture actual generated dialog JSON and render it with the existing changelog-shot --ask facility or a targeted headless fixture; interact with that form and inspect it through screen_read. Label rendering evidence separately from settings persistence and live mapper integration; a canned screenshot is not an end-to-end proof.
   - Run C-settings, C-dialogs and C-lifecycle, plus only relevant existing lock/agent-profile checks identified by touched code. Run active LSP on changed paths; disclose verified baseline-only findings and unavailable coverage.
