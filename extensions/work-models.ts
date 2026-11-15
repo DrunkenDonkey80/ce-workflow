@@ -36,6 +36,7 @@ import {
 import { COMPACTION_PROFILES, compactionThreshold, compactionInputBytes, contextFilterCutIndex, replayCost, retainedHistoryBudget, tightenPreparation, contentText, addCost, filesFromOps, formatCompactionSummary, COMPACTION_NOTE_TOOL, COMPACTION_NOTE_MAX, latestCompactionNote } from "./work-compaction.ts";
 import { compactMemory } from "./work-compaction-memory.ts";
 import { createVisionBridge, splitLevel } from "./work-vision.ts";
+import { createProjectMapSession, createProjectMapper, projectRoot, registryComplete } from "./work-project-map.ts";
 import { createJevTools, jevStatus } from "./jev-tools.ts";
 import { catchUpPlanText, catchUpReviewBlocker, gitLatestCommit, PLAN3_CATCH_UP_PACKAGES, writeGitCatchUpDiff } from "./plan3-catch-up.ts";
 import { listPlans, setPlanModelPicker } from "./plan3.ts";
@@ -1117,6 +1118,22 @@ export function mappingModelSettings(cwd, settings = readEffectiveSettings(cwd))
 	const value = settings.workOrchestrator?.mappingModel;
 	return typeof value === "string" && /^[^/\s:]+\/[^\s:]+:(off|minimal|low|medium|high|xhigh|max)$/.test(value) ? value : NONE_MODEL;
 }
+// Mapping scope: off in subagent children (pi-subagents marks them); a global model maps Git checkouts only, a project setting also maps a plain folder.
+export function projectMapScope(cwd) {
+	if (process.env.PI_SUBAGENT_CHILD === "1") return;
+	const model = mappingModelSettings(cwd);
+	if (model === NONE_MODEL) return;
+	const scope = projectRoot(cwd, { allowNonGit: readScopedSettings(cwd, "project").workOrchestrator?.mappingModel !== undefined });
+	return scope && { ...scope, model };
+}
+let projectMapRegistry;
+const projectMapper = createProjectMapper({
+	complete: (request) => registryComplete(projectMapRegistry)(request),
+	isEnabled: (root) => { try { return Boolean(projectMapScope(root)); } catch { return false; } },
+});
+export let projectMaps = createProjectMapSession({ mapper: projectMapper, scope: projectMapScope });
+export function setProjectMapsForTest(session) { projectMaps = session; }
+let projectMapShutdown = new AbortController();
 
 
 export function compactionModelSettings(cwd, settings = readEffectiveSettings(cwd)) {
@@ -3820,6 +3837,9 @@ if (extensionScoutEnabled()) {
 		}
 ctx.ui.notify(`ce-workflow loaded · ${UTILITY_SHORTCUT_STATUS}`, "info");
 sessionCwd = ctx.cwd;
+projectMapRegistry = ctx.modelRegistry;
+projectMapShutdown = new AbortController();
+projectMaps.background(ctx.cwd, (text) => ctx.ui?.notify?.(text, "warning")); // the initialization job the first message joins
 });
 
 	pi.on("session_shutdown", async (_event, ctx) => {
@@ -3833,6 +3853,7 @@ if (scoutRuntime) {
 		}
 ctx.ui?.setStatus?.("work-extension-scout", undefined);
 ctx.ui?.setWidget?.("work-extension-scout", undefined);
+projectMapShutdown.abort(); // a message held for the first map is dropped with its session
 resetContextCompaction();
 researchContext = null;
 researchNotes = null;
@@ -3842,6 +3863,18 @@ showResearchContext(ctx, false); // no "off" for the hub: a parked session keeps
 
 	pi.on("input", async (event, ctx) => {
 		clearTimeout(idleCompactTimer);
+		// Only idle inputs wait for the first map; a mid-run steer/followUp keeps its queue semantics.
+		if (!event.streamingBehavior) {
+			projectMapRegistry = ctx.modelRegistry ?? projectMapRegistry;
+			const held = await projectMaps.gate(ctx.cwd, {
+				hasUI: ctx.hasUI,
+				ask: (title, items, options) => choose(ctx, title, items, undefined, { compact: true, ...options }),
+				onStatus: (text) => ctx.ui?.setStatus?.("work-project-map", text),
+				signal: projectMapShutdown.signal,
+			});
+			if (typeof held === "object") { console.error(held.error); process.exitCode = 1; return { action: "handled" }; }
+			if (held === "handled") { if (ctx.hasUI && !projectMapShutdown.signal.aborted) ctx.ui.notify("Message not sent (it stays in the input history).", "info"); return { action: "handled" }; }
+		}
 		const coldCache = await compactColdCache(event, ctx, pi);
 		if (coldCache) return coldCache;
 		return;
@@ -3855,6 +3888,10 @@ showResearchContext(ctx, false); // no "off" for the hub: a parked session keeps
  // Pi 1.2+ also fires this for sendMessage(triggerTurn) runs (messageType "custom"); only prompts are user work.
  pendingPromptBackedAgentStart = event.messageType !== "custom";
  const sections = event.systemPromptOptions?.sections;
+ if (sections && typeof sections === "object") {
+	 const map = projectMaps.section(ctx.cwd);
+	 if (map) sections["project-map"] = map; else delete sections["project-map"];
+ }
  if (!researchContext) {
 	 if (sections && typeof sections === "object") delete sections.research;
 	 return;
@@ -4035,6 +4072,7 @@ if (blockedInternalBackgroundCompletionTurn) {
 			notifyResearchContext(ctx);
 		}
 		scheduleFilteredContextPersistence(ctx);
+		projectMaps.background(ctx.cwd, (text) => ctx.ui?.notify?.(text, "warning")); // catches this task's edits; never wakes the model
 	});
 
 	pi.on("turn_end", async (event, ctx) => {
@@ -4717,6 +4755,19 @@ async function workSettingsLoop(ctx, pi = undefined) {
 		}
 
 		if (pick.kind === "mappingModel") {
+			if (projectMapScope(ctx.cwd)) {
+				const action = await choose(ctx, "Mapping agent", [
+					{ value: "model", label: "Change model", description: "Model and effort, or None" },
+					{ value: "retry", label: "Rebuild map now", description: "Update the map and clear this session's failure; no automatic retry happens after one" },
+				], "model", { compact: true, purpose: `Map: ${projectMaps.describe(ctx.cwd)}` });
+				if (action === undefined) continue;
+				if (action === "retry") {
+					projectMapRegistry = ctx.modelRegistry ?? projectMapRegistry;
+					ctx.ui.notify("Rebuilding the project map in the background.", "info");
+					void projectMaps.retry(ctx.cwd).then((result) => ctx.ui.notify(result.status === "ready" ? "Project map updated." : `Project map failed: ${result.error ?? result.status}`, result.status === "ready" ? "info" : "warning"));
+					continue;
+				}
+			}
 			const current = splitLevel(mappingModelSettings(ctx.cwd, settings));
 			const project = scope === "project";
 			const selected = await chooseModel(ctx, "Mapping agent", current.model, project, project,
@@ -4735,6 +4786,9 @@ async function workSettingsLoop(ctx, pi = undefined) {
 			if (selected === INHERIT_MODEL) delete settings.workOrchestrator.mappingModel;
 			else settings.workOrchestrator.mappingModel = value;
 			writeScopedSettings(ctx.cwd, scope, settings);
+			if (mappingModelSettings(ctx.cwd) === NONE_MODEL) {
+				try { const root = projectRoot(ctx.cwd, { allowNonGit: true })?.root; if (root) await projectMaps.disable(root); } catch { /* nothing mapped here */ }
+			} else { projectMapRegistry = ctx.modelRegistry ?? projectMapRegistry; projectMaps.background(ctx.cwd, (text) => ctx.ui.notify(text, "warning")); }
 			continue;
 		}
 		if (pick.kind === "designModel") {

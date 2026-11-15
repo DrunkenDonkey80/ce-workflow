@@ -26,6 +26,8 @@ import workModelsExtension, {
 	resetContextFilter,
 	stripProcessedPayloads,
 	summarizeNativeContext,
+	projectMaps,
+	setProjectMapsForTest,
 } from "../extensions/work-models.ts";
 import { fitImage, parseSize, pngSize } from "../extensions/work-images.ts";
 import { searchKnowledge } from "../extensions/work-knowledge.ts";
@@ -353,6 +355,33 @@ try {
 	assert.equal(await hooks.before_agent_start(researchPrompt, ctx), undefined, "ordinary startup must not force the system prompt");
 	assert.deepEqual(researchPrompt.systemPromptOptions.sections, { other: "Keep me" });
 	assert.equal(await hooks.before_agent_start({ prompt: "Continue", systemPrompt: "base" }, ctx), undefined, "legacy research-off startup also leaves the prompt alone");
+	// P3-04: the project map gate holds only idle inputs; its section is set or deleted, never a whole-prompt override.
+	{
+		const realMaps = projectMaps, gated = [];
+		let verdict = "continue", guidance = "MAP GUIDANCE";
+		setProjectMapsForTest({ ...realMaps, gate: async (_cwd, options) => { gated.push(options.hasUI); return verdict; }, section: () => guidance, background: () => undefined });
+		try {
+			assert.equal((await hooks.input({ text: "steer", source: "interactive", streamingBehavior: "steer" }, ctx))?.action, undefined);
+			assert.equal(gated.length, 0, "a mid-run steer keeps its queue semantics");
+			verdict = "handled";
+			assert.equal((await hooks.input({ text: "/plan3 go", source: "extension" }, ctx))?.action, "handled", "extension kickoffs wait for the map too");
+			verdict = { error: "Project map unavailable: down" };
+			const errors = [], logError = console.error, exitCode = process.exitCode;
+			console.error = (text) => errors.push(text);
+			try { assert.equal((await hooks.input({ text: "print", source: "interactive" }, ctx))?.action, "handled"); assert.equal(process.exitCode, 1); }
+			finally { console.error = logError; process.exitCode = exitCode; }
+			assert.deepEqual(errors, ["Project map unavailable: down"], "headless failure is a deterministic error");
+			assert.equal(gated.length, 2);
+			const prompt = { prompt: "x", systemPrompt: "base", systemPromptOptions: { sections: { other: "Keep me" } } };
+			assert.equal(await hooks.before_agent_start(prompt, ctx), undefined, "no whole systemPrompt override");
+			assert.equal(prompt.systemPromptOptions.sections["project-map"], "MAP GUIDANCE");
+			await hooks.before_agent_start(prompt, ctx);
+			assert.equal(Object.keys(prompt.systemPromptOptions.sections).filter((key) => key === "project-map").length, 1);
+			guidance = undefined;
+			await hooks.before_agent_start(prompt, ctx);
+			assert.deepEqual(prompt.systemPromptOptions.sections, { other: "Keep me" }, "turning mapping off removes the section");
+		} finally { setProjectMapsForTest(realMaps); }
+	}
 	await hooks.before_agent_start(
 		{ prompt: "Continue my real direct task", systemPrompt: "base" },
 		ctx,

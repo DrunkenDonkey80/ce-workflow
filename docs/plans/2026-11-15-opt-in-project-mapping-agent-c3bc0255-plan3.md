@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-15
-updated: 2026-11-15T21:26:36.778Z
+updated: 2026-11-15T21:27:10.789Z
 reviewed: 2026-11-15
 started: 2026-11-15T21:13:02.675Z
 ---
@@ -136,7 +136,7 @@ Project report is stale and only 23% covered; verify every selected owner agains
 
 ### Phase 3: Main-agent guidance and verification [code]
 
-- [ ] **P3-04** Add readiness-aware main-agent guidance and status; verify disabled, stale and failure paths with focused tests.
+- [wip] **P3-04** Add readiness-aware main-agent guidance and status; verify disabled, stale and failure paths with focused tests.
   - Wait for the first usable map before foreground work, joining the initialization job started by Settings/session readiness. Show progress, cancellation and an explicit continue-without-map escape after failure. Headless print/json runs build and wait with a bounded deadline and no dialog; only actual failure/timeout returns a deterministic error, with project None as an explicit bypass. Test the foreground provider request count remains zero until readiness or deliberate bypass.
   - Gate normal idle interactive, RPC and extension-authored kickoff inputs, including /plan3 and /resume3. Pi's Plan3 send uses deliverAs: followUp but the idle input event has streamingBehavior undefined; do not exempt all extension inputs or all followUp call sites. Actual mid-stream steer/followUp inputs retain queue semantics. Exempt control/status and completion messages; disable the whole mapper in child contexts, including scanning and guidance.
   - If held input is replayed, bind a one-shot token to the exact pending request/session, not text equality or source alone. Preserve text/images, arrival order and original expansion semantics: raw interactive/RPC templates expand once; already-expanded Plan3 prompts are not expanded again. Handle abort, second input, session switch and cold-cache compaction without lost or duplicate submission. Native input does not expose the original expandPromptTemplates option, so prove the selected interception route instead of assuming it can reconstruct that option.

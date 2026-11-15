@@ -266,6 +266,118 @@ export function createProjectMapper({ agentDir = undefined, complete, isEnabled,
 			return true;
 		},
 		status: (root, { git = true } = {}) => mapStatus(mapLocation(root, agentDir), git),
+		/** Cheap: a published map of this format exists (no source scan). */
+		hasMap: (root) => Boolean(readMap(mapLocation(root, agentDir))),
 		location: (root) => mapLocation(root, agentDir),
+	};
+}
+
+const errorText = (error) => error instanceof Error ? error.message : String(error);
+/** Stable main-agent guidance: only the map path and the reuse rule, so routine refreshes leave the prompt bytes identical. */
+export const projectMapGuidance = (mapPath) => [
+	`Project map: ${mapPath} — a generated, local index of what lives where in this project (its header states model, coverage and freshness).`,
+	"Before adding a new function, helper, module, component or command, read the map's Index for the area and check the listed owners: reuse or extend an existing one instead of writing a parallel one.",
+	"Verify in the source before relying on an entry; the map can be stale or partial, and a missing entry never proves something does not exist.",
+].join("\n");
+
+/**
+ * Session glue for one Pi process. scope(cwd) -> {root, git, model} | undefined (setting None, child session, no mappable root).
+ * gate() holds an idle input in place (Pi awaits input handlers before expanding it), so nothing is replayed or duplicated.
+ */
+export function createProjectMapSession({ mapper, scope, deadlineMs = MAP_LIMITS.timeoutMs + 60_000 }) {
+	const bypassed = new Set(), failed = new Map(); // failed: no automatic retry until a deliberate one
+	const safeScope = (cwd) => { try { return scope(cwd); } catch { return undefined; } };
+
+	async function build(s, signal = undefined) {
+		const result = await mapper.refresh(s.root, { git: s.git, model: s.model });
+		if (result.status === "busy" && !(await mapper.waitForIdle(s.root, { signal }))) return { status: "failed", error: "Another session's mapping did not finish in time." };
+		if (result.status === "failed") failed.set(s.root, result.error);
+		else if (mapper.hasMap(s.root)) failed.delete(s.root);
+		return mapper.hasMap(s.root) ? { status: "ready", error: undefined } : { status: "failed", error: result.error ?? `Mapping ended ${result.status}.` };
+	}
+
+	/** One build attempt raced against the user's escape (or the headless deadline). */
+	async function attempt(s, { hasUI, ask, onStatus, signal }) {
+		onStatus("Building the project map…");
+		const local = new AbortController();
+		const stop = signal ? AbortSignal.any([local.signal, signal]) : local.signal;
+		const done = build(s, stop).catch((error) => ({ status: "failed", error: errorText(error) }));
+		let timer;
+		const outcome = await Promise.race([
+			done,
+			new Promise((resolve) => stop.addEventListener("abort", () => signal?.aborted && resolve({ pick: "cancel" }), { once: true })), // session closed
+			hasUI && ask
+				? ask("Building the project map", [
+					{ value: "continue", label: "Continue without the map", description: "Send now; the map keeps building in the background" },
+					{ value: "cancel", label: "Cancel this message", description: "Not sent (it stays in the input history)" },
+				], { signal: stop, purpose: "Your message is sent as soon as the first map is ready." }).then((value) => value ? { pick: value } : stop.aborted ? done : { pick: "cancel" })
+				: new Promise((resolve) => { timer = setTimeout(() => resolve({ status: "failed", error: `Mapping took longer than ${Math.round(deadlineMs / 1000)}s.` }), deadlineMs); }),
+		]);
+		clearTimeout(timer);
+		local.abort();
+		onStatus(undefined);
+		return outcome;
+	}
+
+	return {
+		/** Startup and task boundaries: build or catch up in the background; unchanged sources make no model call. */
+		background(cwd, notify = (_text) => {}) {
+			const s = safeScope(cwd);
+			if (!s || failed.has(s.root)) return;
+			return build(s).catch((error) => ({ status: "failed", error: errorText(error) })).then((result) => {
+				if (result.status !== "failed") return result;
+				if (!failed.has(s.root)) failed.set(s.root, result.error);
+				notify(`Project map update failed: ${failed.get(s.root)} Any old map stays and shows as stale; retry in /wo Settings → Mapping agent.`);
+				return result;
+			});
+		},
+		/** "continue" | "handled" | {error} (headless failure). ask(title, items, {signal, purpose}) -> value | undefined. */
+		async gate(cwd, { hasUI = false, ask = undefined, onStatus = (_text) => {}, signal = undefined } = {}) {
+			const s = safeScope(cwd);
+			if (!s || bypassed.has(s.root) || mapper.hasMap(s.root)) return "continue";
+			let known = failed.get(s.root); // a failure this session asks first instead of silently calling the model again
+			for (;;) {
+				if (signal?.aborted) return "handled";
+				const outcome = known ? { status: "failed", error: known } : await attempt(s, { hasUI, ask, onStatus, signal });
+				known = undefined;
+				if (signal?.aborted || outcome.pick === "cancel") return "handled";
+				if (outcome.pick === "continue") { bypassed.add(s.root); return "continue"; }
+				if (outcome.status === "ready") return "continue";
+				if (!hasUI || !ask) return { error: `Project map unavailable: ${outcome.error} Set the project Mapping agent to None to work without it.` };
+				const next = await ask("Project map failed", [
+					{ value: "retry", label: "Retry", description: "Build the map again" },
+					{ value: "continue", label: "Continue without the map", description: "Send now; no automatic retry this session" },
+					{ value: "cancel", label: "Cancel this message", description: "Not sent (it stays in the input history)" },
+				], { signal, purpose: outcome.error });
+				if (next === "continue") { bypassed.add(s.root); return "continue"; }
+				if (next !== "retry") return "handled";
+				failed.delete(s.root);
+			}
+		},
+		/** The prompt section text, or undefined: mapping off here or no map yet. */
+		section(cwd) {
+			const s = safeScope(cwd);
+			return s && mapper.hasMap(s.root) ? projectMapGuidance(mapper.location(s.root).map) : undefined;
+		},
+		/** Deliberate retry from Settings: clears the session's failure and bypass, then rebuilds. */
+		retry(cwd) {
+			const s = safeScope(cwd);
+			if (!s) return Promise.resolve({ status: "disabled", error: "Mapping is off here." });
+			failed.delete(s.root); bypassed.delete(s.root);
+			return build(s).catch((error) => ({ status: "failed", error: errorText(error) }));
+		},
+		/** Settings status line. */
+		describe(cwd) {
+			const s = safeScope(cwd);
+			if (!s) return "off here";
+			const st = mapper.status(s.root, { git: s.git });
+			const error = failed.get(s.root) ?? st.error;
+			return `${st.status}${st.changed ? ` (${st.changed} files changed)` : ""}${error ? `; last error: ${error}` : ""}`;
+		},
+		/** Setting turned None: stop local work and invalidate any running job; never creates a cache for a never-mapped project. */
+		async disable(root) {
+			bypassed.delete(root); failed.delete(root);
+			if (fs.existsSync(mapper.location(root).dir)) await mapper.disable(root);
+		},
 	};
 }

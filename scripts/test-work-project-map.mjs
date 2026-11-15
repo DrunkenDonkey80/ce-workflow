@@ -239,6 +239,91 @@ try {
 	assert.equal(result.status, "ready");
 	assert.ok(plainModel.prompts[0].includes("### tool.py") && !plainModel.prompts[0].includes("dependencyOnly"), "the non-Git walk skips dependencies");
 
+	// Session glue: the first idle input waits for the map; guidance is stable; failures do not retry on their own.
+	{
+		const tick = () => new Promise((resolve) => setTimeout(resolve, 20));
+		const session = (complete, scope = { root: fs.realpathSync(repo), git: true, model: MODEL }, extra = {}) => {
+			const mapper = mod.createProjectMapper({ agentDir: path.join(temp, `agent-${crypto.randomUUID()}`), complete, isEnabled: () => true });
+			return { mapper, maps: mod.createProjectMapSession({ mapper, scope: () => scope, ...extra }) };
+		};
+		const held = fakeModel();
+		const gateHold = held.hold();
+		const { mapper: m1, maps } = session(held.complete);
+		const statuses = [];
+		let settled = false;
+		const first = maps.gate(repo, { onStatus: (text) => statuses.push(text) }).then((value) => { settled = true; return value; });
+		const joined = maps.gate(repo, {});
+		await tick();
+		assert.equal(settled, false, "the input stays held while the first map builds");
+		assert.equal(maps.section(repo), undefined, "no guidance before a map exists");
+		gateHold.release(); held.free();
+		assert.equal(await first, "continue");
+		assert.equal(await joined, "continue");
+		assert.equal(held.prompts.length, 1, "concurrent inputs join one build");
+		assert.deepEqual(statuses, ["Building the project map…", undefined]);
+		const guidance = maps.section(repo);
+		assert.ok(guidance.includes(m1.location(repo).map) && /reuse or extend/.test(guidance));
+		write("src/later.ts", "export function laterThing() {}\n");
+		assert.equal((await maps.background(repo)).status, "ready");
+		assert.equal(held.prompts.length, 2, "a task boundary catches up with edits");
+		assert.equal(maps.section(repo), guidance, "routine refreshes leave the prompt section byte-identical");
+		await maps.background(repo);
+		assert.equal(held.prompts.length, 2, "unchanged sources make no model call");
+		assert.equal(await maps.gate(repo, {}), "continue");
+
+		// Off (None, child session, no root): no hold, no guidance, no model call.
+		const off = session(async () => assert.fail("no model call when mapping is off"), null);
+		assert.equal(await off.maps.gate(repo, { hasUI: true, ask: () => assert.fail("no dialog") }), "continue");
+		assert.equal(off.maps.section(repo), undefined);
+		assert.equal(off.maps.background(repo), undefined);
+
+		// Headless failure: a deterministic error, then no silent retry on later inputs or boundaries.
+		let calls = 0;
+		const broken = session(async () => { calls++; throw new Error("provider down"); });
+		const error = await broken.maps.gate(repo, {});
+		assert.match(error.error, /provider down.*None/);
+		assert.match((await broken.maps.gate(repo, {})).error, /provider down/);
+		const notices = [];
+		assert.equal(broken.maps.background(repo, (text) => notices.push(text)), undefined);
+		assert.equal(calls, 1, "a failure is not retried until the user asks");
+		assert.match(broken.maps.describe(repo), /provider down/);
+
+		// Interactive failure: Retry, then Continue without the map bypasses for the session.
+		let fail = true;
+		const flaky = fakeModel();
+		const retrying = session(async (request) => { if (fail) { fail = false; throw new Error("flaky"); } return flaky.complete(request); });
+		const asked = [];
+		const ask = async (title, _items, options) => { asked.push(title); if (title === "Project map failed") { assert.equal(options.purpose, "flaky"); return "retry"; } await new Promise((resolve) => options.signal.addEventListener("abort", resolve)); };
+		assert.equal(await retrying.maps.gate(repo, { hasUI: true, ask }), "continue");
+		assert.deepEqual(asked, ["Building the project map", "Project map failed", "Building the project map"]);
+		assert.ok(retrying.maps.section(repo));
+
+		const stuck = fakeModel(); const stuckHold = stuck.hold();
+		const bypass = session(stuck.complete);
+		assert.equal(await bypass.maps.gate(repo, { hasUI: true, ask: async () => "continue" }), "continue");
+		assert.equal(await bypass.maps.gate(repo, { hasUI: true, ask: () => assert.fail("bypassed for the session") }), "continue");
+		const cancelled = session(stuck.complete);
+		assert.equal(await cancelled.maps.gate(repo, { hasUI: true, ask: async () => "cancel" }), "handled");
+		const escaped = session(stuck.complete);
+		assert.equal(await escaped.maps.gate(repo, { hasUI: true, ask: async () => undefined }), "handled", "Escape cancels the message");
+		const shutdown = new AbortController();
+		const closing = session(stuck.complete);
+		const closed = closing.maps.gate(repo, { hasUI: true, ask: (_t, _i, options) => new Promise((resolve) => options.signal.addEventListener("abort", () => resolve(undefined))), signal: shutdown.signal });
+		shutdown.abort();
+		assert.equal(await closed, "handled", "session shutdown releases a held input");
+		const late = session(stuck.complete, null, { deadlineMs: 30 });
+		assert.equal(await late.maps.gate(repo, {}), "continue", "scope off: deadline never applies");
+		const slow = session(stuck.complete, { root: fs.realpathSync(repo), git: true, model: MODEL }, { deadlineMs: 30 });
+		assert.match((await slow.maps.gate(repo, {})).error, /longer than/, "headless runs wait with a bounded deadline");
+		stuckHold.release(); stuck.free();
+		await tick();
+
+		// Disabling a never-mapped project creates no cache.
+		const fresh = session(async () => "");
+		await fresh.maps.disable(fs.realpathSync(repo));
+		assert.equal(fs.existsSync(fresh.mapper.location(repo).dir), false);
+	}
+
 	process.stdout.write(`ok - work project map${linked ? "" : " (junction case skipped: could not create one)"}\n`);
 } finally {
 	fs.rmSync(temp, { recursive: true, force: true });
