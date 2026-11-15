@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-15
-updated: 2026-11-15T21:27:10.789Z
+updated: 2026-11-15T21:37:44.947Z
 reviewed: 2026-11-15
 started: 2026-11-15T21:13:02.675Z
 ---
@@ -136,14 +136,7 @@ Project report is stale and only 23% covered; verify every selected owner agains
 
 ### Phase 3: Main-agent guidance and verification [code]
 
-- [wip] **P3-04** Add readiness-aware main-agent guidance and status; verify disabled, stale and failure paths with focused tests.
-  - Wait for the first usable map before foreground work, joining the initialization job started by Settings/session readiness. Show progress, cancellation and an explicit continue-without-map escape after failure. Headless print/json runs build and wait with a bounded deadline and no dialog; only actual failure/timeout returns a deterministic error, with project None as an explicit bypass. Test the foreground provider request count remains zero until readiness or deliberate bypass.
-  - Gate normal idle interactive, RPC and extension-authored kickoff inputs, including /plan3 and /resume3. Pi's Plan3 send uses deliverAs: followUp but the idle input event has streamingBehavior undefined; do not exempt all extension inputs or all followUp call sites. Actual mid-stream steer/followUp inputs retain queue semantics. Exempt control/status and completion messages; disable the whole mapper in child contexts, including scanning and guidance.
-  - If held input is replayed, bind a one-shot token to the exact pending request/session, not text equality or source alone. Preserve text/images, arrival order and original expansion semantics: raw interactive/RPC templates expand once; already-expanded Plan3 prompts are not expanded again. Handle abort, second input, session switch and cold-cache compaction without lost or duplicate submission. Native input does not expose the original expandPromptTemplates option, so prove the selected interception route instead of assuming it can reconstruct that option.
-  - Refresh after agent_settled, not each token/tool result or agent_end retry. Detect missed external changes at startup and task boundaries. Later edits invalidate affected coverage immediately; a background success updates data/status without waking the main model or scheduling itself again.
-  - Inject a stable named prompt section with the stable map path and reuse rule only; generation, readiness, freshness and coverage are read from map metadata/UI. Set/delete sections.<name> and return without a whole systemPrompt override. Routine refreshes must leave section bytes identical; disabling or switching scope intentionally updates/removes it. Verify reload/compaction do not accumulate copies or stale guidance.
-  - A failed updater leaves old data visibly stale, with one bounded notice and no provider/model fallback or retry storm. Provide a deliberate retry/status action in the same settings submenu, not a second settings UI.
-  - Run C-lifecycle and relevant mapper checks; mutation proof removes the configured/usable guard or permits obsolete completion and must fail the targeted assertion.
+- [x] **P3-04** Idle inputs (interactive/RPC/extension) are held in place inside the awaited input hook until the first map exists (no replay, so text/images/expansion stay Pi's); Continue-without/Cancel/Retry dialogs, headless bounded deadline with deterministic error; stable sections["project-map"] set/deleted; background refresh at session_start/agent_settled with no auto-retry after failure; Settings row gains Rebuild/status; None disables; off in PI_SUBAGENT_CHILD (commit 84f769c8).
 - [ ] **P3-06** Isolate non-mapping live tests and benchmarks from global mapper settings; prove zero mapping calls unless a fixture explicitly opts in.
 - [ ] **P3-05** Exercise the real settings UI, run changed-path LSP and targeted checks, and report rollout limits without optimization claims.
   - Drive real settings persistence and model/effort/None/cancel/clear flows in C-settings, which executes workSettingsLoop and shared dialog components. The hub test-browser stub does not execute that loop. For visual checks, capture actual generated dialog JSON and render it with the existing changelog-shot --ask facility or a targeted headless fixture; interact with that form and inspect it through screen_read. Label rendering evidence separately from settings persistence and live mapper integration; a canned screenshot is not an end-to-end proof.
