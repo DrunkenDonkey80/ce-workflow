@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.9.7 — 2026-11-15
+
+### Fixed
+- Hub and terminal Pi keep rejected compaction reply text in local session diagnostics, with secret redaction, model, usage, stop reason and size limits; it is never added to the continuing conversation. Oversized checkpoints now report their actual and allowed character counts rather than only “Memory budget exceeded”.
+
 ## 0.9.6 — 2026-11-15
 
 ### Fixed

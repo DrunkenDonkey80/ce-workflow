@@ -572,6 +572,7 @@ assert.equal(calls, 1, "summary and extraction share one call");
 assert.equal(hybrid.mode, "hybrid");
 assert.equal(hybrid.knowledge.length, 1);
 assert.equal(hybrid.usage.output, 20);
+assert.equal(hybrid.attempts[0].rejectedResponse, undefined, "accepted responses are not duplicated in diagnostics");
 assert.equal(decodeMemory(hybrid.summary).records.filter(r => r.kind === "user-request").length, 1);
 const later = [
 	{ role: "assistant", content: [{ type: "toolCall", id: "edit", name: "edit", arguments: { path: "src/a.js" } }] },
@@ -682,6 +683,21 @@ for (const reason of ["invalid", "large", "citation", "throw", "unavailable", "a
 	assert.equal(result.usage.output, 20 * responses);
 	assert.equal(result.usage.cost.total, 0.3 * responses);
 	assert.equal(result.usage.cost.totalFromProvider, true, "a Pi 1.5 boolean stays a boolean when summed");
+	const rejected = result.attempts[0].rejectedResponse;
+	if (responses === 1) assert.equal(rejected, undefined, "no response is invented for a request that never returned");
+	else {
+		assert(rejected, `rejected ${reason} response must be retained`);
+		assert.equal(rejected.maxChars, 16000);
+		assert.equal(rejected.responseChars, rejected.text.length);
+		assert.equal(rejected.stopReason, reason === "aborted" ? "aborted" : "stop");
+		if (reason !== "aborted") assert(!result.summary.includes(rejected.text), "rejected text stays out of continuation memory");
+		if (reason === "invalid") assert.equal(rejected.text, "not JSON");
+		if (reason === "large") {
+			assert.equal(JSON.parse(rejected.text).checkpoint.length, 17000, "oversized responses are not clipped");
+			assert.match(result.attempts[0].error, new RegExp(`${JSON.stringify(JSON.parse(rejected.text)).length} > 16000 characters`));
+		}
+	}
+	assert.equal(result.attempts[1].rejectedResponse, undefined);
 }
 // Combined cost is provider-billed only when every part is; money still adds up.
 assert.deepEqual(addCost(addCost(undefined, { total: 1, totalFromProvider: true }), { total: 2, totalFromProvider: true }), { total: 3, totalFromProvider: true });
@@ -693,6 +709,20 @@ assert.deepEqual(doubleFailure.attempted, ["summary", "current"]);
 assert(doubleFailure.result.summary.includes(decodeMemory(hybrid.summary).tail));
 assert.equal(doubleFailure.result.usage.output, 40);
 assert.deepEqual(doubleFailure.result.knowledge, []);
+assert.deepEqual(doubleFailure.result.attempts.map(a => a.rejectedResponse?.text), ["not JSON", "not JSON"], "both rejected responses survive preserved-memory fallback");
+// Retain the whole visible response, including malformed JSON and its suffix, but not credentials or hidden reasoning.
+const diagnosticText = `not JSON: token=diagnostic-secret-value\n${"д".repeat(410_000)}\nEND-OF-REJECTED-RESPONSE`;
+const diagnosticResult = await compactMemory({ messages, model: "test/summary", registry: {
+	find: () => ({}), streamSimple: () => ({ result: async () => ({ stopReason: "length",
+		content: [{ type: "thinking", thinking: "private-reasoning" }, { type: "text", text: diagnosticText }],
+	}) }),
+} });
+const diagnostic = diagnosticResult.attempts[0].rejectedResponse;
+assert.equal(diagnostic?.text, diagnosticText.replace("diagnostic-secret-value", "[REDACTED]"), "diagnostics redact secrets without truncating the response");
+assert.equal(diagnostic.responseChars, diagnosticText.length, "length is measured before redaction");
+assert.equal(diagnostic.stopReason, "length");
+assert.doesNotMatch(JSON.stringify(diagnosticResult), /diagnostic-secret-value|private-reasoning/);
+assert.doesNotMatch(diagnosticResult.summary, /END-OF-REJECTED-RESPONSE/);
 const sameModel = await retryCase("invalid", "valid", { currentModel: "test/summary" });
 assert.deepEqual(sameModel.attempted, ["summary"]);
 assert.equal(sameModel.result.mode, "fallback");
