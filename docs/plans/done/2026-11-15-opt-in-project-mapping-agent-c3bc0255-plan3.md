@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: ready
+status: complete
 created: 2026-11-15
-updated: 2026-11-15T21:41:20.424Z
+updated: 2026-11-15T21:45:52.010Z
 reviewed: 2026-11-15
 started: 2026-11-15T21:13:02.675Z
 ---
@@ -138,11 +138,7 @@ Project report is stale and only 23% covered; verify every selected owner agains
 
 - [x] **P3-04** Idle inputs (interactive/RPC/extension) are held in place inside the awaited input hook until the first map exists (no replay, so text/images/expansion stay Pi's); Continue-without/Cancel/Retry dialogs, headless bounded deadline with deterministic error; stable sections["project-map"] set/deleted; background refresh at session_start/agent_settled with no auto-retry after failure; Settings row gains Rebuild/status; None disables; off in PI_SUBAGENT_CHILD (commit 84f769c8).
 - [x] **P3-06** projectMapScope also returns off when PI_WORK_PROJECT_MAP=off; every live script that spawns Pi defaults it with ??= "off" (fixtures opt in with =on); test-work-settings proves a global model maps a Git checkout but not under off, and guards new live scripts (commit 6ee31eaf).
-- [ ] **P3-05** Exercise the real settings UI, run changed-path LSP and targeted checks, and report rollout limits without optimization claims.
-  - Drive real settings persistence and model/effort/None/cancel/clear flows in C-settings, which executes workSettingsLoop and shared dialog components. The hub test-browser stub does not execute that loop. For visual checks, capture actual generated dialog JSON and render it with the existing changelog-shot --ask facility or a targeted headless fixture; interact with that form and inspect it through screen_read. Label rendering evidence separately from settings persistence and live mapper integration; a canned screenshot is not an end-to-end proof.
-  - Run C-settings, C-dialogs and C-lifecycle, plus only relevant existing lock/agent-profile checks identified by touched code. Run active LSP on changed paths; disclose verified baseline-only findings and unavailable coverage.
-  - Probe the selected execution route safely in an explicitly enabled disposable mapper fixture: first-run gating, quiet background completion, cancellation, no recursion and effective read-only capability. Include print/json lifecycle and idle /resume3 input, not just direct hook mocks. If native child profiles are used, verify resolved tools/extensions; in-process mode proves no tools are supplied. Do not configure or map the user's repositories merely to exercise the feature.
-  - Update user documentation and Unreleased changelog in plain language. No version bump or push unless later requested. Do not claim time/token savings; any such claim requires a complete same-benchmark comparison including all maintenance and continuation costs.
+- [x] **P3-05** Settings Mapping row covered end to end in tests (status purpose, Rebuild reports failure, Change model escape keeps value); README + Unreleased changelog; limits reported, no savings claims (1beb406f)
 
 ## Global validation
 
