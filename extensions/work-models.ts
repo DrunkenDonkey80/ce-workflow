@@ -1118,9 +1118,9 @@ export function mappingModelSettings(cwd, settings = readEffectiveSettings(cwd))
 	const value = settings.workOrchestrator?.mappingModel;
 	return typeof value === "string" && /^[^/\s:]+\/[^\s:]+:(off|minimal|low|medium|high|xhigh|max)$/.test(value) ? value : NONE_MODEL;
 }
-// Mapping scope: off in subagent children (pi-subagents marks them); a global model maps Git checkouts only, a project setting also maps a plain folder.
+// Mapping scope: off in subagent children (pi-subagents marks them) and with PI_WORK_PROJECT_MAP=off; a global model maps Git checkouts only, a project setting also maps a plain folder.
 export function projectMapScope(cwd) {
-	if (process.env.PI_SUBAGENT_CHILD === "1") return;
+	if (process.env.PI_SUBAGENT_CHILD === "1" || process.env.PI_WORK_PROJECT_MAP === "off") return; // children; live tests and benchmarks
 	const model = mappingModelSettings(cwd);
 	if (model === NONE_MODEL) return;
 	const scope = projectRoot(cwd, { allowNonGit: readScopedSettings(cwd, "project").workOrchestrator?.mappingModel !== undefined });

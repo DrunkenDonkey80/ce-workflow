@@ -27,6 +27,7 @@ const providerExtension = value("--provider-extension", path.join(process.env.US
 const probe = `
 import { Type } from "typebox";
 import { appendFileSync } from "node:fs";
+process.env.PI_WORK_PROJECT_MAP ??= "off"; // live runs never map unless a fixture opts in (PI_WORK_PROJECT_MAP=on)
 export default function (pi) {
 	pi.registerTool({ name: "word_count", label: "word_count", description: "Count whitespace-separated words in a file.", exposure: "deferred",
 		parameters: Type.Object({ path: Type.String() }),

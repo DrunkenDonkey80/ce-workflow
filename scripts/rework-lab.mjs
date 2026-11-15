@@ -17,6 +17,7 @@ import os from "node:os";
 import path from "node:path";
 import { sessionMetrics } from "./lab-metrics.mjs";
 import { reworkRequest } from "../extensions/plan3-rework.ts";
+process.env.PI_WORK_PROJECT_MAP ??= "off"; // live runs never map unless a fixture opts in (PI_WORK_PROJECT_MAP=on)
 
 const args = process.argv.slice(2);
 const value = (name, fallback) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : fallback; };

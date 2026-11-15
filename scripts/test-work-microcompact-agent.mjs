@@ -15,6 +15,7 @@ import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import workModelsExtension from "../extensions/work-models.ts";
+process.env.PI_WORK_PROJECT_MAP ??= "off"; // live runs never map unless a fixture opts in (PI_WORK_PROJECT_MAP=on)
 
 const scenarios = ["idle", "direct"];
 const modes = ["ultracompact", "ultrafull"];

@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const mod = await import(pathToFileURL(path.join(import.meta.dirname, "../extensions/work-models.ts")).href);
 
@@ -236,6 +237,22 @@ try {
 		{ expectText: "Mapping agent: [Text Only", key: "escape" },
 	]));
 	assert(mod.mappingModelSettings(cwd) === "test/text-only:high", "global mapping model and effort persist as one value");
+	{
+		// P3-06: live tests and benchmarks default PI_WORK_PROJECT_MAP=off, so a global mapping model never runs in them.
+		const saved = process.env.PI_WORK_PROJECT_MAP;
+		const checkout = mkdtempSync(path.join(tmpdir(), "work-map-scope-"));
+		execFileSync("git", ["init", "-q"], { cwd: checkout });
+		delete process.env.PI_WORK_PROJECT_MAP;
+		assert(mod.projectMapScope(checkout)?.model === "test/text-only:high", "a global mapping model maps a Git checkout");
+		process.env.PI_WORK_PROJECT_MAP = "off";
+		try { assert(mod.projectMapScope(checkout) === undefined, "PI_WORK_PROJECT_MAP=off disables mapping despite a configured model"); }
+		finally { if (saved === undefined) delete process.env.PI_WORK_PROJECT_MAP; else process.env.PI_WORK_PROJECT_MAP = saved; rmSync(checkout, { recursive: true, force: true }); }
+		const scriptsDir = path.dirname(fileURLToPath(import.meta.url));
+		for (const name of readdirSync(scriptsDir).filter((file) => /^(benchmark-.*-live|.*-lab|test-work-microcompact-agent)\.mjs$/.test(file))) {
+			const text = readFileSync(path.join(scriptsDir, name), "utf8");
+			if (/\bspawn\(/.test(text) && /cli\.js|launcher|piCli/.test(text)) assert(text.includes('process.env.PI_WORK_PROJECT_MAP ??= "off"'), `${name} spawns Pi and must default PI_WORK_PROJECT_MAP=off`);
+		}
+	}
 	await invoke("work-settings", "", mappingCtx([
 		{ key: "\t" },
 		{ target: "Mapping agent:", key: "enter" },

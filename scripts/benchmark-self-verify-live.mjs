@@ -11,6 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { sessionMetrics } from "./lab-metrics.mjs";
 import { handsOff } from "../extensions/self-verify.ts";
+process.env.PI_WORK_PROJECT_MAP ??= "off"; // live runs never map unless a fixture opts in (PI_WORK_PROJECT_MAP=on)
 
 const repo = path.resolve(import.meta.dirname, "..");
 const args = process.argv.slice(2);
