@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-15
-updated: 2026-11-15T21:15:46.062Z
+updated: 2026-11-15T21:20:24.896Z
 reviewed: 2026-11-15
 started: 2026-11-15T21:13:02.675Z
 ---
@@ -131,10 +131,7 @@ Project report is stale and only 23% covered; verify every selected owner agains
 
 ### Phase 2: Settings and maintenance [code]
 
-- [ ] **P3-02** Implement scoped Mapping agent settings through the existing picker and shared dialogs, with focused settings tests.
-  - Use the single mappingModel value, chooseModel, existing effort selection and splitLevel. None by default; project None overrides global selection; clear override inherits model and effort together. Update status text and menu descriptions as well as the picker. Cover reset, import, malformed model/effort, unavailable model/auth and cancellation without a partial save.
-  - Re-read shared settings inside the update operation; do not write a menu-opening snapshot back over changes from another session. Reuse the existing settings mechanism and narrowly address any concurrency gap this setting requires.
-  - Run C-settings and C-dialogs; prove sensitivity by dropping the explicit-project-None guard in a disposable copy and observe a specific failed assertion.
+- [x] **P3-02** Mapping agent setting added (workOrchestrator.mappingModel "provider/id:effort", None default, malformed fails closed to None, project None wins, clear inherits model+effort, clear re-reads settings instead of writing the menu snapshot); commit 9ee519c0.
 - [ ] **P3-03** Implement bounded read-only maintenance and atomic publication; prove cancellation, freshness and concurrency regressions with sensitive tests.
   - Add a focused .ts owner rather than expanding work-models into another large subsystem. Reuse native execution and confined, bounded, locked atomic storage primitives.
   - Use the outside-worktree local cache defined in contract 3, an owned format version and source fingerprints. Keep map contents and referenced freshness metadata an indivisible published generation; preserve the prior good generation on failure. In a fixture repository without ignore rules, publication leaves git status --porcelain and source fingerprints unchanged.
