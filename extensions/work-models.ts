@@ -4759,7 +4759,7 @@ async function workSettingsLoop(ctx, pi = undefined) {
 				const action = await choose(ctx, "Mapping agent", [
 					{ value: "model", label: "Change model", description: "Model and effort, or None" },
 					{ value: "retry", label: "Rebuild map now", description: "Update the map and clear this session's failure; no automatic retry happens after one" },
-				], "model", { compact: true, purpose: `Map: ${projectMaps.describe(ctx.cwd)}` });
+				], "model", { compact: true, forceCustom: true, purpose: `Map: ${projectMaps.describe(ctx.cwd)}` });
 				if (action === undefined) continue;
 				if (action === "retry") {
 					projectMapRegistry = ctx.modelRegistry ?? projectMapRegistry;

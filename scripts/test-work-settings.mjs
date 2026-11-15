@@ -129,7 +129,7 @@ try {
 				return result;
 			}
 			const action = actions.shift();
-			assert(action, "unexpected settings render");
+			assert(action, `unexpected settings render\n${first.join("\n")}`);
 			let lines = component.render(140);
 			if (action.expectInitial)
 				assert(
@@ -244,6 +244,22 @@ try {
 		execFileSync("git", ["init", "-q"], { cwd: checkout });
 		delete process.env.PI_WORK_PROJECT_MAP;
 		assert(mod.projectMapScope(checkout)?.model === "test/text-only:high", "a global mapping model maps a Git checkout");
+		// P3-05: with mapping on here, the same row offers status and a deliberate rebuild before the model picker.
+		const before = notices.length;
+		await invoke("work-settings", "", { ...mappingCtx([
+			{ target: "Mapping agent:", key: "enter" },
+			{ expectText: "Map: missing", preKeys: ["down"], key: "enter" },
+			{ key: "escape" },
+		]), cwd: checkout });
+		for (let wait = 0; wait < 50 && !notices.slice(before).some((item) => /Project map failed/.test(item.message)); wait++) await new Promise((resolve) => setTimeout(resolve, 20));
+		assert(notices.slice(before).some((item) => /Project map failed: Mapping model test\/text-only:high is unavailable/.test(item.message)), `a rebuild reports its failure: ${JSON.stringify(notices.slice(before))}`);
+		await invoke("work-settings", "", { ...mappingCtx([
+			{ target: "Mapping agent:", key: "enter" },
+			{ expectText: "last error: Mapping model test/text-only:high is unavailable", key: "enter" },
+			{ expectText: "Text Only", key: "escape" },
+			{ key: "escape" },
+		]), cwd: checkout });
+		assert(mod.mappingModelSettings(checkout) === "test/text-only:high", "escaping the picker keeps the model");
 		process.env.PI_WORK_PROJECT_MAP = "off";
 		try { assert(mod.projectMapScope(checkout) === undefined, "PI_WORK_PROJECT_MAP=off disables mapping despite a configured model"); }
 		finally { if (saved === undefined) delete process.env.PI_WORK_PROJECT_MAP; else process.env.PI_WORK_PROJECT_MAP = saved; rmSync(checkout, { recursive: true, force: true }); }
