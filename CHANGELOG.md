@@ -2,7 +2,20 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.9.6 — 2026-11-15
+
+### Fixed
+- Hub and terminal Pi no longer unnecessarily rebuild the full system prompt when work starts, which could move newly enabled tools into earlier context and break prompt-cache reuse. Research instructions and exit permissions are preserved.
+
+### Changed
+- Hub and terminal Pi now apply lean pi-lens machine defaults: Kotlin's background server, automatic formatting/fixes/tests and expanded reads are off; TypeScript stays available and eligible servers retire after two idle minutes. Unrelated settings are preserved. Active memory is not capped, and running sessions are not forcibly restarted.
+
+### Added
+- Hub: the Context button shows where the last compaction left the context: a small "↓50k" after the numbers and a red dotted line at that point on its bar, so a compaction that kept too much stands out.
+![Context bar showing the last compaction size](docs/changelog/0.9.6-context.png)
+![Context menu with Compact now](docs/changelog/0.9.6-context-menu.png)
+- Hub: every compaction leaves a warning in the chat with how much it shrank the context, e.g. "Context compacted from ~180k to ~50k tokens."
+![Compaction warning with before and after sizes](docs/changelog/0.9.6-compaction-warning.png)
 
 ## 0.9.5 — 2026-11-14
 

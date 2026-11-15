@@ -122,7 +122,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 		const [state, stats] = await Promise.all([live.rpc.send({ type: "get_state" }), live.rpc.send({ type: "get_session_stats" })]);
 		void host.remember(live, state);
 		const model = state.data?.model;
-		return { ...base, model: model ? { provider: model.provider, id: model.id, name: model.name ?? model.id } : null, effort: state.data?.thinkingLevel ?? null, context: stats.data?.contextUsage?.percent ?? null, ...contextTokens(stats.data?.contextUsage?.tokens, live.compactedTokens), window: stats.data?.contextUsage?.contextWindow ?? null };
+		return { ...base, model: model ? { provider: model.provider, id: model.id, name: model.name ?? model.id } : null, effort: state.data?.thinkingLevel ?? null, context: stats.data?.contextUsage?.percent ?? null, ...contextTokens(stats.data?.contextUsage?.tokens, live.compactedTokens), window: stats.data?.contextUsage?.contextWindow ?? null, compacted: live.compactedTokens ?? null };
 	}
 	const publishStatus = async (id: string) => { const value = await status(id); views.get(id)?.publish("status", value); return value; };
 

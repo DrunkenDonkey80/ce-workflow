@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: ready
+status: complete
 created: 2026-11-12
-updated: 2026-11-12T21:57:05.992Z
+updated: 2026-11-14T18:06:55.055Z
 size: map
 kind: map
 reviewed: 2026-11-12
@@ -145,3 +145,4 @@ Append material changes and their reasons.
   - F5 T-04 covered only multi-hub wishes: accepted. T-04 covers every D-01 item; T-03 adds a hardening verdict.
   - Own finding: `~/.pi/agent/pi-sync.json` (git settings sync) and pi-provider-claude-ex `sync.ts` (account sync) already exist; T-04 starts from them.
 - 2026-11-12, after T-10: the user said the new server needs no terminal UI. `decision.md` costs revised: C 30 to 58 weeks, D 44 to 78, E 33 to 54 (the TUI row and about 35k of Pi's core lines drop out); A and B unchanged; scores and the D-17 choice unchanged. D-16 keeps its original figures as recorded.
+- 2026-11-14: Force-finished by the user.

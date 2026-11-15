@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: ready
+status: complete
 created: 2026-11-05
-updated: 2026-11-08T14:40:31.411Z
+updated: 2026-11-14T20:18:09.486Z
 reviewed: 2026-11-05
 started: 2026-11-05T10:39:25.505Z
 ---
@@ -244,3 +244,4 @@ Append material changes and their reasons; preserve the original request and set
   - F5 `[human]` used as a phase tag: accepted. Verified that `needsThinkTags` (`extensions/plan3.ts:413-416`) only accepts `[think]`/`[code]`. Pick and Switch phases are now `[think]` with `[human]` steps; RW-13 asserts no tagging turn.
   - F6 night-mode wording: accepted. Verified that `nightSet` copies the day set and `setBoth` sets both (`extensions/plan3-needs.ts:27-31`). The recipe now says approved gates stay on at night.
 - 2026-11-05: Added RW-18, RW-19 after RW-03: 2026-11-05 user direction: run the recipe autonomously on throwaway full clones of DealFinder (thinker anthropic/claude-opus-5-5, worker openai-codex/gpt-6.1-sol), evaluate each result (code improvement, readability, security, performance), strengthen the prompts and repeat until good; then move to a more serious project. The real-repo pilot RW-04 is paused at its Pick.
+- 2026-11-14: Force-finished by the user with unfinished steps: RW-18, RW-19, RW-04, RW-05, RW-06, RW-07, RW-08, RW-17, RW-09, RW-10, RW-11, RW-12, RW-13, RW-14, RW-15, RW-16, ARCH-RECONCILE.

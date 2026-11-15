@@ -14,7 +14,10 @@ const repetitions = Number(value("--repetitions", "2"));
 const label = value("--label", "run");
 const outputRoot = path.resolve(value("--output", path.join(repo, ".pi", "context-cache-benchmark", `${new Date().toISOString().replaceAll(":", "-")}-${label}`)));
 const npmRoot = () => { try { return execFileSync("npm", ["root", "-g"], { encoding: "utf8", shell: true }).trim(); } catch { return path.join(process.env.APPDATA ?? "", "npm", "node_modules"); } };
-const piCli = [path.join(process.env.USERPROFILE ?? process.env.HOME ?? "", ".pi", "agent", "install", "releases", "1.4.0", "node_modules", "@earendil-works", "pi-coding-agent", "dist", "bundle", "cli.js"), path.join(npmRoot(), "@earendil-works", "pi-coding-agent", "dist", "bundle", "cli.js")].find(existsSync);
+const releases = path.join(process.env.USERPROFILE ?? process.env.HOME ?? "", ".pi", "agent", "install", "releases");
+const installed = (existsSync(releases) ? readdirSync(releases) : []).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
+	.map(version => path.join(releases, version, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "bundle", "cli.js"));
+const piCli = [...installed, path.join(npmRoot(), "@earendil-works", "pi-coding-agent", "dist", "bundle", "cli.js")].find(existsSync);
 if (!piCli) throw new Error("Pi CLI not found");
 // The user's Anthropic OAuth pool provider (real sessions load it; --no-extensions would leave a revoked auth.json token).
 const providerExtension = value("--provider-extension", path.join(process.env.USERPROFILE ?? process.env.HOME ?? "", ".pi", "agent", "git", "github.com", "DrunkenDonkey80", "pi-provider-claude-ex", "index.ts"));
@@ -68,7 +71,7 @@ function readJsonl(file) {
 async function run(repetition) {
 	const cwd = path.join(outputRoot, `rep-${repetition + 1}`);
 	scaffold(cwd);
-	const probeFile = path.join(outputRoot, `probe-${repetition + 1}.mjs`), probeLog = path.join(cwd, "probe.jsonl");
+	const probeFile = path.join(outputRoot, `probe-${repetition + 1}.ts`), probeLog = path.join(cwd, "probe.jsonl");
 	writeFileSync(probeFile, probe);
 	writeFileSync(probeLog, "");
 	const sessionDir = path.join(cwd, "sessions");
@@ -129,7 +132,7 @@ mkdirSync(outputRoot, { recursive: true });
 const results = await Promise.all(Array.from({ length: repetitions }, (_, i) => run(i).catch((error) => ({ repetition: i + 1, error: String(error?.stack ?? error) }))));
 const ok = results.filter((r) => !r.error);
 const mean = (pick) => ok.length ? ok.reduce((s, r) => s + pick(r), 0) / ok.length : NaN;
-const summary = { label, model, repetitions, outputRoot, mean: { costUsd: mean((r) => r.usage.costUsd), totalTokens: mean((r) => r.usage.totalTokens), cacheRead: mean((r) => r.usage.cacheRead), cacheWrite: mean((r) => r.usage.cacheWrite), elapsedMs: mean((r) => r.elapsedMs), turns: mean((r) => r.turns), toolCalls: mean((r) => r.toolCalls) }, results };
+const summary = { label, model, piCli, repetitions, outputRoot, mean: { costUsd: mean((r) => r.usage.costUsd), totalTokens: mean((r) => r.usage.totalTokens), cacheRead: mean((r) => r.usage.cacheRead), cacheWrite: mean((r) => r.usage.cacheWrite), elapsedMs: mean((r) => r.elapsedMs), turns: mean((r) => r.turns), toolCalls: mean((r) => r.toolCalls) }, results };
 writeFileSync(path.join(outputRoot, "results.json"), `${JSON.stringify(summary, null, 2)}\n`);
 process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
 if (results.some((r) => r.error || !r.completed || !r.toolChange)) process.exitCode = 1;

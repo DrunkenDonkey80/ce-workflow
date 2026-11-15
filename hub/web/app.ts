@@ -34,7 +34,7 @@ const auth: RequestInit = token ? { credentials: "omit", headers: { Authorizatio
 let target = new URLSearchParams(location.search).get("target") ?? undefined;
 type Model = { provider: string; id: string; name: string };
 type Plan = { id: string; title: string; done?: number; total?: number; focus?: string; bias?: number; open?: number; planning?: boolean; finishable?: boolean };
-const state: { connected: boolean; diagram: Diagram | null; plan: Plan | null; status: { model: Model | null; effort: string | null; context?: number | null; tokens?: number | null; estimated?: boolean; window?: number | null; git?: GitFiles | null; folder?: string; tab?: string; parked?: boolean; commands?: ProjectCommand[] } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]> & { thinkingLength: number }>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, status: null, activity: {}, pinning: false, more: false };
+const state: { connected: boolean; diagram: Diagram | null; plan: Plan | null; status: { model: Model | null; effort: string | null; context?: number | null; tokens?: number | null; estimated?: boolean; window?: number | null; compacted?: number | null; git?: GitFiles | null; folder?: string; tab?: string; parked?: boolean; commands?: ProjectCommand[] } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]> & { thinkingLength: number }>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, status: null, activity: {}, pinning: false, more: false };
 let commentPoint, hoverTimer, messageSending = false, commandSending = false;
 type ReferenceMessage = { text: string; target?: string; diagrams?: { target: string; ids: string[] }[]; references: { submission: string; refs: { ref: string; revision: number }[] } };
 let pendingSubmission: { text: string; refs: string[]; at: number; request?: ReferenceMessage } | undefined, draftEdits = 0;
@@ -101,9 +101,14 @@ function renderShell() {
  const short = n => n >= 1e6 ? +(n / 1e6).toFixed(1) + "m" : Math.round(n / 1e3) + "k";
  // Research suspends compaction, so the bar fills up to the model's real window instead of the 200k compaction border.
  const researching = ((status as { modes?: { research?: string } })?.modes?.research ?? "off") !== "off";
- const used = typeof status?.tokens === "number" ? status.tokens / (researching && status.window ? status.window : Math.min(COMPACT_AT, status.window || COMPACT_AT)) * 100 : status?.context ?? 0;
+ const scale = researching && status?.window ? status.window : Math.min(COMPACT_AT, status?.window || COMPACT_AT);
+ const used = typeof status?.tokens === "number" ? status.tokens / scale * 100 : status?.context ?? 0;
  setBar($("context-button"), used, used >= 90 ? "error" : used >= 70 ? "warning" : "accent");
  $("context-button").replaceChildren(icon("context"), html("span", { className: "context-label", textContent: "Context: " }), (status?.window ? (typeof status.tokens === "number" ? (status.estimated ? "~" : "") + short(status.tokens) : "?") + "/" + short(status.window) : typeof status?.context === "number" ? Math.round(status.context) + "%" : "—")); // the phone drawer hides the label
+ // Where the last compaction left the context (red dotted line + small size), so a compaction that kept too much stands out.
+ const compacted = status?.compacted;
+ if (typeof compacted === "number") { const mark = html("i", { className: "compact-mark" }); mark.style.left = Math.min(100, compacted / scale * 100) + "%"; $("context-button").append(html("small", { className: "compact-size", textContent: " ↓" + short(compacted) }), mark); }
+ $("context-button").title = typeof compacted === "number" ? "Context; the last compaction left ~" + short(compacted) : "Context";
  $("bias-button").replaceChildren(icon("bias"), (plan ? BIAS_LABEL : SESSION_BIAS)[biasNow()] ?? "Normal");
  for (const id of ["model-button", "context-button"] as const) $(id).disabled = !state.connected;
  $("bias-button").disabled = !state.connected;

@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: ready
+status: complete
 created: 2026-11-09
-updated: 2026-11-09T13:32:15.160Z
+updated: 2026-11-14T20:18:18.124Z
 size: plan
 reviewed: 2026-11-09
 ---
@@ -257,3 +257,4 @@ Append material changes and their reasons; preserve the original request and set
   - 7 Shared browser sessions interleave: accepted. Each capture uses its own agent-browser session, with an overlapping-capture test in S06.
   - 8 Bridge trust not validated: accepted (the frame is an opaque origin, so origin checks cannot identify it). S10 checks `event.source` against the current frame plus a load id and bounded schemas; messages only fill the chat box.
   - 9 R15 grep contradicts the OD library and catch-up; fixtures missed: accepted (`test-work-knowledge.mjs` line 48, `test-sessions.mjs` line 62, the redaction assertion at `test-work-opendesign-client.mjs` line 661). R15 now forbids runtime integration only; S17 greps for integration symbols, moves the redaction assertion and updates the fixtures; C10 added.
+- 2026-11-14: Force-finished by the user with unfinished steps: S05, S19.

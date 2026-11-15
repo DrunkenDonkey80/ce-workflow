@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: draft
+status: complete
 created: 2026-11-09
-updated: 2026-11-09T10:52:00.567Z
+updated: 2026-11-14T20:18:00.732Z
 ---
 
 # Plan3 draft
@@ -48,3 +48,4 @@ Planning has not started.
 ## Amendments
 
 Append material changes and their reasons; preserve the original request and settled decisions.
+- 2026-11-14: Force-finished by the user.

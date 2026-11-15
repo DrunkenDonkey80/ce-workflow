@@ -528,6 +528,7 @@ async function runParent() {
 						CE_MICROCOMPACT_PI_ROOT: piRoot,
 						CE_MICROCOMPACT_MODE: mode,
 						PI_CODING_AGENT_DIR: path.join(cwd, "agent"),
+						PI_LENS_CONFIG_PATH: path.join(cwd, "lens.json"),
 					},
 				},
 			);

@@ -33,6 +33,7 @@ import { sendExplored, viewers } from "./explore.ts";
 import { pruneSessions, sessionTrash, trimCompacted } from "./session-prune.ts";
 import { createAutoUpdate } from "./auto-update.ts";
 import { install as installBrowserFetch } from "../../extensions/browser-fetch.ts";
+import { applyLensDefaults } from "../../extensions/work-lens-format.ts";
 
 export type HubConfig = { version: 1; port: number; localKey: string; idleParkMinutes: number; remote?: boolean; icon?: string; usageHidden?: string[]; notify?: { question: boolean; done: boolean }; seenVersion?: string; collapseHours?: number; attentionKey?: string };
 export type HubMarker = { pid: number; port: number; startedAt: number };
@@ -95,6 +96,7 @@ function envCommand(): string[] | undefined {
 }
 
 export async function startHub({ command = envCommand(), run = exec as Exec, openUrl = (_url: string) => {}, usage: usageOptions = {} as Partial<UsageOptions> | Usage | false, pool: poolOption = undefined as Pool | false | undefined, models = piModels() as ParkedModels | undefined, updates = undefined as UpdateCheck | undefined, app = undefined as ReturnType<typeof createAppInstall> | undefined, linkRequest = undefined as LinkRequest | undefined } = {}) {
+	try { applyLensDefaults(); } catch (error) { console.warn(`pi-lens defaults not applied: ${error.message}`); }
 	const dataDir = hubDataDir();
 	mkdirSync(dataDir, { recursive: true }); // `node src/hub.ts` on a fresh machine, not only through the CLI
 	// One running hub only: the same lock file rule as sessions (D9), on `<data>/hub.lock`.

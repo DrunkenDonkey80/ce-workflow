@@ -107,6 +107,8 @@ import { searchKnowledge } from "../extensions/work-knowledge.ts";
 // on 2026-09-08. No provider, child process, or real project mutation is needed.
 const cwd = mkdtempSync(path.join(tmpdir(), "ce-compaction-notifications-"));
 const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+const previousLensConfig = process.env.PI_LENS_CONFIG_PATH;
+process.env.PI_LENS_CONFIG_PATH = path.join(cwd, "lens.json");
 process.env.PI_CODING_AGENT_DIR = path.join(cwd, "agent");
 const hooks = {};
 const contextHooks = [];
@@ -347,6 +349,10 @@ try {
 		);
 	}
 
+	const researchPrompt = { prompt: "Continue", systemPrompt: "base", systemPromptOptions: { sections: { other: "Keep me" } } };
+	assert.equal(await hooks.before_agent_start(researchPrompt, ctx), undefined, "ordinary startup must not force the system prompt");
+	assert.deepEqual(researchPrompt.systemPromptOptions.sections, { other: "Keep me" });
+	assert.equal(await hooks.before_agent_start({ prompt: "Continue", systemPrompt: "base" }, ctx), undefined, "legacy research-off startup also leaves the prompt alone");
 	await hooks.before_agent_start(
 		{ prompt: "Continue my real direct task", systemPrompt: "base" },
 		ctx,
@@ -1491,7 +1497,15 @@ try {
 	assert.equal(await hooks.tool_call({ toolName: "subagent", input: { agent: "oracle", task: "Read-only critique" } }, researchCtx)?.block, undefined);
 	assert.equal(await hooks.tool_call({ toolName: "subagent", input: { action: "models" } }, researchCtx)?.block, undefined);
 	assert.equal(await hooks.tool_call({ toolName: "subagent", input: { agent: "oracle", worktree: true } }, researchCtx)?.block, undefined);
-	assert.match((await hooks.before_agent_start({ prompt: "Explore options" }, researchCtx)).systemPrompt, /Writing a project plan is part of research/);
+	assert.match((await hooks.before_agent_start({ prompt: "Explore options", systemPrompt: "base" }, researchCtx)).systemPrompt, /^base\n\nRESEARCH MODE:/, "legacy hosts keep the research prompt");
+	assert.equal(await hooks.before_agent_start(researchPrompt, researchCtx), undefined, "structured research must not force the full prompt");
+	const researchText = researchPrompt.systemPromptOptions.sections.research;
+	assert.match(researchText, /Writing a project plan is part of research/);
+	assert.match(researchText, /only they can turn it off/);
+	assert(researchText.includes(notebook), "research section includes the notebook");
+	assert.equal(researchPrompt.systemPromptOptions.sections.other, "Keep me");
+	await hooks.before_agent_start(researchPrompt, researchCtx);
+	assert.equal(researchPrompt.systemPromptOptions.sections.research, researchText, "repeated runs do not duplicate instructions");
 	await tools.research_note.execute("note", { note: "Observed result: source.md:12" });
 	assert.match(readFileSync(notebook, "utf8"), /Observed result: source.md:12/);
 	assert.equal(requestContextFilter(researchCtx), false, "no early cut above our threshold");
@@ -1564,7 +1578,12 @@ try {
 	// The agent may leave research Plan3 started, mid-run, but never research the user started.
 	listeners.get("plan3:research")({ ctx: researchCtx, enabled: true });
 	assert.match((await hooks.before_agent_start({ prompt: "Fix it" }, researchCtx)).systemPrompt, /call research_exit first/);
+	assert.equal(await hooks.before_agent_start(researchPrompt, researchCtx), undefined);
+	assert.match(researchPrompt.systemPromptOptions.sections.research, /call research_exit first/);
+	assert.doesNotMatch(researchPrompt.systemPromptOptions.sections.research, /only they can turn it off/);
 	await tools.research_exit.execute("exit", {}, undefined, undefined, busyCtx);
+	assert.equal(await hooks.before_agent_start(researchPrompt, researchCtx), undefined);
+	assert.deepEqual(researchPrompt.systemPromptOptions.sections, { other: "Keep me" }, "exit removes only the research section");
 	assert.equal(researchEntries.at(-1).data.mode, "off", "research_exit leaves Plan3 research at once");
 	await commands.research.handler("on", researchCtx);
 	await assert.rejects(async () => tools.research_exit.execute("exit", {}, undefined, undefined, researchCtx), /only they can turn it off/);
@@ -2135,5 +2154,6 @@ try {
 	await hooks.session_shutdown?.({}, ctx);
 	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
 	else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+	if (previousLensConfig === undefined) delete process.env.PI_LENS_CONFIG_PATH; else process.env.PI_LENS_CONFIG_PATH = previousLensConfig;
 	rmSync(cwd, { recursive: true, force: true });
 }

@@ -11,6 +11,8 @@ const sent = [], notices = [], forwarded = [];
 const previousSwitch = process.env.CE_WORKFLOW_ENABLED;
 const previousAgents = process.env.PI_SUBAGENT_AGENT_DIRS;
 const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+const previousLensConfig = process.env.PI_LENS_CONFIG_PATH;
+process.env.PI_LENS_CONFIG_PATH = path.join(cwd, "lens.json");
 try {
 	// An old configuration cannot reactivate removed orchestration.
 	process.env.CE_WORKFLOW_ENABLED = "1";
@@ -55,5 +57,6 @@ try {
 	if (previousSwitch === undefined) delete process.env.CE_WORKFLOW_ENABLED; else process.env.CE_WORKFLOW_ENABLED = previousSwitch;
 	if (previousAgents === undefined) delete process.env.PI_SUBAGENT_AGENT_DIRS; else process.env.PI_SUBAGENT_AGENT_DIRS = previousAgents;
 	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+	if (previousLensConfig === undefined) delete process.env.PI_LENS_CONFIG_PATH; else process.env.PI_LENS_CONFIG_PATH = previousLensConfig;
 	rmSync(cwd, { recursive: true, force: true });
 }

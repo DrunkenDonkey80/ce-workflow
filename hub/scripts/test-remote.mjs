@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "hub-remote-"));
 process.env.PI_CODING_AGENT_DIR = root;
+process.env.PI_LENS_CONFIG_PATH = path.join(root, "lens.json");
 const { startHub } = await import("../src/hub.ts");
 const { createDeviceRegistry, tailscaleCommand } = await import("../src/remote.ts");
 const { COMM, FILE_BODY } = await import("../src/link.ts");

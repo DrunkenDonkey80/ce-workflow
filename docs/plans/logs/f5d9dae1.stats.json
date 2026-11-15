@@ -1,23 +1,23 @@
 {
  "version": 1,
- "activeMs": 18350593,
- "runs": 16,
+ "activeMs": 19979700,
+ "runs": 19,
  "waitingMs": 127649,
- "toolWallMs": 12744031,
+ "toolWallMs": 13774906,
  "compactions": {
-  "count": 4,
-  "ms": 105088
+  "count": 5,
+  "ms": 140794
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
-   "replies": 726,
-   "thinkingMs": 2888925,
-   "actingMs": 1444088,
-   "input": 1974,
-   "output": 416180,
-   "cacheRead": 82804170,
-   "cacheWrite": 3313896,
-   "cost": 41.461810000000035,
+   "replies": 767,
+   "thinkingMs": 2991111,
+   "actingMs": 1486914,
+   "input": 2078,
+   "output": 428887,
+   "cacheRead": 86341150,
+   "cacheWrite": 3522745,
+   "cost": 43.46800700000003,
    "errors": 1
   }
  },
@@ -29,20 +29,20 @@
    "failures": 0
   },
   "bash": {
-   "count": 518,
-   "ms": 12155869,
+   "count": 552,
+   "ms": 13163902,
    "maxMs": 408496,
-   "failures": 12
+   "failures": 14
   },
   "read": {
-   "count": 139,
-   "ms": 3270,
+   "count": 141,
+   "ms": 3325,
    "maxMs": 640,
    "failures": 0
   },
   "edit": {
-   "count": 106,
-   "ms": 978,
+   "count": 111,
+   "ms": 1034,
    "maxMs": 54,
    "failures": 5
   },
@@ -79,14 +79,14 @@
  },
  "categories": {
   "shell": {
-   "count": 426,
-   "ms": 4604424,
+   "count": 454,
+   "ms": 4611252,
    "maxMs": 265320,
-   "failures": 11
+   "failures": 13
   },
   "test": {
-   "count": 85,
-   "ms": 7539790,
+   "count": 91,
+   "ms": 8540995,
    "maxMs": 408496,
    "failures": 1
   },
@@ -380,12 +380,6 @@
    "maxMs": 71481,
    "failures": 0
   },
-  "bash\u0000python - <<'EOF' p=\"hub/scripts/test-browser.mjs\" s=open(p,encoding=\"utf8\").read() a='fs.copyFileSync(new URL(\"../../extensions/astryx-runtime/previews/neutral.webp\", import.meta.url), join(downloads,": {
-   "count": 1,
-   "ms": 192,
-   "maxMs": 192,
-   "failures": 0
-  },
   "bash\u0000python - <<'EOF' p=\"hub/scripts/test-browser.mjs\" s=open(p,encoding=\"utf8\").read() a='join(downloads, \"set\", \"02.webp\")); // a different picture: the same bytes would merge into the first pick' assert": {
    "count": 1,
    "ms": 197135,
@@ -414,12 +408,6 @@
    "count": 1,
    "ms": 411,
    "maxMs": 411,
-   "failures": 0
-  },
-  "bash\u0000agent-browser eval --help 2>&1 | head -20": {
-   "count": 1,
-   "ms": 188,
-   "maxMs": 188,
    "failures": 0
   },
   "bash\u0000node scripts/astryx-component-shots.mjs 2>&1 | tail -15 | cut -c1-400": {
@@ -573,10 +561,10 @@
    "failures": 0
   },
   "\u0000(other)": {
-   "count": 301,
-   "ms": 30682,
-   "maxMs": 170,
-   "failures": 8
+   "count": 335,
+   "ms": 35008,
+   "maxMs": 192,
+   "failures": 10
   },
   "bash\u0000node scripts/test-work-design.mjs 2>&1 | grep -v -i deprecation | tail -4 | cut -c1-300; node hub/scripts/test-api.mjs 2>&1 | grep -v -i deprecation | tail -6 | cut -c1-400": {
    "count": 1,
@@ -1010,12 +998,6 @@
    "maxMs": 344,
    "failures": 0
   },
-  "bash\u0000cd \".\"; sed -n \"686,692p\" hub/web/app.ts | cut -c1-300; sed -n \"1765p\" hub/web/app.ts | grep -o \"session: sessionId, nav: navRequest[^}]\\{0,80\\}\"; sed -n \"1815,1824p\" hub/web/app.ts; file hub/web/app.": {
-   "count": 1,
-   "ms": 172,
-   "maxMs": 172,
-   "failures": 0
-  },
   "bash\u0000cd \".\"; node -e \" const fs=require('fs'); let s=fs.readFileSync('hub/web/styles.css','utf8'); s=s.split('\\r\\n.library-open').join('\\r\\n.library-list .library-open'); fs.writeFileSync('hub/web/styles.c": {
    "count": 1,
    "ms": 86891,
@@ -1032,12 +1014,6 @@
    "count": 1,
    "ms": 722,
    "maxMs": 722,
-   "failures": 0
-  },
-  "bash\u0000cd \".\"; git diff --stat HEAD -- hub/scripts/test-browser.mjs; git checkout -- hub/scripts/test-browser.mjs; file hub/scripts/test-browser.mjs; sed -n \"176,183p\" hub/scripts/test-browser.mjs | cut -c1-": {
-   "count": 1,
-   "ms": 190,
-   "maxMs": 190,
    "failures": 0
   },
   "bash\u0000cd \".\"; git diff --stat -- hub/scripts/test-browser.mjs; for i in 1 2 3; do node hub/scripts/test-browser.mjs > \"$TEMP/tb.log\" 2>&1; r=$?; echo \"browser $i exit $r\"; [ $r = 0 ] && break; grep -m3 \"Ass": {
@@ -1112,12 +1088,6 @@
    "maxMs": 25046,
    "failures": 0
   },
-  "bash\u0000cd \".\"; node -e \" const fs=require('fs'),f='hub/scripts/test-browser.mjs';let t=fs.readFileSync(f,'utf8'); const a=\\\"[!!node.querySelector('iframe[src]'),\\\", b=\\\"[!!node.querySelector('img')?.naturalW": {
-   "count": 1,
-   "ms": 173,
-   "maxMs": 173,
-   "failures": 0
-  },
   "bash\u0000cd \".\"; for i in 1 2 3; do s=$(date +%s); node hub/scripts/test-browser.mjs > \"$TEMP/tb.log\" 2>&1; r=$?; echo \"browser $i exit $r ($(( $(date +%s)-s ))s)\"; [ $r = 0 ] && break; grep -m2 \"AssertionErro": {
    "count": 1,
    "ms": 197550,
@@ -1172,12 +1142,6 @@
    "maxMs": 1291,
    "failures": 0
   },
-  "bash\u0000cd \".\"; git log --oneline -3; git show --stat HEAD | head -20 | cut -c1-150; grep -n \"screenshot\" CHANGELOG.md | head -5 | cut -c1-160": {
-   "count": 1,
-   "ms": 171,
-   "maxMs": 171,
-   "failures": 0
-  },
   "bash\u0000cd \".\"; git show HEAD:hub/web/styles.css | od -c | grep -m2 \"\\\\\\\\r\"; od -c hub/web/styles.css | grep -m2 \"\\\\\\\\r\"; git show HEAD:hub/web/styles.css | wc -l; wc -l hub/web/styles.css": {
    "count": 1,
    "ms": 217,
@@ -1194,12 +1158,6 @@
    "count": 1,
    "ms": 384,
    "maxMs": 384,
-   "failures": 0
-  },
-  "bash\u0000cd \".\"; git status --short; git log --oneline origin/master..HEAD; grep -n \"\\\"version\\\"\" package.json; git ls-files package-lock.json; date +%F": {
-   "count": 1,
-   "ms": 187,
-   "maxMs": 187,
    "failures": 0
   },
   "bash\u0000cd \".\"; git add -u && git commit -qm \"Release 0.9.1: design library background shots and theme samples, Ctrl+Tab last session, F4 narrow chat, disk load box\" && git push -q origin master && git status": {
@@ -1236,12 +1194,6 @@
    "count": 1,
    "ms": 281,
    "maxMs": 281,
-   "failures": 0
-  },
-  "bash\u0000cd \".\"; git -c core.editor=true rebase --continue 2>&1 | head -20; git diff --name-only --diff-filter=U; git ls-files -u | head": {
-   "count": 1,
-   "ms": 183,
-   "maxMs": 183,
    "failures": 0
   },
   "bash\u0000cd \".\"; git stash push -q -m \"plan logs during rebase\" -- docs/plans/logs/19abb9ec.stats.json docs/plans/logs/f5d9dae1.stats.json && git -c core.editor=true rebase --continue 2>&1 | tail -4; git statu": {
@@ -1292,10 +1244,58 @@
    "maxMs": 229938,
    "failures": 0
   },
-  "bash\u0000cd \".\"; node -e \" const fs=require('fs'); for (const f of ['package.json','package-lock.json']) { let s=fs.readFileSync(f,'utf8'); let n=0; s=s.replace(/\\\"version\\\": \\\"0\\.9\\.4\\\"/g,m=>(n++<(f==='packag": {
+  "bash\u0000cd \".\"; git add -u && git commit -qm \"Release 0.9.5: Steer/queue send button, persistent warning rows, question popup fixes, Codex saved resets\" && git push -q origin master; git status -sb | head -1;": {
    "count": 1,
-   "ms": 149,
-   "maxMs": 149,
+   "ms": 3228,
+   "maxMs": 3228,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist\"; grep -rn \"estimatedTokensAfter\" --include=*.d.ts . | head; grep -rn \"interface CompactionEntry\" -": {
+   "count": 1,
+   "ms": 216,
+   "maxMs": 216,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \" const fs=require('fs'); const ed=(f,a,b)=>{let s=fs.readFileSync(f,'utf8');if(!s.includes(a))throw f+': '+a.slice(0,40);fs.writeFileSync(f,s.replace(a,b));}; ed('hub/src/api.ts','win": {
+   "count": 1,
+   "ms": 684,
+   "maxMs": 684,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; for i in 1 2 3; do node hub/scripts/test-browser.mjs >\"$TEMP/tb.log\" 2>&1; r=$?; echo \"try $i exit=$r\"; grep -m3 -i \"assert\\|error\\|expected\" \"$TEMP/tb.log\" | cut -c1-300; [ $r -eq 0 ] && brea": {
+   "count": 1,
+   "ms": 313179,
+   "maxMs": 313179,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'); let f='hub/src/sessions.ts',s=fs.readFileSync(f,'utf8'); const a='else if (event.type === \\\"compaction_end\\\") { live.compacting = false; live.compactedToken": {
+   "count": 1,
+   "ms": 4600,
+   "maxMs": 4600,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/scripts/test-api.mjs 2>&1 | tail -3; node hub/scripts/test-browser.mjs 2>&1 | tail -5": {
+   "count": 1,
+   "ms": 227784,
+   "maxMs": 227784,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/scripts/test-browser.mjs 2>&1 | rg -n \"Assertion|Error|message:|expected|actual|at file\" | head -20": {
+   "count": 1,
+   "ms": 226893,
+   "maxMs": 226893,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/scripts/test-browser.mjs > \"$TEMP/tb.log\" 2>&1; echo exit=$?; tail -40 \"$TEMP/tb.log\"": {
+   "count": 1,
+   "ms": 228653,
+   "maxMs": 228653,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff CHANGELOG.md": {
+   "count": 1,
+   "ms": 75,
+   "maxMs": 75,
    "failures": 0
   }
  },
@@ -1404,13 +1404,13 @@
    "failures": 1
   },
   "(none)": {
-   "ms": 6954492,
-   "testMs": 4065053,
-   "replies": 297,
+   "ms": 8107648,
+   "testMs": 5066258,
+   "replies": 338,
    "models": {
-    "anthropic/claude-opus-5-5:high": 297
+    "anthropic/claude-opus-5-5:high": 338
    },
-   "failures": 12
+   "failures": 14
   }
  },
  "spans": [
@@ -1477,6 +1477,18 @@
   {
    "start": "2026-11-14T17:51:33.774Z",
    "ms": 9927
+  },
+  {
+   "start": "2026-11-14T17:53:47.179Z",
+   "ms": 382188
+  },
+  {
+   "start": "2026-11-14T20:06:14.654Z",
+   "ms": 441578
+  },
+  {
+   "start": "2026-11-14T20:25:57.633Z",
+   "ms": 769635
   }
  ],
  "hints": [
@@ -1488,6 +1500,10 @@
   {
    "at": "2026-11-12T22:14:15.465Z",
    "shape": "for i"
+  },
+  {
+   "at": "2026-11-14T20:38:32.868Z",
+   "shape": "node hub/scripts/test-browser.mjs"
   }
  ]
 }

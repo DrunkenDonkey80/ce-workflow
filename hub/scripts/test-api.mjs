@@ -16,6 +16,7 @@ import { appPublication, ensureAppBuilt } from "../../extensions/design-build.ts
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "hub-api-"));
 process.env.PI_CODING_AGENT_DIR = root;
+process.env.PI_LENS_CONFIG_PATH = path.join(root, "lens.json");
 const { startHub } = await import("../src/hub.ts");
 { // CU-04: background git reads never take the optional index lock, whatever the parent set.
 	const { gitReadEnv } = await import("../src/files.ts");

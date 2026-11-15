@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: ready
+status: complete
 created: 2026-11-05
-updated: 2026-11-06T06:37:50.408Z
+updated: 2026-11-14T20:17:50.400Z
 reviewed: 2026-11-05
 ---
 
@@ -192,3 +192,4 @@ Append material changes and their reasons; preserve the original request and set
 - 2026-11-05 (S06): the mirror is not swapped in as a whole folder. On Windows the hub's folder watcher (S01) blocks renaming a watched folder and would keep watching the old one. Instead every file is fetched first (a failed fetch changes nothing), then files are replaced one by one and removed files are deleted. The folder stays, so live preview keeps working. Because the mirror owns `.pi/designs/<handle>/`, S08 keeps its selection copy at `.pi/designs/selected/<handle>/` (not `<handle>/selected/`).
 - 2026-11-05 (S05 on): Phase 3 builds on uncommitted design-sessions v1 code that is mixed with other sessions' changes, so these steps stay in the working tree until the user asks for a commit.
 - 2026-11-05 (S07): the page API call is `designpreview`, not `design-preview`: page endpoints only match `[a-z]+` (hub.ts line ~327).
+- 2026-11-14: Force-finished by the user.

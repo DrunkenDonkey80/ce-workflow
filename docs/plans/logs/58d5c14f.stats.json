@@ -1,12 +1,12 @@
 {
  "version": 1,
- "activeMs": 7783788,
- "runs": 17,
- "waitingMs": 0,
- "toolWallMs": 4409142,
+ "activeMs": 9224957,
+ "runs": 20,
+ "waitingMs": 73317,
+ "toolWallMs": 4649246,
  "compactions": {
-  "count": 7,
-  "ms": 180044
+  "count": 8,
+  "ms": 269487
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
@@ -19,54 +19,65 @@
    "cacheWrite": 2382786,
    "cost": 24.649618599999997,
    "errors": 0
+  },
+  "openai-codex/gpt-6-astra:high": {
+   "replies": 74,
+   "thinkingMs": 667922,
+   "actingMs": 291171,
+   "input": 312444,
+   "output": 27095,
+   "cacheRead": 5767808,
+   "cacheWrite": 0,
+   "cost": 10.246998000000005,
+   "errors": 0
   }
  },
  "tools": {
   "bash": {
-   "count": 315,
-   "ms": 3853397,
+   "count": 353,
+   "ms": 3962832,
    "maxMs": 600151,
-   "failures": 11
+   "failures": 17
   },
   "read": {
-   "count": 60,
-   "ms": 2226,
+   "count": 127,
+   "ms": 3403,
    "maxMs": 974,
    "failures": 0
   },
   "edit": {
-   "count": 64,
-   "ms": 2164,
+   "count": 72,
+   "ms": 2639,
    "maxMs": 1048,
-   "failures": 3
+   "failures": 4
   },
   "compaction_note": {
-   "count": 5,
+   "count": 6,
    "ms": 0,
    "maxMs": 0,
    "failures": 1
   },
   "plan3": {
-   "count": 19,
-   "ms": 3766,
+   "count": 32,
+   "ms": 4784,
    "maxMs": 1178,
    "failures": 1
   },
   "codemode": {
-   "count": 3,
-   "ms": 43262,
-   "maxMs": 23642,
-   "failures": 0
+   "count": 32,
+   "ms": 172460,
+   "maxMs": 27397,
+   "failures": 1
   },
   "lens_diagnostics": {
-   "count": 7,
-   "ms": 66193,
+   "count": 8,
+   "ms": 84760,
    "maxMs": 35928,
    "failures": 0
   },
   "test_sensitivity": {
-   "count": 5,
-   "ms": 143946,
+   "count": 6,
+   "ms": 149084,
    "maxMs": 31475,
    "failures": 2
   },
@@ -77,22 +88,58 @@
    "failures": 1
   },
   "write": {
-   "count": 1,
-   "ms": 5,
+   "count": 9,
+   "ms": 19,
    "maxMs": 5,
+   "failures": 0
+  },
+  "effective_config": {
+   "count": 1,
+   "ms": 25,
+   "maxMs": 25,
+   "failures": 0
+  },
+  "project_report": {
+   "count": 1,
+   "ms": 194,
+   "maxMs": 194,
+   "failures": 0
+  },
+  "jev_evidence": {
+   "count": 2,
+   "ms": 10956,
+   "maxMs": 5554,
+   "failures": 0
+  },
+  "research_exit": {
+   "count": 1,
+   "ms": 1,
+   "maxMs": 1,
+   "failures": 0
+  },
+  "subagents_enable": {
+   "count": 1,
+   "ms": 1,
+   "maxMs": 1,
+   "failures": 0
+  },
+  "subagent": {
+   "count": 1,
+   "ms": 421,
+   "maxMs": 421,
    "failures": 0
   }
  },
  "categories": {
   "shell": {
-   "count": 270,
-   "ms": 990066,
+   "count": 307,
+   "ms": 1074840,
    "maxMs": 253053,
-   "failures": 10
+   "failures": 16
   },
   "test": {
-   "count": 45,
-   "ms": 2863331,
+   "count": 46,
+   "ms": 2887992,
    "maxMs": 600151,
    "failures": 1
   }
@@ -152,12 +199,6 @@
    "maxMs": 201,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && rg -n \"^import .*src/\" \"scripts/test-remote.mjs\" | head -3; rg -n \"import\\(\" \"scripts/test-remote.mjs\" | head -3": {
-   "count": 1,
-   "ms": 124,
-   "maxMs": 124,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && node --test \"scripts/test-remote.mjs\" 2>&1 | rg -v \"^ℹ\" | tail -15": {
    "count": 1,
    "ms": 60983,
@@ -176,22 +217,10 @@
    "maxMs": 207,
    "failures": 0
   },
-  "bash\u0000cd \"./hub/web\" && rg -n \"function menuItem|const menuItem\" -A6 app.ts | head -12; rg -n \"menu-group|menu-child\" -A3 styles.css": {
-   "count": 1,
-   "ms": 117,
-   "maxMs": 117,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && node -e \"console.log(JSON.stringify(require('./package.json').scripts,null,1))\" 2>/dev/null | head -20; rg -n \"Hub links|openHubLinks|menu-group\" \"scripts/test-browser.mjs\" | head": {
    "count": 1,
    "ms": 172,
    "maxMs": 172,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && git diff -U1 -- hub/web/app.ts | sed -n \"1,40p\" | cut -c1-220; git diff -U1 -- hub/web/styles.css hub/web/index.html | cut -c1-200 | head -40": {
-   "count": 1,
-   "ms": 125,
-   "maxMs": 125,
    "failures": 0
   },
   "bash\u0000cd \".\" && for f in hub/web/app.ts hub/web/styles.css; do git diff -U1 -- \"$f\"; done | awk \"/^diff --git/{hdr=1} hdr{print; if(/^\\+\\+\\+/)hdr=0; next} /^@@/{keep=(\\$2 ~ /^-(2113|2121|684),/)} keep\" > \"$": {
@@ -210,12 +239,6 @@
    "count": 1,
    "ms": 179,
    "maxMs": 179,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"DELIVER_MS|function call|fetchRequest|case \\\"deliver\\\"|case \\\"ping\\\"|async function serve|function forward|wakeAndSend|const tell|^export const|^import|timeout\" \"src/link.ts\" | cu": {
-   "count": 1,
-   "ms": 118,
-   "maxMs": 118,
    "failures": 0
   },
   "bash\u0000cd \".\" && rg -n \"D-0[6-9]|D-08|late\" \"docs/plans/2026-11-12-hub-project-links-and-file-transfer-58d5c14f-plan3.md\" | cut -c1-600; P=$(ls -d ~/.pi/agent/npm/node_modules/pi-intercom 2>/dev/null || find": {
@@ -242,12 +265,6 @@
    "maxMs": 61029,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && rg -n \"content: \\{ text: options.text \\}|const state =|state\\.alpha =|state = \\{|alpha: \\{|folder:\" \"scripts/test-link.mjs\" | cut -c1-220; rg -n \"parked drop|A parked session drops\" \"scr": {
-   "count": 1,
-   "ms": 118,
-   "maxMs": 118,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && git diff --stat -- hub/src hub/scripts && git diff -U0 -- hub/src/hub.ts | rg \"^[-+][^-+]\" | cut -c1-160": {
    "count": 1,
    "ms": 142,
@@ -266,22 +283,10 @@
    "maxMs": 157,
    "failures": 0
   },
-  "bash\u0000cd \".\" && git diff -- CHANGELOG.md | rg \"^[-+]\" | cut -c1-120; rg -n -i \"hub links|links\\b.*sessions|remoteSessions|/links\" hub/scripts/test-browser.mjs | head | cut -c1-200": {
-   "count": 1,
-   "ms": 131,
-   "maxMs": 131,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && rg -n \"const links = |function links|async function openHubLinks\" -A3 web/app.ts | cut -c1-250; rg -n \"openHubLinks\\(\" web/app.ts | cut -c1-200; sed -n \"1,40p\" scripts/changelog-shot.mjs": {
    "count": 1,
    "ms": 150,
    "maxMs": 150,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"setup\" scripts/changelog-shot.mjs | cut -c1-220; rg -n \"openSessionMenu\\(\" web/app.ts | cut -c1-220": {
-   "count": 1,
-   "ms": 123,
-   "maxMs": 123,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && cat > \"$TEMP/hl-setup.js\" <<'EOF' const real = window.fetch, json = value => new Response(JSON.stringify(value), { status: 200, headers: { \"content-type\": \"application/json\" } }); const ": {
@@ -306,12 +311,6 @@
    "count": 1,
    "ms": 258,
    "maxMs": 258,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"createLinks\\(\" -A6 src/hub.ts | cut -c1-300; rg -n \"cleanSessions|inFolder|sessions: inFolder|live\" src/link.ts | cut -c1-260": {
-   "count": 1,
-   "ms": 124,
-   "maxMs": 124,
    "failures": 0
   },
   "bash\u0000hostname; cd \".\" && git log --oneline -3; ls \"$LOCALAPPDATA/../Roaming\" >/dev/null; find \"$HOME/.pi/agent\" -maxdepth 3 -name \"links.json\" 2>/dev/null | head": {
@@ -348,12 +347,6 @@
    "count": 1,
    "ms": 301,
    "maxMs": 301,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && rg -n \"published\\b|function published|const published\" hub/src/api.ts | cut -c1-220 | head; rg -n \"finishable\" --glob \"!**/node_modules/**\" --glob \"!docs/**\" -l . | head -20": {
-   "count": 1,
-   "ms": 134,
-   "maxMs": 134,
    "failures": 0
   },
   "bash\u0000cd \".\" && rg -n \"listPlans|currentPlan\" hub/src/api.ts | head -3 | cut -c1-200; sed -n \"600,660p\" extensions/plan3.ts; sed -n \"1,38p\" extensions/plan3.ts | rg -n \"^import\" | cut -c1-200": {
@@ -440,18 +433,6 @@
    "maxMs": 3198,
    "failures": 0
   },
-  "bash\u0000cd \"./hub/web\" && rg -n \"table|\\bt[dh]\\b|anywhere|break-all|word-break\" styles.css | cut -c1-220 | head -40; git -C .. status --short": {
-   "count": 1,
-   "ms": 134,
-   "maxMs": 134,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && cat > /tmp/tbl.mjs <<'EOF' import { chromium } from \"playwright\"; import fs from \"node:fs\"; const css = fs.readFileSync(\"web/styles.css\", \"utf8\"); const b = await chromium.launch(); cons": {
-   "count": 1,
-   "ms": 134,
-   "maxMs": 134,
-   "failures": 0
-  },
   "bash\u0000B=\"$APPDATA/npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe\"; f=\"$LOCALAPPDATA/Temp/tbl.html\"; { printf '<link rel=\"stylesheet\" href=\"file:///./hub/web/styles.css\"><body style=\"width:34": {
    "count": 1,
    "ms": 687,
@@ -470,12 +451,6 @@
    "maxMs": 231,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && rg -n \"cpu|loadavg|freemem|totalmem\" src web --glob \"*.ts\" | cut -c1-220 | head -30; git -C .. status --short": {
-   "count": 1,
-   "ms": 129,
-   "maxMs": 129,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && sed -n \"390,396p\" src/api.ts | cut -c1-200; rg -n \"^import\" src/api.ts | rg \"fs|child\" ; sed -n \"436,442p\" web/styles.css | cut -c1-260; sed -n \"26,31p\" web/index.html; node -e \"require(": {
    "count": 1,
    "ms": 219,
@@ -486,12 +461,6 @@
    "count": 1,
    "ms": 152,
    "maxMs": 152,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && sed -i \"s#<div id=\\\"load-cpu\\\" class=\\\"load\\\"#<div id=\\\"load-cpu\\\" class=\\\"load\\\" data-label=\\\"CPU\\\"#; s#<div id=\\\"load-memory\\\" class=\\\"load\\\"#<div id=\\\"load-memory\\\" class=\\\"load\\\" dat": {
-   "count": 1,
-   "ms": 124,
-   "maxMs": 124,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && rg -n \"\\\"system\\\"|load-cpu|load-memory|\\\"processes\\\"\" scripts/*.mjs | cut -c1-220; node -e \"import('./src/api.ts').then(async m=>{console.log(await m.systemLoad()); console.log(await m.v": {
@@ -510,12 +479,6 @@
    "count": 1,
    "ms": 27345,
    "maxMs": 27345,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"data-inspect\" scripts/test-browser.mjs web/*.ts | cut -c1-200 | head; sed -n \"1,30p\" /tmp/tb.log | cut -c1-300; git log --oneline -3 -- web/design-library.ts scripts/test-browser.": {
-   "count": 1,
-   "ms": 119,
-   "maxMs": 119,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && timeout 600 node scripts/test-browser.mjs > /tmp/tb.log 2>&1 && echo ok || { echo FAIL; rg -n \"\\\"error\\\"|AssertionError\" /tmp/tb.log | head -5 | cut -c1-300; }": {
@@ -548,12 +511,6 @@
    "maxMs": 164,
    "failures": 0
   },
-  "bash\u0000cd \".\" && rg -n \"diagramPath\\(|loadDiagram\\(\" extensions hub/src | rg -v \"^extensions\\\\\\\\plan3-diagram.ts:(9|10)\" | cut -c1-240": {
-   "count": 1,
-   "ms": 122,
-   "maxMs": 122,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && rg -l -i \"bounded regular\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules\" hub/node_modules node_modules 2>/dev/null | head; echo ---; git log --oneline -S \"bounded regular fil": {
    "count": 1,
    "ms": 5796,
@@ -584,12 +541,6 @@
    "maxMs": 231,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && rg -n \"function diagramTarget|const diagramTarget|^let target|let target\\b|comments:\" web/*.ts | cut -c1-260; rg -n \"leftTab|left-panel|activeTab|panelTab\" web/app.ts | head -20 | cut -c": {
-   "count": 1,
-   "ms": 128,
-   "maxMs": 128,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && sed -n \"185,200p\" web/app.ts | cut -c1-260; rg -n \"diagramTab\\s*=|let diagramTab|leftView|left-view|data-view|panelView|function setLeft|showLeft|leftOpen|left-collapsed|collapse\" web/ap": {
    "count": 1,
    "ms": 154,
@@ -608,12 +559,6 @@
    "maxMs": 220,
    "failures": 0
   },
-  "bash\u0000cd \".\" && rg -n \"\\.target\\b\" extensions/design-bundles.ts | cut -c1-220; rg -n \"target\" scripts/test-work-plan3*.mjs hub/scripts/*.mjs 2>/dev/null | rg \"api/message|\\\"message\\\"\" | cut -c1-220 | head": {
-   "count": 1,
-   "ms": 123,
-   "maxMs": 123,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && rg -n \"^import .*readFile|readFile,\" scripts/test-work-plan3.mjs | head -3 | cut -c1-200": {
    "count": 1,
    "ms": 218,
@@ -630,12 +575,6 @@
    "count": 1,
    "ms": 9251,
    "maxMs": 9251,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && sed -n \"385,402p\" scripts/test-browser.mjs | cut -c1-260; rg -n \"messages\\.at\\(-1\\)\" scripts/test-browser.mjs | head -8 | cut -c1-220": {
-   "count": 1,
-   "ms": 127,
-   "maxMs": 127,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && timeout 600 node scripts/test-browser.mjs > /tmp/tb.log 2>&1 && echo ok || { echo FAIL; rg -n \"AssertionError|\\\"error\\\"|expected|actual|at file\" /tmp/tb.log | head -10 | cut -c1-300; }": {
@@ -678,12 +617,6 @@
    "count": 1,
    "ms": 261,
    "maxMs": 261,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && rg -n \"\\\"/api/message\\\"\" extensions/plan3.ts hub/src/*.ts | cut -c1-200": {
-   "count": 1,
-   "ms": 119,
-   "maxMs": 119,
    "failures": 0
   },
   "bash\u0000cd \".\" && ls docs/plans/*.md docs/plans/done/*.md | wc -l; du -ch docs/plans/*.md docs/plans/done/*.md | tail -1; node -e \" const t=Date.now();import('./extensions/plan3.ts').then(async m=>{const a=Da": {
@@ -746,12 +679,6 @@
    "maxMs": 184,
    "failures": 0
   },
-  "bash\u0000cd \".\" && git log --oneline -4 && git diff -- extensions/plan3.ts | rg \"^[+-]\\s\" | cut -c1-160": {
-   "count": 1,
-   "ms": 119,
-   "maxMs": 119,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && git diff -U1 -- extensions/plan3.ts > p3.tmp.diff && node -e \" const fs=require('fs');const s=fs.readFileSync('p3.tmp.diff','utf8');const [head,...hunks]=s.split(/^(?=@@)/m); fs.writeFileSyn": {
    "count": 2,
    "ms": 850,
@@ -800,12 +727,6 @@
    "maxMs": 167,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && rg -n \"topbar-h|app-top\" web/app.ts web/styles.css | cut -c1-220; sed -n \"262,272p\" web/styles.css | cut -c1-200": {
-   "count": 1,
-   "ms": 119,
-   "maxMs": 119,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && sed -n \"655,660p;284p\" web/styles.css | cut -c1-300; rg -n \"prompt\" scripts/test-browser.mjs | head -30 | cut -c1-200": {
    "count": 1,
    "ms": 135,
@@ -819,10 +740,10 @@
    "failures": 0
   },
   "\u0000(other)": {
-   "count": 110,
-   "ms": 9995,
-   "maxMs": 116,
-   "failures": 6
+   "count": 147,
+   "ms": 14435,
+   "maxMs": 134,
+   "failures": 7
   },
   "bash\u0000cd \".\" && git diff -- hub/web/app.ts hub/web/styles.css | rg \"^[+-]\\s\" | cut -c1-90 && cat > cl.tmp.mjs <<'EOF' import { readFileSync, writeFileSync } from \"node:fs\"; const file = process.argv[2], tex": {
    "count": 1,
@@ -870,12 +791,6 @@
    "count": 1,
    "ms": 220,
    "maxMs": 220,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && sed -n \"1,60p\" src/cache-miss.ts | cut -c1-250; echo ---; rg -n \"cache-miss|cacheMiss\" src/*.ts web/*.ts | grep -v \"^src/cache-miss.ts\" | cut -c1-250": {
-   "count": 1,
-   "ms": 126,
-   "maxMs": 126,
    "failures": 0
   },
   "bash\u0000cd \".\" && rg -n \"notifyType\" hub/src/*.ts ~/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist/modes/rpc/*.js 2>/dev/null | head -5 | cut -c1-220; echo ---; rg -n \"chec": {
@@ -938,12 +853,6 @@
    "maxMs": 164,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && rg -n \"state.more = value|more: value\" web/app.ts | cut -c1-200; rg -n \"notices = value.notices\" web/app.ts": {
-   "count": 1,
-   "ms": 118,
-   "maxMs": 118,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && rg -n \"notice\" hub/scripts/test-browser.mjs | head -20 | cut -c1-220; rg -n \"\\\"(test|typecheck|check)[^\\\"]*\\\":\" package.json hub/package.json 2>/dev/null | cut -c1-200 | head; rg -ln \"notice": {
    "count": 1,
    "ms": 181,
@@ -996,12 +905,6 @@
    "count": 1,
    "ms": 2379,
    "maxMs": 2379,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && sed -n \"846,866p\" scripts/test-browser.mjs | cut -c1-320": {
-   "count": 1,
-   "ms": 120,
-   "maxMs": 120,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && python - <<'EOF' p=\"scripts/test-browser.mjs\"; s=open(p,encoding=\"utf-8\").read() old=''' // Cache misses survive every chat filter, including a tool-only/non-final reply. Off by default,": {
@@ -1068,12 +971,6 @@
    "count": 1,
    "ms": 136,
    "maxMs": 136,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && git ls-files -u | head; GIT_EDITOR=true git rebase --continue 2>&1 | head -12": {
-   "count": 1,
-   "ms": 133,
-   "maxMs": 133,
    "failures": 0
   },
   "bash\u0000cd \".\" && git diff --cached --check | head; rg -n \"^(<<<<<<<|>>>>>>>|=======$)\" CHANGELOG.md hub/web/app.ts hub/web/prompts.ts hub/web/styles.css hub/scripts/test-browser.mjs | head; ls .git/MERGE_MSG": {
@@ -1160,12 +1057,6 @@
    "maxMs": 138,
    "failures": 0
   },
-  "bash\u0000cd \".\" && rg -n \"forwardDiagramChat\\(\" extensions/*.ts | cut -c1-300; sed -n \"875,900p\" extensions/plan3.ts | cut -c1-280": {
-   "count": 1,
-   "ms": 130,
-   "maxMs": 130,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && rg -n \"Resolve questions\" hub/web extensions -g \"*.ts\" | head -4 | cut -c1-220; rg -n \"contextmenu|longPress|long-press\" hub/web/app.ts | head -10 | cut -c1-220; rg -n \"\\\"send\\\"\\)\\.addEventL": {
    "count": 1,
    "ms": 205,
@@ -1196,12 +1087,6 @@
    "maxMs": 579,
    "failures": 0
   },
-  "bash\u0000cd \".\" && rg -n \"wo:cold-cache\" -A8 extensions/work-models.ts | rg -n \"sendUserMessage|deliverAs|isIdle|handled\" | head -8 | cut -c1-240": {
-   "count": 1,
-   "ms": 117,
-   "maxMs": 117,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && sed -n \"1402,1405p\" web/app.ts | cut -c1-240; sed -n \"141,144p\" web/app.ts | cut -c1-200; rg -n \"\\\\\\$\\(\\\"send\\\"\\)\" web/app.ts | cut -c1-160": {
    "count": 1,
    "ms": 140,
@@ -1212,12 +1097,6 @@
    "count": 1,
    "ms": 291,
    "maxMs": 291,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"^\\[hidden\\]|\\[hidden\\] *\\{\" web/styles.css | head -3 | cut -c1-120; rg -n \"plan-menu\" web/app.ts | head -5 | cut -c1-200": {
-   "count": 1,
-   "ms": 131,
-   "maxMs": 131,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && python - <<'EOF' p=\"web/styles.css\"; s=open(p,encoding=\"utf-8\").read() old='''.plan-list { display: grid; gap: 2px; overflow: auto; } /* Plans fill the screen height (the actions stay be": {
@@ -1297,6 +1176,174 @@
    "ms": 576,
    "maxMs": 576,
    "failures": 0
+  },
+  "bash\u0000ls -d \"C:/SOFT/git/\"*domain*; ls -la \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-lens\"; ls \"C:/Users/Flex/.pi/agent/sessions\"": {
+   "count": 1,
+   "ms": 148,
+   "maxMs": 148,
+   "failures": 0
+  },
+  "bash\u0000ls -la \"C:/SOFT/git/DomainCheck\"; ls -la \"C:/Users/Flex/.pi-lens\"; rg -n \"config.json|format.*enabled|auto.*fix|read.*widen|telemetry|latency|logs\" \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-lens/RE": {
+   "count": 1,
+   "ms": 781,
+   "maxMs": 781,
+   "failures": 0
+  },
+  "bash\u0000powershell -NoProfile -Command \"Get-CimInstance Win32_Process | Where-Object { $_.Name -match \\\"node|java|deno|biome|oxlint|opengrep|fallow\\\" } | Select-Object ProcessId,ParentProcessId,Name,KernelMod": {
+   "count": 1,
+   "ms": 9684,
+   "maxMs": 9684,
+   "failures": 0
+  },
+  "bash\u0000find \"C:/SOFT/git/DomainCheck\" \"./.pi\" -maxdepth 3 -iname \"*lens*\" -o -name \"AGENTS.md\"; ls \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-lens/docs\"; rg -n \"version\" \"C:/Users/Flex/.pi/agent/npm/node_m": {
+   "count": 1,
+   "ms": 162,
+   "maxMs": 162,
+   "failures": 0
+  },
+  "bash\u0000python -c \"import subprocess,json; r=subprocess.run(['powershell','-NoProfile','-Command','Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,KernelModeTime,UserModeTime,Work": {
+   "count": 1,
+   "ms": 551,
+   "maxMs": 551,
+   "failures": 0
+  },
+  "bash\u0000python \"C:/Users/Flex/AppData/Local/Temp/lens-local-audit.py\"": {
+   "count": 1,
+   "ms": 332,
+   "maxMs": 332,
+   "failures": 0
+  },
+  "bash\u0000python \"C:/Users/Flex/AppData/Local/Temp/lens-session-audit.py\"": {
+   "count": 1,
+   "ms": 4759,
+   "maxMs": 4759,
+   "failures": 1
+  },
+  "bash\u0000python -X utf8 \"C:/Users/Flex/AppData/Local/Temp/lens-session-audit.py\"": {
+   "count": 1,
+   "ms": 1267,
+   "maxMs": 1267,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"read.*widen|smart.*read|read.*expand|autoLint|lint.*enabled|lsp.enabled|contextInjection|autofix|post.*edit\" \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-lens/docs/settings.md\"; find \"C:/Users/": {
+   "count": 1,
+   "ms": 292,
+   "maxMs": 292,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"location|loadModels\\(|loadPlanningModel\\(\" \"C:/SOFT/git/DomainCheck/public/app.js\" \"C:/SOFT/git/DomainCheck/server.mjs\"; rg -n \"uacBefore\" \"./hub/web/app.ts\"; ls -d \"C:/Users/Flex/.pi-lens/proj": {
+   "count": 1,
+   "ms": 178,
+   "maxMs": 178,
+   "failures": 0
+  },
+  "bash\u0000python -X utf8 \"C:/Users/Flex/AppData/Local/Temp/lens-audit-detail.py\"": {
+   "count": 1,
+   "ms": 1336,
+   "maxMs": 1336,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"postEdit|post.edit|format.enabled|autofix.enabled|expandReads|lsp.enabled|on.demand\" \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-lens/docs/configuration.md\" \"C:/Users/Flex/.pi/agent/npm/node_m": {
+   "count": 1,
+   "ms": 176,
+   "maxMs": 176,
+   "failures": 0
+  },
+  "bash\u0000python -X utf8 \"C:/Users/Flex/AppData/Local/Temp/lens-audit-final.py\"": {
+   "count": 1,
+   "ms": 11940,
+   "maxMs": 11940,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"lsp_server_spawned.*(20608|30840)|lsp_server_spawned.*DomainCheck|lsp_server_spawned.*07:06|lsp_server_spawned.*07:07\" \"C:/Users/Flex/.pi-lens/latency.log\"; rg -n \"format.*enabled|autofix\" \"C:/": {
+   "count": 1,
+   "ms": 148,
+   "maxMs": 148,
+   "failures": 0
+  },
+  "bash\u0000rg -n -F \"Invalid knowledge schema or unknown citation\" \".\"; rg -n -F \"Compaction used current model\" \"./extensions\"": {
+   "count": 1,
+   "ms": 811,
+   "maxMs": 811,
+   "failures": 0
+  },
+  "bash\u0000ls -t \"C:/Users/Flex/.pi/agent/sessions/--C--SOFT-git-ce-workflow--\" | head -8; rg -n \"attempts|audit|compaction.*log\" \"./extensions/work-compaction-memory.ts\" \"./extensions/work-compaction.ts\"": {
+   "count": 1,
+   "ms": 4209,
+   "maxMs": 4209,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"attempts:|compacted.attempts|memoryAttempts|memoryModel|compactionMemory|\\.attempts\" \"./extensions/work-models.ts\"; rg -n \"2026-11-15T07:16.*(compaction|attempts)|Invalid knowledge schema\" \"C:/": {
+   "count": 1,
+   "ms": 140,
+   "maxMs": 140,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"work-lens-format|registerLensFormat|lensFormat\" \"./extensions\" \"./hub/src\"; rg -n \"env:|spawn\\(|PI_CODING_AGENT_DIR|piArgs\" \"./hub/src/rpc-client.ts\" \"./hub/src/hub.ts\"; rg -n \"idle|memory|NO_L": {
+   "count": 1,
+   "ms": 148,
+   "maxMs": 148,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"PI_LENS_LSP_IDLE_EVICT_MS|PI_LENS_TS_IDLE_EVICT_MS\" \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-lens\" -g \"*.js\" -g \"*.ts\" --max-count 5; rg -n \"hubEnv|readConfig|export.*start|export.*serve\" \"": {
+   "count": 1,
+   "ms": 215,
+   "maxMs": 215,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"writeJsonAtomic|with.*Lock|atomicWrite\" \"./extensions/work-settings.ts\" \"./extensions\" -g \"*file*\" -g \"*json*\" -g \"*lock*\"; rg --no-ignore -n \"getLspIdleEvictMsForRoot|getLspIdleEvictMs\\(\" \"C:/": {
+   "count": 1,
+   "ms": 164,
+   "maxMs": 164,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"export.*(Lock|Atomic|Json)|function.*(Lock|Atomic)\" \"./extensions\" -g \"*store*\" -g \"*fs*\" -g \"*state*\" -g \"*write*\"; rg -n \"writeJsonAtomic\" \"./hub/src/registry.ts\"; rg -n \"lens|format\" \"./READ": {
+   "count": 1,
+   "ms": 242,
+   "maxMs": 242,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"export.*(write.*Atomic|atomic.*|with.*Lock|mutate.*Json)|renameSync\\(\" \"./extensions\" -g \"*.ts\" --max-count 2 | head -40; rg --no-ignore -n \"function.*[Cc]onfig.*[Pp]ath|PI_LENS_CONFIG_PATH\" \"C": {
+   "count": 1,
+   "ms": 222,
+   "maxMs": 222,
+   "failures": 0
+  },
+  "bash\u0000rg --no-ignore -n \"PI_LENS_CONFIG_PATH\" \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-lens/dist\" -g \"*.js\" --max-count 1 | head -8; rg -n \"registerLensFormatCheck\" \"./extensions/work-models.ts\"; rg -n ": {
+   "count": 1,
+   "ms": 188,
+   "maxMs": 188,
+   "failures": 1
+  },
+  "bash\u0000node \"scripts/test-work-lens-format.mjs\" && node \"hub/scripts/test-hub.mjs\"": {
+   "count": 1,
+   "ms": 24661,
+   "maxMs": 24661,
+   "failures": 0
+  },
+  "bash\u0000ls \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-lens/dist\"; rg -n \"function.*effective|export\" \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-lens/dist/tools/effective-config.js\" | tail -8; git diff --s": {
+   "count": 1,
+   "ms": 190,
+   "maxMs": 190,
+   "failures": 0
+  },
+  "bash\u0000ls \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-lens/dist/mcp\"; git diff --check; rg --no-ignore -n \"effective_config\" \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-lens/dist/mcp/server.js\" --max-count": {
+   "count": 1,
+   "ms": 152,
+   "maxMs": 152,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/pi-lens-policy-probe.mjs\"": {
+   "count": 2,
+   "ms": 45237,
+   "maxMs": 45158,
+   "failures": 2
+  },
+  "bash\u0000rg -l \"startHub\\(\" \"./hub/scripts\"; rg -n \"PI_CODING_AGENT_DIR|homedir|HOME|USERPROFILE\" \"./hub/scripts/test-browser.mjs\" \"./hub/scripts/test-sessions.mjs\"; rg -n \"registerLensFormatCheck|lensFormatUn": {
+   "count": 1,
+   "ms": 148,
+   "maxMs": 148,
+   "failures": 1
   }
  },
  "steps": {
@@ -1336,13 +1383,14 @@
    "failures": 1
   },
   "(none)": {
-   "ms": 5665891,
+   "ms": 6830772,
    "testMs": 2710822,
-   "replies": 339,
+   "replies": 413,
    "models": {
-    "anthropic/claude-opus-5-5:high": 339
+    "anthropic/claude-opus-5-5:high": 339,
+    "openai-codex/gpt-6-astra:high": 74
    },
-   "failures": 16
+   "failures": 23
   }
  },
  "spans": [
@@ -1413,6 +1461,18 @@
   {
    "start": "2026-11-14T15:48:02.232Z",
    "ms": 7614
+  },
+  {
+   "start": "2026-11-15T07:03:56.757Z",
+   "ms": 375738
+  },
+  {
+   "start": "2026-11-15T07:17:31.321Z",
+   "ms": 53602
+  },
+  {
+   "start": "2026-11-15T07:21:09.412Z",
+   "ms": 922386
   }
  ],
  "hints": []

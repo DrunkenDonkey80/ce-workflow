@@ -1,10 +1,10 @@
 ---
 plan3: true
-status: blocked
+status: complete
 created: 2026-11-11
 source: catch-up
 catch-up: {"@earendil-works/pi-coding-agent":"1.5.2","pi-subagents":"0.88.0","pi-lens":"4.4.12","meta/astryx":"b8335ba861a8207a7b22bba1f0748d400d022a65","nexu-io/open-design":"614795896e09a2c1682b24cc1406529baf531bd7"}
-updated: 2026-11-11T21:19:56.709Z
+updated: 2026-11-14T20:17:19.183Z
 reviewed: 2026-11-11
 started: 2026-11-11T20:55:15.681Z
 ---
@@ -253,3 +253,4 @@ CU-01–CU-05 and CU-91 done; CU-90 blocked, not green. npm run verify:quiet ran
   - Finding 1, Native mode's cold threshold uses ce-workflow's trigger: accepted. coldCacheCompactMinutes (work-models.ts:2267) picks nativeCompactionTrigger only for native-200k; Pi's shouldCompact (compaction.js) fires at contextWindow - reserveTokens. D-05 now names each mode's trigger; CU-03 shares one helper with status and tests all four modes.
   - Finding 2, Astryx Selector and theme-registry changes not recorded: accepted. Diff lines 4821-4955 and 5120-5146 confirmed; the runtime-rejection rationale now names both and why they do not affect the pinned single-copy foundation.
 2026-11-11 CU-90 verification: replaced the baseline's stale prior-run verification summary with this run's explicit BLOCKED result, failure list and targeted-rerun evidence. No claim of a green full suite; post-metadata node scripts/test-work-plan3.mjs and JSON LSP check passed.
+- 2026-11-14: Force-finished by the user with unfinished steps: CU-90.

@@ -128,7 +128,7 @@ const child = spawn(
 		"-nt",
 		"-a",
 	],
-	{ cwd, stdio: ["pipe", "pipe", "pipe"], env: { ...process.env } },
+	{ cwd, stdio: ["pipe", "pipe", "pipe"], env: { ...process.env, PI_LENS_CONFIG_PATH: path.join(cwd, "lens.json") } },
 );
 
 const events = [];

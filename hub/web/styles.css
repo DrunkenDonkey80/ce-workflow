@@ -460,6 +460,10 @@ h2 { font-size: 15px; font-weight: 600; }
  background: linear-gradient(to right, color-mix(in srgb, var(--bar) 30%, var(--panel)) var(--fill), var(--panel) var(--fill)); }
 .bar:hover:not(:disabled) { border-color: var(--bar); background: linear-gradient(to right, color-mix(in srgb, var(--bar) 45%, var(--panel)) var(--fill), var(--hover) var(--fill)); }
 .bar[data-tone=success] { --bar: var(--success); } .bar[data-tone=warning] { --bar: var(--warning); } .bar[data-tone=error] { --bar: var(--error); } .bar[data-tone=dim] { --bar: var(--muted); }
+#context-button { position: relative; }
+/* The last compaction's size: a small label and a red dotted line where it sits on the bar. */
+.compact-size { font-size: 11px; color: var(--muted); }
+.compact-mark { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px dotted var(--error); pointer-events: none; }
 .bar-group { display: flex; gap: 6px; padding: 0; border: 0; background: none; min-width: 0; }
 .bar-group:hover:not(:disabled) { background: none; }
 .bar-group .bar { flex: 1; min-width: 0; }

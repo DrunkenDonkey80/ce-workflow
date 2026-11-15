@@ -27,6 +27,7 @@ async function browser(...args) {
 
 const root = fs.mkdtempSync(join(os.tmpdir(), "hub-shot-")), folder = join(root, "ce-workflow");
 process.env.PI_CODING_AGENT_DIR = root;
+process.env.PI_LENS_CONFIG_PATH = join(root, "lens.json");
 fs.mkdirSync(join(folder, "docs/plans"), { recursive: true });
 fs.writeFileSync(join(folder, "docs/plans/2026-10-25-sample-plan-12345678-plan3.md"), "---\nplan3: true\nstatus: active\ncreated: 2026-10-25\n---\n\n# Sample plan\n\n## Steps\n\n- [x] **S01** first\n- [ ] **S02** second\n");
 execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "init", "-q"], { cwd: folder, windowsHide: true });

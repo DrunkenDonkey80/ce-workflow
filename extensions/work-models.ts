@@ -12,7 +12,7 @@ import { publish } from "./hub-channel.ts";
 import { handleDesignLibraryCommand, handleHubCommand, intercomParkedSessions, projectCommandsTool, scheduleTool, sessionDialogTool, longSleepWait, LONG_WAIT_REASON, undeclaredBackground, BACKGROUND_REASON } from "./hub-command.ts";
 import { handleEnvCommand } from "./work-env.ts";
 import { registerSelfUpdate } from "./work-self-update.ts";
-import { registerLensFormatCheck } from "./work-lens-format.ts";
+import { registerLensDefaults } from "./work-lens-format.ts";
 import { createImageTools, imageModelCanDraw } from "./work-images.ts";
 import { toolsEnableTool } from "./tool-loader.ts";
 import { registerRemoteAskAnswers } from "./work-ask-remote.ts";
@@ -3598,7 +3598,7 @@ export default function workModelsExtension(pi) {
 	process.env.PI_ASK_USER_CONTEXT_EXPANDED ||= "true";
 	workExtensionPi = pi;
 	registerSelfUpdate(pi);
-	registerLensFormatCheck(pi);
+	registerLensDefaults(pi);
 	// Read once at load; the Settings toggle reloads the runtime (D10).
 
 	const visionBridge = createVisionBridge();
@@ -3849,9 +3849,18 @@ showResearchContext(ctx, false); // no "off" for the hub: a parked session keeps
  pendingInternalBackgroundCompletionPrompt = null;
  // Pi 1.2+ also fires this for sendMessage(triggerTurn) runs (messageType "custom"); only prompts are user work.
  pendingPromptBackedAgentStart = event.messageType !== "custom";
- const systemPrompt=String(event.systemPrompt ?? "");
- const exit=researchContext?.source==="user"?"The user turned research mode on; only they can turn it off (/research or Alt+R).":"Plan3 turned research mode on for planning. When the user asks for work outside planning (fixes, edits, commits), call research_exit first, then do it.";
- return {systemPrompt:researchContext?`${systemPrompt}\n\n${RESEARCH_INSTRUCTIONS}\n${exit}\nTemporary notebook: ${researchContext.notes}`:systemPrompt};
+ const sections = event.systemPromptOptions?.sections;
+ if (!researchContext) {
+	 if (sections && typeof sections === "object") delete sections.research;
+	 return;
+ }
+ const exit = researchContext.source === "user"
+	 ? "The user turned research mode on; only they can turn it off (/research or Alt+R)."
+	 : "Plan3 turned research mode on for planning. When the user asks for work outside planning (fixes, edits, commits), call research_exit first, then do it.";
+ const instructions = `${RESEARCH_INSTRUCTIONS}\n${exit}\nTemporary notebook: ${researchContext.notes}`;
+ // A whole-prompt override makes Pi fold later tool declarations into the cached head.
+ if (sections && typeof sections === "object") { sections.research = instructions; return; }
+ return { systemPrompt: `${String(event.systemPrompt ?? "")}\n\n${instructions}` };
 });
 
 	pi.on("agent_start", (_event,ctx)=>{

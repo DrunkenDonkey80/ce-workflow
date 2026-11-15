@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "hub-view-"));
 process.env.PI_CODING_AGENT_DIR = root;
+process.env.PI_LENS_CONFIG_PATH = path.join(root, "lens.json");
 process.env.FAKE_PI = "compacted";
 const { startHub } = await import("../src/hub.ts");
 const folder = path.join(root, "proj");

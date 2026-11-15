@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: draft
+status: complete
 created: 2026-11-10
-updated: 2026-11-10T19:32:56.464Z
+updated: 2026-11-14T20:17:29.415Z
 started: 2026-11-10T18:52:52.349Z
 ---
 
@@ -139,3 +139,4 @@ Research comparison and proposal are finished (S01–S05 done). Plan remains dra
 ## Amendments
 
 Append material changes and their reasons; preserve the original request and settled decisions.
+- 2026-11-14: Force-finished by the user.

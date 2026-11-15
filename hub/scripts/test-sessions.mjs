@@ -131,14 +131,15 @@ try {
 	// Parking checks the last real request (/wo compact early park), so idle warms do not postpone compaction.
 	const parkPrompts = [], prompt = host.prompt.bind(host);
 	host.prompt = async (id, text, ...rest) => { parkPrompts.push(text); return prompt(id, text, ...rest); };
-	const seen = [], track = (sid, e) => { if (sid === a.id) seen.push(e.type); };
-	host.on("event", track);
+	const seen = [], notices = [], track = (sid, e) => { if (sid === a.id) seen.push(e.type); }, noticed = (sid, text) => { if (sid === a.id) notices.push(text); };
+	host.on("event", track); host.on("notice", noticed);
 	const parking = host.autoPark(Date.now() + 61 * 60_000);
 	assert.deepEqual(await host.autoPark(Date.now() + 61 * 60_000), [], "a session compacting before its park is not parked twice");
 	assert.deepEqual(await parking, [a.id]);
 	assert.deepEqual(parkPrompts, ["/wo compact early park"], "auto-park must ignore idle warms, not force an ordinary microcompact");
 	host.prompt = prompt;
-	host.off("event", track);
+	host.off("event", track); host.off("notice", noticed);
+	assert.deepEqual(notices, ["Context compacted from ~180k to ~1k tokens."], "a compaction warns with its before/after size");
 	assert.deepEqual(seen.filter(type => type.startsWith("compaction")), ["compaction_start", "compaction_end"]);
 	host.idleParkMinutes = 0;
 

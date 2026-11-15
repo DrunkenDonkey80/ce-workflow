@@ -1,43 +1,63 @@
-// pi-lens reformats every file the agent writes (format.enabled defaults to on), which rewrites whole sources behind the
-// user's back. On a machine with pi-lens, ask once to turn it off. The answer is stored in pi-lens's own config as an
-// explicit true or false, so an unset key is the only state that asks.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+// Shared machine defaults for Hub and terminal Pi; keep semantic tools, not automatic source mutations.
+import { readFileSync, realpathSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { showListDialog } from "./ask-user/menu.ts";
+import { atomic, tryPlanLock } from "./plan3-files.ts";
 
-// shortcut: default config location only; pi-lens can relocate it (configuration.md "global-config-location"), add that if someone does.
-export const lensConfigFile = (home = os.homedir()) => path.join(home, ".pi-lens", "config.json");
-
-const read = (file: string) => { try { return JSON.parse(readFileSync(file, "utf8")); } catch { return null; } };
-
-/** True when pi-lens is in use here and nobody has decided on its auto-format yet. */
-export const lensFormatUndecided = (file = lensConfigFile()) => {
-	if (!existsSync(path.dirname(file))) return false;
-	const config = existsSync(file) ? read(file) : {};
-	return !!config && typeof config === "object" && typeof config.format?.enabled !== "boolean";
-};
-
-export function setLensFormat(enabled: boolean, file = lensConfigFile()) {
-	const config = (existsSync(file) ? read(file) : null) ?? {};
-	config.format = { ...config.format, enabled };
-	mkdirSync(path.dirname(file), { recursive: true });
-	writeFileSync(file, `${JSON.stringify(config, null, 2)}\n`);
+function present(file: string) {
+	try { return statSync(file).isFile(); }
+	catch (error) { if (error.code === "ENOENT") return false; throw error; }
 }
 
-export function registerLensFormatCheck(pi, file = lensConfigFile(), dialog = showListDialog) {
-	let asked = false;
-	pi.on("session_start", (_event, ctx) => {
-		if (asked || !ctx?.hasUI || !lensFormatUndecided(file)) return;
-		asked = true;
-		// Not awaited: the dialog must not hold up session start.
-		void dialog(ctx, {
-			title: "Turn off pi-lens auto-format?", purpose: "pi-lens reformats every file the agent writes, so unrelated lines change in your diffs. Lint and diagnostics keep running.",
-			compact: true, filter: false, cursorKey: "lens-format",
-			items: [{ value: "off", label: "Turn it off (Recommended)" }, { value: "on", label: "Keep formatting" }],
-		})
-			// Escape decides nothing: the next session asks again.
-			.then(pick => { if (pick?.value && lensFormatUndecided(file)) setLensFormat(pick.value === "on", file); })
-			.catch(() => { asked = false; });
+export function lensConfigFile(home = os.homedir(), env = process.env) {
+	if (env.PI_LENS_CONFIG_PATH) return path.resolve(env.PI_LENS_CONFIG_PATH);
+	const canonical = path.join(home, ".pi-lens", "config.json");
+	if (present(canonical)) return canonical;
+	const agent = env.PI_CODING_AGENT_DIR?.trim();
+	const hosted = agent && path.resolve(agent, "extensions", "pi-lens.json");
+	return hosted && present(hosted) ? hosted : canonical;
+}
+
+function object(value: unknown, key: string): Record<string, unknown> {
+	if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`Invalid pi-lens ${key}; configuration left unchanged.`);
+	return value as Record<string, unknown>;
+}
+function section(config: Record<string, unknown>, key: string) {
+	const value = config[key] === undefined ? {} : object(config[key], key);
+	config[key] = value;
+	return value;
+}
+
+export function applyLensDefaults(file = lensConfigFile(), env = process.env) {
+	// pi-lens reads this when scheduling each idle timer, not when its module loads.
+	env.PI_LENS_LSP_IDLE_EVICT_MS = "120000";
+	try { file = realpathSync(file); } catch (error) { if (error.code !== "ENOENT") throw error; }
+	const release = tryPlanLock(file);
+	if (!release) throw new Error(`pi-lens configuration is being saved elsewhere: ${file}. Retry on the next start.`);
+	try {
+		let before: string | undefined;
+		try { before = readFileSync(file, "utf8"); } catch (error) { if (error.code !== "ENOENT") throw error; }
+		const config = object(before === undefined ? {} : JSON.parse(before), "config");
+		const original = JSON.stringify(config);
+		for (const key of ["format", "autofix", "tests"]) section(config, key).enabled = false;
+		section(config, "readGuard").expandReads = false;
+		section(section(config, "actionableWarnings"), "autoFix").enabled = false;
+		const lsp = section(config, "lsp");
+		const disabled = lsp.disabledServers === undefined ? [] : lsp.disabledServers;
+		if (!Array.isArray(disabled) || disabled.some(id => typeof id !== "string")) throw new Error("Invalid pi-lens lsp.disabledServers; configuration left unchanged.");
+		lsp.disabledServers = [...new Set([...disabled, "kotlin"])];
+		const changed = JSON.stringify(config) !== original;
+		if (changed) atomic(file, `${JSON.stringify(config, null, 2)}\n`);
+		return { file, changed };
+	} finally { release(); }
+}
+
+export function registerLensDefaults(pi, file?: string) {
+	let warning: string | undefined;
+	try { applyLensDefaults(file); }
+	catch (error) { warning = `pi-lens defaults not applied: ${error.message}`; }
+	if (warning) pi.on("session_start", (_event, ctx) => {
+		if (ctx.hasUI) ctx.ui.notify(warning, "warning");
+		else console.warn(warning);
 	});
 }

@@ -30,6 +30,8 @@ function piReleasePackages() {
 
 const temp = mkdtempSync(path.join(os.tmpdir(), "ce-native-smoke-"));
 const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+const previousLensConfig = process.env.PI_LENS_CONFIG_PATH;
+process.env.PI_LENS_CONFIG_PATH = path.join(temp, "lens.json");
 const previousAgentDirs = process.env.PI_SUBAGENT_EXTRA_AGENT_DIRS;
 process.env.PI_CODING_AGENT_DIR = path.join(temp, "agent");
 const npmCli =
@@ -114,8 +116,36 @@ try {
 	writeFileSync(path.join(compactCwd, ".pi/settings.json"), JSON.stringify({ workOrchestrator: { context: { mode: "native-200k" } } }));
 	const runtime = createExtensionRuntime();
 	runtime.getSettings = () => ({ compaction: { reserveTokens: 16_384, keepRecentTokens: 20_000 } });
+	runtime.getActiveTools = () => [];
 	const loaded = await loadExtensions([path.join(installed, "extensions/work-models.ts")], compactCwd, undefined, runtime);
 	assert.deepEqual(loaded.errors, [], "installed native SDK extension loads");
+	// A whole-prompt return folds tool patches AFTER context_with_system; test that native stage too.
+	const { ExtensionRunner } = await import(pathToFileURL(path.join(sdkRoot, "dist/core/extensions/runner.js")).href);
+	const { AgentSession } = await import(pathToFileURL(path.join(sdkRoot, "dist/core/agent-session.js")).href);
+	const cacheErrors = [];
+	const cacheCtx = { cwd: compactCwd, getContextUsage: () => ({ tokens: 0 }), ui: { notify() {} } };
+	const start = await ExtensionRunner.prototype.emitBeforeAgentStart.call({
+		extensions: loaded.extensions, createContext: () => cacheCtx, assertActive() {}, emitError: error => cacheErrors.push(error),
+	}, { prompt: "Continue working", messageType: "user" }, { cwd: compactCwd, tools: [], skills: [], contextFiles: [] });
+	assert.deepEqual(cacheErrors, []);
+	const cacheSession = { agent: { transformContext: async messages => {
+		for (const handler of loaded.extensions[0].handlers.get("context_with_system") ?? []) {
+			const result = await handler({ type: "context_with_system", messages }, cacheCtx);
+			if (result?.messages) messages = result.messages;
+		}
+		return messages;
+	} }, _runSystemPromptOptions: start.systemPromptOptions };
+	AgentSession.prototype._installAgentForcedPromptProjection.call(cacheSession);
+	const declaration = name => ({ name, description: name, parameters: { type: "object", properties: {} } });
+	const prior = [{ role: "system", content: "Stable instructions", toolsAdded: [declaration("read")], timestamp: 1 },
+		{ role: "user", content: "First request", timestamp: 2 }];
+	const patch = { role: "system", content: "", toolsAdded: [declaration("word_count")], timestamp: 3 };
+	const before = await cacheSession.agent.transformContext(structuredClone(prior));
+	const after = await cacheSession.agent.transformContext(structuredClone([...prior, patch,
+		{ role: "user", content: "Next request", timestamp: 4 }]));
+	assert.deepEqual(after.slice(0, before.length), before, "native final projection must preserve the prefix when a tool is activated");
+	assert.deepEqual(after[before.length], patch, "the added tool stays at its chronological position");
+	assert.equal(start.systemPromptOptions.forceSystemPrompt, undefined, "ordinary startup must not force a whole prompt");
 	const messages = [
 		{ role: "user", content: "Preserve the original request", timestamp: 1 },
 		{ role: "assistant", content: [{ type: "text", text: "Original evidence. ".repeat(30_000) }], timestamp: 2 },
@@ -241,6 +271,7 @@ try {
 	else process.env.PI_SUBAGENT_EXTRA_AGENT_DIRS = previousAgentDirs;
 	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
 	else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+	if (previousLensConfig === undefined) delete process.env.PI_LENS_CONFIG_PATH; else process.env.PI_LENS_CONFIG_PATH = previousLensConfig;
 	rmSync(temp, {
 		recursive: true,
 		force: true,

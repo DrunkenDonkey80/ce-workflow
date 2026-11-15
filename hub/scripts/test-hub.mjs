@@ -10,7 +10,7 @@ const folder = path.join(root, "proj");
 fs.mkdirSync(folder);
 const fake = fileURLToPath(new URL("./fake-pi.mjs", import.meta.url));
 // Temp home and app dirs: a spawned hub stages and restarts the installed desktop app at start, which must never be the user's.
-const env = { ...process.env, PI_CODING_AGENT_DIR: root, PI_HUB_PI_COMMAND: JSON.stringify([process.execPath, fake]), HOME: root, USERPROFILE: root, LOCALAPPDATA: root, APPDATA: root };
+const env = { ...process.env, PI_CODING_AGENT_DIR: root, PI_LENS_CONFIG_PATH: path.join(root, "lens.json"), PI_HUB_PI_COMMAND: JSON.stringify([process.execPath, fake]), HOME: root, USERPROFILE: root, LOCALAPPDATA: root, APPDATA: root };
 const cli = (...args) => {
 	try { return { code: 0, out: execFileSync(process.execPath, [fileURLToPath(new URL("../src/cli.ts", import.meta.url)), ...args], { env, encoding: "utf8", stdio: "pipe" }) }; }
 	catch (error) { return { code: error.status, out: error.stdout + error.stderr }; }
@@ -26,6 +26,10 @@ const api = async (route, body) => {
 try {
 	assert.match(cli("status").out, /Not running/);
 	assert.match(cli("start").out, /Started: pid \d+/);
+	const lens = JSON.parse(fs.readFileSync(env.PI_LENS_CONFIG_PATH, "utf8"));
+	assert.deepEqual(lens.lsp.disabledServers, ["kotlin"], "Hub startup installs machine defaults before sessions");
+	assert.equal(lens.autofix.enabled, false); assert.equal(lens.actionableWarnings.autoFix.enabled, false);
+	assert.equal(lens.readGuard.expandReads, false);
 	const port = JSON.parse(fs.readFileSync(path.join(data, "config.json"), "utf8")).port;
 	assert.match(cli("start").out, /Already running/, "one running hub only");
 

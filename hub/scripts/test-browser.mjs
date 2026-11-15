@@ -61,6 +61,7 @@ diagram.nodes.find(node => node.id === "backend").summary = "Manages upload writ
 // The project: a git folder named ce-workflow (the title is "<folder> - <session>"), two plans and the diagram on disk.
 const root = fs.mkdtempSync(join(os.tmpdir(), "hub-browser-"));
 process.env.PI_CODING_AGENT_DIR = root;
+process.env.PI_LENS_CONFIG_PATH = join(root, "lens.json");
 const folder = join(root, "ce-workflow"), write = (file, text) => { fs.mkdirSync(join(folder, file, ".."), { recursive: true }); fs.writeFileSync(join(folder, file), text); };
 const planFile = (id, title) => `docs/plans/2026-10-18-${title.toLowerCase().replace(/\W+/g, "-")}-${id}-plan3.md`;
 const writePlan = (id, title, total, done, updated) => write(planFile(id, title), `---\nplan3: true\nstatus: active\ncreated: 2026-10-18\nupdated: ${updated}\n---\n\n# ${title}\n\n## Steps\n\n${Array.from({ length: total }, (_, i) => `- [${i < done ? "x" : " "}] **S0${i + 1}** step ${i + 1}`).join("\n")}\n`);
@@ -1107,6 +1108,11 @@ try {
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open"); assert.deepEqual(answers.at(-1).values, ["one", "two"]);
  // R13/D19 status line: [model: effort] [context] [bias]; plan and usage as coloured progress bars; title folder - tab: plan.
  assert.deepEqual(await evaluate("['model-button', 'context-button', 'bias-button', 'plan-button'].map(id => document.getElementById(id).textContent)"), ["fake-1: Low", "Context: 84k/200k", "Default", sample.title + "2/5"]);
+ // The last compaction's size: a small label and a red dotted line at its place on the 200k bar.
+ const live = (await api("snapshot")).status; publish("status", { ...live, tokens: 84000, window: 200000, compacted: 50000 });
+ await browser("wait", "--fn", "document.querySelector('#context-button .compact-mark') !== null");
+ assert.deepEqual(await evaluate("[document.getElementById('context-button').textContent, document.querySelector('#context-button .compact-mark').style.left, getComputedStyle(document.querySelector('#context-button .compact-mark')).borderLeftStyle]"), ["Context: 84k/200k ↓50k", "25%", "dotted"]);
+ publish("status", live);
  assert.equal(await evaluate("document.getElementById('title').textContent"), "ce-workflow - 1", "desktop title: folder - session name; the plan is in its bar");
  // Usage: one bar per window (5h when there is one, then the headline 7d); a warning shows in the headline and colours it.
  const usageBars = "[...document.querySelectorAll('#usage-button .usage-bar')].map(b => b.textContent + '|' + b.dataset.tone + '|' + b.style.getPropertyValue('--fill'))";
