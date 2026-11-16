@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 1.0.3 — 2026-11-16
+
+### Changed
+- Hub and terminal compaction now try the configured model once and accept valid output even above the character target. No shortening retry or fallback model. Malformed, invalid or incomplete responses still preserve local memory, with cancellation and rejected-response diagnostics unchanged. Summaries may be larger than the target; end-to-end performance has not been benchmarked.
+
 ## 1.0.2 — 2026-11-16
 
 ### Changed

@@ -579,7 +579,7 @@ const later = [
 	{ role: "toolResult", toolName: "edit", toolCallId: "edit", content: "Changed after the last tests." },
 	...messages.slice(1),
 ];
-for (const invalid of ["invalid", "large", "citation"]) {
+for (const invalid of ["invalid", "citation"]) {
 	responseMode = invalid;
 	const failed = await compactMemory({ messages: later, previousSummary: hybrid.summary, registry, model: "test/summary" });
 	assert.equal(failed.mode, "fallback");
@@ -587,18 +587,18 @@ for (const invalid of ["invalid", "large", "citation"]) {
 	assert(failed.summary.includes(decodeMemory(hybrid.summary).tail));
 	assert(decodeMemory(failed.summary).records.some(r => r.tool === "edit"));
 	assert.deepEqual(failed.knowledge, [], "rejected output cannot create knowledge");
-	assert.equal(failed.usage.output, invalid === "large" ? 40 : 20, "rejected output and size repair both incur usage");
+	assert.equal(failed.usage.output, 20, "the rejected call still incurs usage");
 	assert(failed.summary.length <= 32000);
 }
-assert.equal(calls, 5, "size failure gets one repair before cleaned memory");
+assert.equal(calls, 3, "invalid output preserves local memory without another call");
 const switchedOff = await compactMemory({ messages: later, previousSummary: hybrid.summary, registry });
-assert.equal(calls, 5);
+assert.equal(calls, 3);
 assert.match(switchedOff.summary, /07:15 UTC/);
 const unavailable = await compactMemory({ messages, registry, model: "missing/model" });
 assert.equal(unavailable.mode, "fallback");
-assert.equal(calls, 5);
+assert.equal(calls, 3);
 await assert.rejects(compactMemory({ messages, registry, model: "test/summary", signal: AbortSignal.abort() }), /cancelled/);
-assert.equal(calls, 5);
+assert.equal(calls, 3);
 const longRequest = "Keep all original requirements. ".repeat(2200);
 const protectedMemory = await compactMemory({ messages: [{ role: "user", content: longRequest }], registry });
 assert.equal(decodeMemory(protectedMemory.summary).records[0].text, longRequest, "32k rolling target must not reject or clip protected user history");
@@ -647,8 +647,8 @@ const records = gather(later);
 const frame = { coreRecords: [], core: coreText([]) };
 const preserved = fallbackMemory(frame, decodeMemory(hybrid.summary).tail, records, 32000);
 assert(preserved.memory.includes(JSON.stringify(records.find(r => r.tool === "edit"))));
-// Each model gets one full attempt, plus one size repair total; retain all rejected usage.
-async function retryCase(primary, secondary = "valid", options = {}) {
+// Only the selected model is tried, even when a different current model is supplied.
+async function attemptCase(primary, options = {}) {
 	const attempted = [];
 	const result = await compactMemory({
 		messages, previousSummary: hybrid.summary, model: "test/summary", currentModel: "test/current", ...options,
@@ -656,7 +656,7 @@ async function retryCase(primary, secondary = "valid", options = {}) {
 			find: (provider, id) => primary === "unavailable" && id === "summary" ? undefined : { provider, id },
 			streamSimple(selected, context, request) {
 				attempted.push(selected.id);
-				const outcome = selected.id === "summary" ? primary : secondary;
+				const outcome = primary;
 				if (outcome === "throw") throw new Error("Provider unavailable");
 				responseMode = outcome;
 				const response = registry.streamSimple(selected, context, request);
@@ -672,44 +672,33 @@ async function retryCase(primary, secondary = "valid", options = {}) {
 	});
 	return { result, attempted };
 }
-for (const reason of ["invalid", "large", "citation", "throw", "unavailable", "aborted"]) {
-	const { result, attempted } = await retryCase(reason);
-	assert.equal(result.mode, "hybrid", reason);
-	assert.equal(result.model, "test/current");
-	assert.deepEqual(attempted, reason === "unavailable" ? ["current"] : reason === "large" ? ["summary", "summary", "current"] : ["summary", "current"]);
-	assert.equal(result.attempts.length, reason === "large" ? 3 : 2);
+for (const reason of ["invalid", "citation", "throw", "unavailable", "aborted"]) {
+	const { result, attempted } = await attemptCase(reason);
+	assert.equal(result.mode, "fallback", reason);
+	assert.deepEqual(attempted, reason === "unavailable" ? [] : ["summary"]);
+	assert.equal(result.attempts.length, 1);
 	assert(result.attempts[0].error);
-	const responses = ["throw", "unavailable"].includes(reason) ? 1 : reason === "large" ? 3 : 2;
-	assert.equal(result.usage.output, 20 * responses);
-	assert.equal(result.usage.cost.total, 0.3 * responses);
-	assert.equal(result.usage.cost.totalFromProvider, true, "a Pi 1.5 boolean stays a boolean when summed");
+	assert(result.summary.includes(decodeMemory(hybrid.summary).tail));
 	const rejected = result.attempts[0].rejectedResponse;
-	if (responses === 1) assert.equal(rejected, undefined, "no response is invented for a request that never returned");
-	else {
+	if (["throw", "unavailable"].includes(reason)) {
+		assert.equal(result.usage, undefined);
+		assert.equal(rejected, undefined, "no response is invented for a request that never returned");
+	} else {
+		assert.equal(result.usage.output, 20);
+		assert.equal(result.usage.cost.total, 0.3);
+		assert.equal(result.usage.cost.totalFromProvider, true);
 		assert(rejected, `rejected ${reason} response must be retained`);
-		assert.equal(rejected.maxChars, 16000);
+		assert.equal(rejected.maxChars, 8000);
 		assert.equal(rejected.responseChars, rejected.text.length);
 		assert.equal(rejected.stopReason, reason === "aborted" ? "aborted" : "stop");
 		if (reason !== "aborted") assert(!result.summary.includes(rejected.text), "rejected text stays out of continuation memory");
 		if (reason === "invalid") assert.equal(rejected.text, "not JSON");
-		if (reason === "large") {
-			assert.equal(JSON.parse(rejected.text).checkpoint.length, 17000, "oversized responses are not clipped");
-			assert.match(result.attempts[0].error, new RegExp(`${JSON.stringify(JSON.parse(rejected.text)).length} > 16000 characters`));
-		}
 	}
-	assert.equal(result.attempts.at(-1).rejectedResponse, undefined);
 }
 // Combined cost is provider-billed only when every part is; money still adds up.
 assert.deepEqual(addCost(addCost(undefined, { total: 1, totalFromProvider: true }), { total: 2, totalFromProvider: true }), { total: 3, totalFromProvider: true });
 assert.deepEqual(addCost(addCost(undefined, { total: 1, totalFromProvider: true }), { total: 2 }), { total: 3, totalFromProvider: false });
 assert.deepEqual(addCost(addCost(undefined, { input: 1, total: 1 }), { input: 2, total: 2 }), { input: 3, total: 3, totalFromProvider: false });
-const doubleFailure = await retryCase("invalid", "invalid");
-assert.equal(doubleFailure.result.mode, "fallback");
-assert.deepEqual(doubleFailure.attempted, ["summary", "current"]);
-assert(doubleFailure.result.summary.includes(decodeMemory(hybrid.summary).tail));
-assert.equal(doubleFailure.result.usage.output, 40);
-assert.deepEqual(doubleFailure.result.knowledge, []);
-assert.deepEqual(doubleFailure.result.attempts.map(a => a.rejectedResponse?.text), ["not JSON", "not JSON"], "both rejected responses survive preserved-memory fallback");
 // Retain the whole visible response, including malformed JSON and its suffix, but not credentials or hidden reasoning.
 const diagnosticText = `not JSON: token=diagnostic-secret-value\n${"д".repeat(410_000)}\nEND-OF-REJECTED-RESPONSE`;
 const diagnosticResult = await compactMemory({ messages, model: "test/summary", registry: {
@@ -723,13 +712,13 @@ assert.equal(diagnostic.responseChars, diagnosticText.length, "length is measure
 assert.equal(diagnostic.stopReason, "length");
 assert.doesNotMatch(JSON.stringify(diagnosticResult), /diagnostic-secret-value|private-reasoning/);
 assert.doesNotMatch(diagnosticResult.summary, /END-OF-REJECTED-RESPONSE/);
-const sameModel = await retryCase("invalid", "valid", { currentModel: "test/summary" });
+const sameModel = await attemptCase("invalid", { currentModel: "test/summary" });
 assert.deepEqual(sameModel.attempted, ["summary"]);
 assert.equal(sameModel.result.mode, "fallback");
-assert.deepEqual((await retryCase("valid")).attempted, ["summary"]);
+assert.deepEqual((await attemptCase("valid")).attempted, ["summary"]);
 const controller = new AbortController();
 const beforeCancel = calls;
-await assert.rejects(retryCase("cancel", "valid", { controller, signal: controller.signal }), /cancelled/);
+await assert.rejects(attemptCase("cancel", { controller, signal: controller.signal }), /cancelled/);
 assert.equal(calls, beforeCancel + 1, "user cancellation must not retry on the current model");
 // Subagent/intercom idle-wake prompts are not user requests; real requests survive.
 const wakeRequests = gather([
@@ -775,11 +764,11 @@ assert.deepEqual(decodeMemory(`${header}{broken\n{"source":"s","kind":"user-requ
 	// One invented citation among many drops that fact only; mostly invented ones still reject the answer (the "citation" case above).
 	const { validateMemory } = await import("../extensions/work-compaction-memory.ts");
 	const facts = ["a", "b", "c", "d"].map(source => ({ claim: source, status: "observed", sources: [source] }));
-	assert.deepEqual(validateMemory(JSON.stringify({ checkpoint: "x", knowledge: [...facts, { claim: "e", status: "observed", sources: ["a", "a:70"] }] }), new Set("abcd"), 9999).knowledge, facts);
-	assert.throws(() => validateMemory(JSON.stringify({ checkpoint: "x", knowledge: [facts[0], { ...facts[1], sources: ["z"] }] }), new Set("a"), 9999), /unknown citation/);
+	assert.deepEqual(validateMemory(JSON.stringify({ checkpoint: "x", knowledge: [...facts, { claim: "e", status: "observed", sources: ["a", "a:70"] }] }), new Set("abcd")).knowledge, facts);
+	assert.throws(() => validateMemory(JSON.stringify({ checkpoint: "x", knowledge: [facts[0], { ...facts[1], sources: ["z"] }] }), new Set("a")), /unknown citation/);
 	// A stray `}]` or fence after the object (seen live) keeps the answer; no object at all still fails.
-	assert.equal(validateMemory("```json\n{\"checkpoint\":\"x\",\"knowledge\":[]}] }]}\n```", new Set(), 9999).tail, '{"checkpoint":"x","knowledge":[]}');
-	assert.throws(() => validateMemory("not JSON", new Set(), 9999), /Invalid memory JSON/);
+	assert.equal(validateMemory("```json\n{\"checkpoint\":\"x\",\"knowledge\":[]}] }]}\n```", new Set()).tail, '{"checkpoint":"x","knowledge":[]}');
+	assert.throws(() => validateMemory("not JSON", new Set()), /Invalid memory JSON/);
 	assert.deepEqual(seen.aging.map(r => r.text), requests.slice(0, 5).map(m => m.content), "the 5 oldest go to the model as aging");
 	assert(!seen.delta.some(r => seen.aging.some(a => a.source === r.source)), "aging is not sent twice");
 	assert.match(seen.task, /"aging" holds older user requests/);
@@ -799,6 +788,7 @@ assert.deepEqual(decodeMemory(`${header}{broken\n{"source":"s","kind":"user-requ
 	// The checkpoint gets real room even when 20 long requests fill the target (it used to get about 1k and failed).
 	reply = "valid";
 	await compactMemory({ messages: Array.from({ length: 20 }, () => ({ role: "user", content: "w".repeat(3000) })), registry: model, model: "test/summary", limit: 32000 });
-	assert.match(seen.task, /Target 8000 characters; hard maximum 8000/);
+	assert.match(seen.task, /Target 8000 characters including JSON/);
+	assert.doesNotMatch(seen.task, /hard maximum/);
 }
-process.stdout.write("ok - work compaction policy, selected/current/cleaned fallback, bounded attempts, usage, cancellation, bounded protected history\n");
+process.stdout.write("ok - work compaction policy, one selected-model call, preserved-memory fallback, usage, cancellation, bounded protected history\n");

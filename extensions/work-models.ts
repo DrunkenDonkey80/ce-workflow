@@ -1348,14 +1348,10 @@ async function compactSessionMemory(ctx, current, state, preparation, currentMes
 		messages: [...asArray(preparation.messagesToSummarize), ...asArray(preparation.turnPrefixMessages)],
 		previousSummary: preparation.previousSummary ?? "", prefix, limit: max,
 		model: configured.model === NONE_MODEL ? null : configured.model === INHERIT_MODEL ? currentModelId(ctx) : configured.model,
-		currentModel: currentModelId(ctx),
 		thinking: configured.thinking, registry: ctx.modelRegistry, signal: signal ?? ctx.signal,
 		redact: text => redactSecrets(text, 400_000),
 	});
 	if (result.fallback) ctx.ui?.notify?.(`Compaction used preserved-memory fallback: ${result.fallback}`, "warning");
-	else if (result.attempts?.length > 1) ctx.ui?.notify?.(result.attempts.at(-1)?.repair
-		? `Compaction shortened its checkpoint with ${result.model}: ${result.attempts.find(a => a.error)?.error}`
-		: `Compaction used current model ${result.model}: ${result.attempts[0].error}`, "warning");
 	return result;
 }
 
