@@ -197,6 +197,8 @@ try {
 			const thumbs = path.join(root, "ce-workflow", "design-thumbs"), route = `designthumb?id=od:example&revision=${commit}`;
 			const first = await get(id, route); assert.equal(first.status, 200); assert.equal(first.body.toString("ascii", 1, 4), "PNG");
 			assert.equal(fs.readdirSync(thumbs).length, 1); assert.deepEqual((await get(id, route)).body, first.body, "the kept shot is served again");
+			write(".pi/designs/systems/example/SOURCE.json", JSON.stringify({ commit, files: [] })); assert.equal((await get(id, route)).status, 200);
+			assert.equal(fs.readdirSync(thumbs).length, 1, "SOURCE.json (the upstream commit) is not part of the shot key"); write(".pi/designs/systems/example/SOURCE.json", JSON.stringify({ commit }));
 			write(".pi/designs/systems/example/components.html", html + "<p>changed</p>"); assert.equal((await get(id, route)).status, 200);
 			assert.equal(fs.readdirSync(thumbs).length, 2, "a changed page gets a new shot"); write(".pi/designs/systems/example/components.html", html);
 			assert.equal((await get(id, `designthumb?id=od:example&revision=../x`)).status, 400);

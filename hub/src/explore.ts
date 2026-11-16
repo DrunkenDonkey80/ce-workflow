@@ -142,12 +142,17 @@ export async function referencePage(project: string, id: unknown, revision: unkn
  * on disk by the page's content, shared by every project, so only a changed page renders again. */
 const shooting = new Map<string, Promise<Buffer>>(), shotQueue: (() => void)[] = [];
 let shots = 0;
+const SHOT_DEADLINE = 60_000;
 // An OpenDesign theme is pictured as one fixed sample screen in its colors (its own color page is just swatches).
 const THEME_SAMPLE = readFile(new URL("./theme-sample.html", import.meta.url));
 export async function cardShot(project: string, id: unknown, revision: unknown) {
-	const { item, files, revision: content } = await catalogFiles(project, id, revision);
+	const { item, files } = await catalogFiles(project, id, revision);
 	const tokens = item.id.startsWith("od-colors:") ? files.get("tokens.css") : undefined;
-	const key = createHash("sha256").update(`${item.id}\0${item.page}\0${content}`).update(tokens ? await THEME_SAMPLE : "").digest("hex");
+	// Keyed by the rendered files only: SOURCE.json names the OpenDesign commit, which moves on every upstream push, so a
+	// project that fetched a newer index would otherwise re-render every unchanged card.
+	const hash = createHash("sha256").update(`${item.id}\0${item.page}\0`);
+	for (const name of [...files.keys()].sort()) if (name !== "SOURCE.json") hash.update(`${name}\0${files.get(name)!.length}\0`).update(files.get(name)!);
+	const key = hash.update(tokens ? await THEME_SAMPLE : "").digest("hex");
 	const file = join(agentDir(), "ce-workflow", "design-thumbs", `${key}.png`);
 	const kept = await readFile(file).catch(() => undefined);
 	if (kept) return kept;
@@ -182,7 +187,10 @@ async function shoot(project: string, id: unknown, revision: unknown, file: stri
 			sample = directory = await mkdtemp(join(tmpdir(), "pi-hub-theme-")); screen = "index.html";
 			await writeFile(join(sample, "index.html"), await THEME_SAMPLE); await writeFile(join(sample, "tokens.css"), tokens);
 		}
-		const shot = await renderDesign({ folder: directory, screen, width: 1280, height: 800, reducedMotion: true, maxEdge: 640 });
+		// A render that never returns (seen: a headless browser hung for hours) would hold its slot and stall the warm-up loop.
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const shot = await Promise.race([renderDesign({ folder: directory, screen, width: 1280, height: 800, reducedMotion: true, maxEdge: 640 }),
+			new Promise<never>((_, reject) => { timer = setTimeout(() => reject(fail(504, "The page took over a minute to picture.")), SHOT_DEADLINE); })]).finally(() => clearTimeout(timer));
 		if (!shot.png.length) throw fail(502, "The page gave no picture.");
 		await mkdir(dirname(file), { recursive: true });
 		const temp = `${file}.${randomBytes(4).toString("hex")}`;

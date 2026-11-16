@@ -2,6 +2,16 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 1.0.2 — 2026-11-16
+
+### Changed
+- Hub and terminal agents share result-first reporting guidance, with or without Plan3: enough detail to understand, trust or decide; no forced template; risks and verification gaps kept visible. Choices get up to five useful options and a recommendation. No new setting or claimed token savings.
+
+### Fixed
+- Hub: compactions now leave a Warning card in chat as soon as they start, including automatic compactions during a run. Completion stays visible even without token counts; cancelled and failed compactions are labelled too.
+![Compaction start and completion warnings](docs/changelog/1.0.2-compaction-warnings.png)
+- Hub: design previews reuse unchanged page images across upstream updates, and a stuck render no longer blocks the preview queue indefinitely.
+
 ## 1.0.1 — 2026-11-16
 
 ### Fixed
@@ -30,6 +40,10 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ![Context bar showing the last compaction size](docs/changelog/0.9.6-context.png)
 ![Context menu with Compact now](docs/changelog/0.9.6-context-menu.png)
 - Hub: every compaction leaves a warning in the chat with how much it shrank the context, e.g. "Context compacted from ~180k to ~50k tokens."
+
+### Fixed
+- Hub: design library cards no longer re-render in a new project just because OpenDesign published a newer version; only a card whose page actually changed gets a new picture.
+- Hub: the design library's background picture-making no longer stalls for good on one stuck page; a page that takes over a minute is skipped (its card offers Retry) and the rest keep coming without scrolling.
 ![Compaction warning with before and after sizes](docs/changelog/0.9.6-compaction-warning.png)
 
 ## 0.9.5 — 2026-11-14

@@ -1,23 +1,23 @@
 {
  "version": 1,
- "activeMs": 19979700,
- "runs": 19,
+ "activeMs": 20501669,
+ "runs": 22,
  "waitingMs": 127649,
- "toolWallMs": 13774906,
+ "toolWallMs": 13992731,
  "compactions": {
-  "count": 5,
-  "ms": 140794
+  "count": 6,
+  "ms": 190677
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
-   "replies": 767,
-   "thinkingMs": 2991111,
-   "actingMs": 1486914,
-   "input": 2078,
-   "output": 428887,
-   "cacheRead": 86341150,
-   "cacheWrite": 3522745,
-   "cost": 43.46800700000003,
+   "replies": 804,
+   "thinkingMs": 3183611,
+   "actingMs": 1530979,
+   "input": 2162,
+   "output": 447212,
+   "cacheRead": 89639276,
+   "cacheWrite": 3832843,
+   "cost": 46.04495820000004,
    "errors": 1
   }
  },
@@ -29,8 +29,8 @@
    "failures": 0
   },
   "bash": {
-   "count": 552,
-   "ms": 13163902,
+   "count": 581,
+   "ms": 13282605,
    "maxMs": 408496,
    "failures": 14
   },
@@ -41,8 +41,8 @@
    "failures": 0
   },
   "edit": {
-   "count": 111,
-   "ms": 1034,
+   "count": 116,
+   "ms": 1087,
    "maxMs": 54,
    "failures": 5
   },
@@ -75,18 +75,24 @@
    "ms": 28,
    "maxMs": 28,
    "failures": 0
+  },
+  "test_sensitivity": {
+   "count": 1,
+   "ms": 68507,
+   "maxMs": 68507,
+   "failures": 0
   }
  },
  "categories": {
   "shell": {
-   "count": 454,
-   "ms": 4611252,
+   "count": 482,
+   "ms": 4699589,
    "maxMs": 265320,
    "failures": 13
   },
   "test": {
-   "count": 91,
-   "ms": 8540995,
+   "count": 92,
+   "ms": 8571361,
    "maxMs": 408496,
    "failures": 1
   },
@@ -176,12 +182,6 @@
    "maxMs": 192423,
    "failures": 0
   },
-  "bash\u0000git diff -U0 hub/web/app.ts > \"$TEMP/a.patch\" && node -e \"const fs=require('fs');const p=process.env.TEMP+'/a.patch';const t=fs.readFileSync(p,'utf8');const parts=t.split(/(?=^@@ )/m);const keep=parts": {
-   "count": 1,
-   "ms": 199,
-   "maxMs": 199,
-   "failures": 0
-  },
   "bash\u0000git add hub/scripts/test-browser.mjs docs/plans/2026-11-12-visual-design-library-tabs-real-previews-image-search-f5d9dae1-plan3.md docs/plans/logs/f5d9dae1.md && git commit -qm \"V-02: per-session, per": {
    "count": 1,
    "ms": 222,
@@ -228,12 +228,6 @@
    "count": 1,
    "ms": 363,
    "maxMs": 363,
-   "failures": 0
-  },
-  "bash\u0000git add docs/plans/2026-11-12-visual-design-library-tabs-real-previews-image-search-f5d9dae1-plan3.md docs/plans/logs/f5d9dae1.md && git commit -qm \"V-04: lazy big previews on Designs library cards\" &": {
-   "count": 1,
-   "ms": 206,
-   "maxMs": 206,
    "failures": 0
   },
   "bash\u0000cd scripts && python - <<'EOF' p=\"test-work-design.mjs\"; s=open(p,encoding=\"utf-8\").read() old=''' hits.length = 0; assert.equal((await ask()).cached, true); assert.deepEqual(hits, [], \"a cache hit fo": {
@@ -284,12 +278,6 @@
    "maxMs": 19620,
    "failures": 0
   },
-  "bash\u0000git add docs/plans/2026-11-12-visual-design-library-tabs-real-previews-image-search-f5d9dae1-plan3.md docs/plans/logs/f5d9dae1.md && git commit -qm \"V-12: OpenDesign color pages as Themes cards\" && gi": {
-   "count": 1,
-   "ms": 206,
-   "maxMs": 206,
-   "failures": 0
-  },
   "bash\u0000node scripts/test-work-browser-fetch.mjs 2>&1 | tail -15": {
    "count": 1,
    "ms": 108669,
@@ -312,12 +300,6 @@
    "count": 1,
    "ms": 195421,
    "maxMs": 195421,
-   "failures": 0
-  },
-  "bash\u0000git diff --check -- extensions/browser-search.ts extensions/plan3.ts hub/src/api.ts hub/web/design-library.ts hub/web/styles.css hub/scripts/test-api.mjs hub/scripts/test-browser.mjs scripts/test-work": {
-   "count": 1,
-   "ms": 193,
-   "maxMs": 193,
    "failures": 0
   },
   "bash\u0000git add browser-fetch/extension/background.js browser-fetch/extension/manifest.json extensions/browser-search.ts extensions/plan3.ts hub/src/api.ts hub/web/design-library.ts hub/scripts/test-api.mjs h": {
@@ -561,9 +543,9 @@
    "failures": 0
   },
   "\u0000(other)": {
-   "count": 335,
-   "ms": 35008,
-   "maxMs": 192,
+   "count": 364,
+   "ms": 39477,
+   "maxMs": 221,
    "failures": 10
   },
   "bash\u0000node scripts/test-work-design.mjs 2>&1 | grep -v -i deprecation | tail -4 | cut -c1-300; node hub/scripts/test-api.mjs 2>&1 | grep -v -i deprecation | tail -6 | cut -c1-400": {
@@ -752,12 +734,6 @@
    "maxMs": 5422,
    "failures": 0
   },
-  "bash\u0000cd \".\"; node -e \"const c=require('./extensions/astryx-runtime/catalog.json'); console.log(c.lockDigest, Object.keys(c).join(','))\"; node -e \"const l=require('./extensions/astryx-runtime/runtime-lock.j": {
-   "count": 1,
-   "ms": 203,
-   "maxMs": 203,
-   "failures": 0
-  },
   "bash\u0000cd \".\"; grep -rn \"lockDigest\" extensions/design-catalog.ts hub/src/*.ts extensions/*.ts | grep -v \"^extensions/design-runtime.ts\" | cut -c1-220 | head -20; grep -rn \"93973bb8\" --include=*.ts --include": {
    "count": 1,
    "ms": 30220,
@@ -836,12 +812,6 @@
    "maxMs": 197957,
    "failures": 0
   },
-  "bash\u0000cd \".\"; git diff -U0 docs/upstream/astryx.md | grep \"^@@\" | cut -c1-80; git diff -U0 CHANGELOG.md | grep \"^@@\" | cut -c1-60; git status --short scripts hub/scripts extensions | cut -c1-90 | grep -v \"p": {
-   "count": 1,
-   "ms": 195,
-   "maxMs": 195,
-   "failures": 0
-  },
   "bash\u0000cd \".\"; git add extensions/astryx-runtime extensions/design-catalog.ts hub/scripts/changelog-shot.mjs hub/scripts/test-api.mjs hub/scripts/test-browser.mjs scripts/astryx-component-shots.mjs scripts/t": {
    "count": 1,
    "ms": 483,
@@ -888,12 +858,6 @@
    "count": 1,
    "ms": 903,
    "maxMs": 903,
-   "failures": 0
-  },
-  "bash\u0000agent-browser session list 2>&1 | head -12": {
-   "count": 1,
-   "ms": 221,
-   "maxMs": 221,
    "failures": 0
   },
   "bash\u0000cd \".\"; for i in 1 2 3; do node hub/scripts/test-browser.mjs > \"C:/Users/Flex/AppData/Local/Temp/tb.log\" 2>&1; c=$?; echo \"browser $i exit $c\"; [ $c = 0 ] && break; node -e \"const t=require('fs').read": {
@@ -1142,18 +1106,6 @@
    "maxMs": 1291,
    "failures": 0
   },
-  "bash\u0000cd \".\"; git show HEAD:hub/web/styles.css | od -c | grep -m2 \"\\\\\\\\r\"; od -c hub/web/styles.css | grep -m2 \"\\\\\\\\r\"; git show HEAD:hub/web/styles.css | wc -l; wc -l hub/web/styles.css": {
-   "count": 1,
-   "ms": 217,
-   "maxMs": 217,
-   "failures": 0
-  },
-  "bash\u0000cd \".\"; git show HEAD:hub/web/styles.css > \"$TEMP/head.css\"; node -e \"const fs=require('fs');for(const f of process.argv.slice(1)){const s=fs.readFileSync(f,'latin1');console.log(f,(s.match(/\\r/g)||[]": {
-   "count": 1,
-   "ms": 216,
-   "maxMs": 216,
-   "failures": 0
-  },
   "bash\u0000cd \".\"; node -e \"const fs=require('fs'),f='hub/web/styles.css';fs.writeFileSync(f,fs.readFileSync(f,'utf8').replace(/\\r\\n/g,'\\n'))\"; git diff --stat; git diff --check && git add extensions/design-cata": {
    "count": 1,
    "ms": 384,
@@ -1214,12 +1166,6 @@
    "maxMs": 1315,
    "failures": 0
   },
-  "bash\u0000cd \".\"; git grep -n \"^<<<<<<< \\|^>>>>>>> \" -- . \":!*.md\" | head -3; echo \"markers checked\"; git diff --check HEAD~3 HEAD && echo \"diff-check ok\"": {
-   "count": 1,
-   "ms": 216,
-   "maxMs": 216,
-   "failures": 0
-  },
   "bash\u0000cd \".\"; git status --short; git diff --stat | tail -15; git diff --stat origin/master HEAD | tail -3; git diff CHANGELOG.md | grep \"^[+-]\" | cut -c1-200; grep -n \"\\\"version\\\"\" package.json": {
    "count": 1,
    "ms": 305,
@@ -1248,12 +1194,6 @@
    "count": 1,
    "ms": 3228,
    "maxMs": 3228,
-   "failures": 0
-  },
-  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist\"; grep -rn \"estimatedTokensAfter\" --include=*.d.ts . | head; grep -rn \"interface CompactionEntry\" -": {
-   "count": 1,
-   "ms": 216,
-   "maxMs": 216,
    "failures": 0
   },
   "bash\u0000cd \".\"; node -e \" const fs=require('fs'); const ed=(f,a,b)=>{let s=fs.readFileSync(f,'utf8');if(!s.includes(a))throw f+': '+a.slice(0,40);fs.writeFileSync(f,s.replace(a,b));}; ed('hub/src/api.ts','win": {
@@ -1292,10 +1232,76 @@
    "maxMs": 228653,
    "failures": 0
   },
-  "bash\u0000cd \".\" && git diff CHANGELOG.md": {
+  "bash\u0000cd \".\" && rg -n \"design-thumbs\" --glob \"!docs/**\" | head; ls \"$HOME/.pi/agent/ce-workflow/design-thumbs\" 2>&1 | head -5; ls \"$HOME/.pi/agent/ce-workflow/design-thumbs\" 2>/dev/null | wc -l": {
    "count": 1,
-   "ms": 75,
-   "maxMs": 75,
+   "ms": 295,
+   "maxMs": 295,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"300,420p\" extensions/design.ts | rg -n \"SOURCE.json|fetchedAt|at:|Date|writeFile|commit\"": {
+   "count": 1,
+   "ms": 557,
+   "maxMs": 557,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git\" && for f in */.pi/designs/systems/index.json; do echo \"$f $(node -e \"const j=require('./$f');console.log(j.commit.slice(0,7),new Date(j.fetched).toISOString())\")\"; done": {
+   "count": 1,
+   "ms": 569,
+   "maxMs": 569,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && time node hub/scripts/test-api.mjs 2>&1 | rg -v \"timer .* ended\" | tail -4": {
+   "count": 1,
+   "ms": 30366,
+   "maxMs": 30366,
+   "failures": 0
+  },
+  "bash\u0000cd \"$HOME/.pi/agent\" && rg -il \"dealfinder\" --max-depth 3 -g \"*.json\" . 2>/dev/null | head; rg -io \"\\\"[^\\\"]*dealfinder[^\\\"]*\\\"\" -g \"*.json\" --max-depth 3 . 2>/dev/null | sort -u | head": {
+   "count": 1,
+   "ms": 644,
+   "maxMs": 644,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/DomainCheck/.pi/designs/systems\" && ls | wc -l; ls -la --time-style=+%H:%M | head -5; ls -lt --time-style=+%m-%d_%H:%M | tail -3; date; ls -lt --time-style=+%m-%d_%H:%M \"$HOME/.pi/agen": {
+   "count": 1,
+   "ms": 3618,
+   "maxMs": 3618,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git\" && rg -il \"dealfinder\" --glob \"*/.pi/designs/sessions.json\" --hidden . 2>/dev/null; rg -il \"deal\" -g \"sessions.json\" --hidden -g \"!node_modules\" --max-depth 4 . 2>/dev/null | head; ls": {
+   "count": 1,
+   "ms": 1952,
+   "maxMs": 1952,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat > \"$TEMP/chk.mjs\" <<'EOF' import { createHash } from \"node:crypto\"; import fs from \"node:fs\"; import path from \"node:path\"; import os from \"node:os\"; const { designCatalog, catalogFiles ": {
+   "count": 1,
+   "ms": 42161,
+   "maxMs": 42161,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat > \"$TEMP/r.mjs\" <<'EOF' import fs from \"node:fs\"; import os from \"node:os\"; import path from \"node:path\"; const { renderDesign } = await import(\"file:///./extensions/design-render.ts\"); ": {
+   "count": 1,
+   "ms": 4429,
+   "maxMs": 4429,
+   "failures": 0
+  },
+  "bash\u0000ls -ld --time-style=+%m-%d_%H:%M \"$TEMP\"/design-render-* \"$TEMP\"/pi-hub-theme-* 2>/dev/null | tail -5; powershell -NoProfile -Command \"Get-CimInstance Win32_Process | ? { \\$_.Name -match 'agent-browse": {
+   "count": 1,
+   "ms": 578,
+   "maxMs": 578,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/^export const SHOT_DEADLINE = 60_000;/const SHOT_DEADLINE = 60_000;/\" hub/src/explore.ts && rg -n \"SHOT_DEADLINE\" hub/src/explore.ts && node hub/scripts/test-api.mjs 2>&1 | rg -v \"": {
+   "count": 1,
+   "ms": 31259,
+   "maxMs": 31259,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n -i \"dark|color-scheme|tweaks\" extensions/design-guide.md extensions/design-build.ts extensions/design-render.ts hub/web/design-view.ts | head -30; rg -n \"tweaks\" extensions/design.ts |": {
+   "count": 1,
+   "ms": 169,
+   "maxMs": 169,
    "failures": 0
   }
  },
@@ -1404,11 +1410,11 @@
    "failures": 1
   },
   "(none)": {
-   "ms": 8107648,
-   "testMs": 5066258,
-   "replies": 338,
+   "ms": 8531476,
+   "testMs": 5096624,
+   "replies": 375,
    "models": {
-    "anthropic/claude-opus-5-5:high": 338
+    "anthropic/claude-opus-5-5:high": 375
    },
    "failures": 14
   }
@@ -1489,6 +1495,18 @@
   {
    "start": "2026-11-14T20:25:57.633Z",
    "ms": 769635
+  },
+  {
+   "start": "2026-11-16T09:24:55.775Z",
+   "ms": 180556
+  },
+  {
+   "start": "2026-11-16T10:57:55.369Z",
+   "ms": 268875
+  },
+  {
+   "start": "2026-11-16T12:20:59.041Z",
+   "ms": 22655
   }
  ],
  "hints": [

@@ -3,7 +3,8 @@
 // self-verify.ts stubbed and tool-loader.ts from HEAD (the old one-line catalog), everything else identical.
 // Each run: a fresh git fixture in temp, one `pi -p` prompt, then scoring from its session file.
 // Usage: node scripts/benchmark-self-verify-live.mjs [--model ID] [--thinking L] [--reps N] [--arms on,off]
-//          [--scenarios web,cli,explain] [--parallel N] [--output DIR]
+//          [--scenarios web,cli,explain] [--parallel N] [--output DIR] [--append FILE]
+// --append FILE adds FILE to the system prompt of every arm (prompt A/B: run once without, once with, then compare).
 // Compare: node scripts/compare-benchmark-runs.mjs <out>/off/results.json <out>/on/results.json
 import { execFileSync, spawn } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -22,6 +23,7 @@ const reps = Number(value("--reps", "3"));
 const arms = value("--arms", "off,on").split(",");
 const scenarioNames = value("--scenarios", "web,cli,explain").split(",");
 const parallel = Number(value("--parallel", "4"));
+const append = value("--append", undefined);
 const out = path.resolve(value("--output", path.join(repo, ".pi", "self-verify-bench", new Date().toISOString().replace(/[:.]/g, "-"))));
 const launcher = path.join(os.homedir(), ".pi", "agent", "bin", "pi-launcher.js");
 const piEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("PI_HUB"))); // dialogs never reach the user's hub
@@ -118,8 +120,8 @@ async function one(arm, extDir, name, repetition) {
 	const started = Date.now();
 	const { code, timedOut } = await new Promise((resolve) => {
 		const child = spawn(process.execPath, [launcher, "-p", "--mode", "json", "--model", model, "--thinking", thinking, "--no-extensions", ...extArgs,
-			"--session-dir", sessions, scenario.prompt],
-		{ cwd: dir, env: { ...piEnv, AGENT_BROWSER_SESSION: `sv-${id}` }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+			"--session-dir", sessions, ...(append ? ["--append-system-prompt", path.resolve(append)] : []), scenario.prompt],
+		{ cwd: dir, env: { ...piEnv, AGENT_BROWSER_SESSION: `sv-${process.pid}-${id}` }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
 		let timedOut = false;
 		const timer = setTimeout(() => { timedOut = true; child.kill(); }, 15 * 60_000);
 		const log = [];
@@ -128,12 +130,13 @@ async function one(arm, extDir, name, repetition) {
 		child.on("exit", (code) => { clearTimeout(timer); writeFileSync(path.join(art, "pi.log"), Buffer.concat(log)); resolve({ code, timedOut }); });
 	});
 	const elapsedMs = Date.now() - started;
-	try { execFileSync("agent-browser", ["--session", `sv-${id}`, "close"], { stdio: "ignore", timeout: 20_000 }); } catch {}
+	try { execFileSync("agent-browser", ["--session", `sv-${process.pid}-${id}`, "close"], { stdio: "ignore", timeout: 20_000 }); } catch {}
 	const messages = sessionEntries(sessions).filter((e) => e.type === "message").map((e) => e.message);
 	const calls = messages.filter((m) => m.role === "assistant").flatMap((m) => (m.content ?? []).filter((b) => b.type === "toolCall"))
 		.map((b) => ({ name: b.name, args: JSON.stringify(b.arguments ?? {}) }));
 	const nudged = messages.filter((m) => m.role === "user" && JSON.stringify(m.content).includes("Self-verify check")).length;
 	const firstAnswer = nudged ? messages.slice(0, messages.findIndex((m) => m.role === "user" && JSON.stringify(m.content).includes("Self-verify check"))) : messages;
+	const finalText = messages.filter((m) => m.role === "assistant").map((m) => (m.content ?? []).filter((b) => b.type === "text").map((b) => b.text).join("")).filter(Boolean).at(-1) ?? "";
 	const metrics = sessionMetrics(sessions);
 	const failed = timedOut ? "timeout" : code !== 0 ? `exit ${code}` : messages.find((m) => m.role === "assistant" && m.stopReason === "error")?.errorMessage?.slice(0, 200);
 	let pass;
@@ -142,6 +145,7 @@ async function one(arm, extDir, name, repetition) {
 		scenario: name, repetition, arm, model, elapsedMs, completed: !failed, ...(failed ? { error: failed } : {}),
 		usage: { totalTokens: metrics.totalTokens, costUsd: metrics.cost }, turns: metrics.turns, toolCalls: metrics.toolCalls,
 		pass, verified: scenario.verified(calls), handoffBeforeNudge: handsOff(firstAnswer), handoffFinal: handsOff(messages), nudged,
+		finalWords: finalText.split(/\s+/).filter(Boolean).length, finalText,
 		enabled: calls.filter((c) => c.name === "tools_enable").map((c) => c.args), dir,
 	};
 	writeFileSync(path.join(art, "result.json"), JSON.stringify(result, null, 2));

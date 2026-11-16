@@ -87,12 +87,19 @@ export class SessionHost extends EventEmitter {
 				if (!intercom) live.intercomRun = false; else live.intercomRun ??= true;
 			} // follows a session switch before the run streams far
 			else if (event.type === "agent_settled") { live.running = false; live.settles++; void this.remember(live); } // a run (or Plan3) may switch models
-			else if (event.type === "compaction_start") live.compacting = true;
+			else if (event.type === "compaction_start") {
+				live.compacting = true;
+				this.emit("notice", live.id, "Compacting context…");
+			}
 			else if (event.type === "compaction_end") {
 				live.compacting = false; live.compactedTokens = event.result?.estimatedTokensAfter;
 				// A warning in the chat timeline, so a compaction that kept too much is easy to spot.
 				const k = (n: number) => Math.round(n / 1000) + "k", { tokensBefore: before, estimatedTokensAfter: after } = event.result ?? {};
-				if (typeof before === "number" && typeof after === "number") this.emit("notice", live.id, `Context compacted from ~${k(before)} to ~${k(after)} tokens.`);
+				let text = "Context compaction finished.";
+				if (event.errorMessage) text = "Context compaction failed.";
+				else if (event.aborted) text = "Context compaction cancelled.";
+				else if (typeof before === "number" && typeof after === "number") text = `Context compacted from ~${k(before)} to ~${k(after)} tokens.`;
+				this.emit("notice", live.id, text);
 			}
 			this.emit("event", record.id, event);
 		});

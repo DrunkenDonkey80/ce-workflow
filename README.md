@@ -32,6 +32,10 @@ Hub startup and CE terminal-extension startup apply the same lean pi-lens defaul
 
 Both launch paths set `PI_LENS_LSP_IDLE_EVICT_MS=120000` for their process and children. Eligible servers, including TypeScript, shut down after two idle minutes and restart on demand; busy servers are not killed. This is not an active-memory cap or a measured overall speed improvement. Terminal Pi needs CE loaded for the idle setting; no shell profiles are edited. Existing processes are not restarted automatically. Other machines adopt the policy when they start the updated Hub or CE extension; settings already cached by pi-lens may require a new Pi process.
 
+## Clear reports
+
+Every ce-workflow session, with or without Plan3, receives the same reporting guidance: lead with the result, keep the details needed to understand, trust or decide, and match length to the task. No forced headings or template, no next steps unless action is needed, and no hiding risks or verification gaps. When a choice is needed, offer up to five useful options with a recommendation. Explicit requests for detail or format take precedence. This is shared guidance, not a setting or a hard output limit; no token savings are claimed.
+
 ## Test sensitivity (every project)
 
 Every ce-workflow session, with or without Plan3, asks for evidence that a focused regression test detects the bug—not just a green test run. A genuine failing-before-fix/passing-after-fix pair counts. Otherwise the agent selects one plausible production-code mutation for each nontrivial behavior change and uses `test_sensitivity` with the project's existing test executable and arguments. Documentation-only work needs none; explicit no-tests requests and missing safe prerequisites remain disclosed gaps. This is always-on guidance plus an execution helper, **not a hard completion gate**.

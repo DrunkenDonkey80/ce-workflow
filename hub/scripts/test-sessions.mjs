@@ -45,6 +45,35 @@ try {
 	await new Promise(r => setTimeout(r, 50));
 	assert.deepEqual(host.busyReasons(a.id), []);
 
+	// Compaction notices arrive during a run, not only when the agent settles.
+	{
+		const live = host.live.get(a.id), notices = [], noticed = (id, text) => { if (id === a.id) notices.push(text); };
+		host.on("notice", noticed);
+		await host.prompt(a.id, "hold");
+		for (const reason of ["manual", "threshold", "overflow"]) {
+			notices.length = 0;
+			live.rpc.emit("event", { type: "compaction_start", reason });
+			assert.deepEqual(notices, ["Compacting context…"], `${reason}: compaction start must warn immediately, before completion`);
+			assert.equal(live.running, true); assert.equal(live.compacting, true);
+			live.rpc.emit("event", { type: "compaction_end", reason, result: { tokensBefore: 180000, estimatedTokensAfter: 50000 }, aborted: false });
+			assert.deepEqual(notices, ["Compacting context…", "Context compacted from ~180k to ~50k tokens."]);
+			assert.equal(live.running, true); assert.equal(live.compacting, false);
+		}
+		for (const [outcome, expected] of [
+			[{ result: { tokensBefore: 180000 }, aborted: false }, "Context compaction finished."],
+			[{ aborted: false }, "Context compaction finished."],
+			[{ aborted: true }, "Context compaction cancelled."],
+			[{ errorMessage: "provider unavailable", aborted: false }, "Context compaction failed."],
+		]) {
+			live.rpc.emit("event", { type: "compaction_start", reason: "threshold" });
+			live.rpc.emit("event", { type: "compaction_end", reason: "threshold", ...outcome });
+			assert.equal(notices.at(-1), expected, "every compaction outcome is visible without token counts");
+			assert.equal(live.compacting, false);
+		}
+		host.off("notice", noticed);
+		const done = settled(a.id); await live.rpc.send({ type: "abort" }); await done;
+	}
+
 	// Open dialogs count as busy until answered.
 	const ui = new Promise(r => host.once("ui", (id, req) => req.method === "input" && r(req)));
 	const command = host.prompt(a.id, "/ask q");
@@ -139,7 +168,7 @@ try {
 	assert.deepEqual(parkPrompts, ["/wo compact early park"], "auto-park must ignore idle warms, not force an ordinary microcompact");
 	host.prompt = prompt;
 	host.off("event", track); host.off("notice", noticed);
-	assert.deepEqual(notices, ["Context compacted from ~180k to ~1k tokens."], "a compaction warns with its before/after size");
+	assert.deepEqual(notices, ["Compacting context…", "Context compacted from ~180k to ~1k tokens."], "an idle compaction warns at start and with its before/after size");
 	assert.deepEqual(seen.filter(type => type.startsWith("compaction")), ["compaction_start", "compaction_end"]);
 	host.idleParkMinutes = 0;
 
