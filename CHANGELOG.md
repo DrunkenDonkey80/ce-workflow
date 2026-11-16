@@ -2,6 +2,14 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 1.0.5 — 2026-11-17
+
+### Changed
+- Hub and terminal agents no longer send an automatic “Self-verify check” follow-up. The standing instructions to verify their own work remain unchanged.
+
+### Fixed
+- In the hub and terminal, `/wo design <brief>` now passes the brief to the agent to start design sessions instead of rejecting it. `/wo design` without a brief still opens the reference library.
+
 ## 1.0.4 — 2026-11-16
 
 ### Added

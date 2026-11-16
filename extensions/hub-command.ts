@@ -213,7 +213,8 @@ export async function handleDesignLibraryCommand(args: string, ctx, pi, cli = hu
 		if (ctx.hasUI) ctx.ui?.notify?.(text, ok ? "info" : "warning");
 		else console.log(text);
 	};
-	if (args.trim()) return tell("Use /wo design without arguments to browse and collect references.", false);
+	// A typed brief is a design request: hand it to the agent instead of dropping it.
+	if (args.trim()) return void pi.sendUserMessage(`Design request: start design sessions (design action start) for this brief.\n\n${args.trim()}`, ctx.isIdle?.() === false ? { deliverAs: "followUp" } : undefined);
 	const saved = ctx.sessionManager?.getBranch?.().findLast(entry => entry.type === "custom" && entry.customType === "design-library-view")?.data?.session;
 	const id = process.env.PI_HUB_SESSION ?? saved;
 	const result = await cli(["open", "--view", "library", "--folder", ctx.cwd, "--json", ...(id ? ["--session", id] : [])]);

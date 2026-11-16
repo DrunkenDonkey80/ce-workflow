@@ -26,7 +26,7 @@ import { childWorkItems, listWorkItems, loadStore } from "./work-store.ts";
 import { docCandidates, slug as docSlug, writeDocs } from "./plan3-docs.ts";
 import { lockedWritesNote } from "./locked-writes.ts";
 import { registerTestSensitivity, TEST_SENSITIVITY } from "./test-sensitivity.ts";
-import { registerSelfVerify, SELF_VERIFY } from "./self-verify.ts";
+import { SELF_VERIFY } from "./self-verify.ts";
 
 const POINTER = "plan3-current";
 const RUN = "plan3-run";
@@ -709,7 +709,6 @@ function orderPlans(ctx, plans) {
 // ---------- extension ----------
 export default function plan3(pi) {
 	registerTestSensitivity(pi);
-	registerSelfVerify(pi, (ctx) => !!pointer(ctx).planning);
 	const idle = (ctx) => {
 		if (ctx.isIdle()) return true;
 		ctx.ui.notify("Plan3 needs an idle agent; stop the current run first.", "warning");

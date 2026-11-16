@@ -30,7 +30,7 @@ const cwd = await mkdtemp(path.join(os.tmpdir(), "plan3-test-"));
 const agentDir = await mkdtemp(path.join(os.tmpdir(), "plan3-agent-"));
 process.env.PI_CODING_AGENT_DIR = agentDir;
 const commands = new Map(), tools = new Map(), hooks = new Map(), listeners = new Map(), shortcuts = new Map();
-const messages = [], notices = [], events = [], planEvents = [], statuses = [], execCalls = [];
+const messages = [], notices = [], events = [], planEvents = [], statuses = [], execCalls = [], endHandlers = [];
 let execResult = { code: 0, stdout: "", stderr: "", killed: false };
 let entries = [], sessionId = randomUUID();
 let idle = true, tokens = 0, compactions = 0, compactFails = false, compactError = "boom", selectScript = [];
@@ -69,6 +69,7 @@ const api = {
 	registerShortcut: (key, shortcut) => shortcuts.set(key, shortcut),
 	registerTool: (tool) => tools.set(tool.name, tool),
 	on: (name, handler) => {
+		if (name === "agent_end") endHandlers.push(handler);
 		const previous = name === "tool_execution_end" && hooks.get(name);
 		hooks.set(name, previous ? (event, ctx) => { previous(event, ctx); return handler(event, ctx); } : handler);
 	},
@@ -95,10 +96,15 @@ try {
 	assert.deepEqual([...commands.keys()], ["night", "plan3", "plans3", "resume3", "pi-hub"]);
 	assert(tools.has("plan3") && tools.get("plan3").promptSnippet);
 	assert(tools.has("test_sensitivity") && tools.get("test_sensitivity").promptSnippet, "sensitivity tool is available without starting a plan");
+	for (const text of ["Now you can run it.", "I haven't opened the page in a browser to confirm."]) {
+		for (const end of endHandlers) await end({ messages: [{ role: "assistant", content: [{ type: "text", text }] }] }, ctx);
+		assert.equal(messages.length, 0, "verification handoffs must not enqueue an automatic follow-up");
+	}
 	const sensitivitySections = {};
 	const sensitivityLegacy = hooks.get("before_agent_start")({ systemPrompt: "BASE" }).systemPrompt;
 	assert.match(sensitivityLegacy, /\*\*Test sensitivity \(every project\)\*\*[\s\S]*\*\*Verify it yourself \(every session\)\*\*/, "every session carries the self-verify rule");
 	hooks.get("before_agent_start")({ systemPromptOptions: { sections: sensitivitySections } });
+	assert.match(sensitivitySections["self-verify"], /Verify it yourself[\s\S]*no-tests/, "standing verification instructions remain active without a follow-up");
 	assert.match(sensitivitySections["test-sensitivity"], /failing-before-fix[\s\S]*test_sensitivity[\s\S]*unrelated failures/);
 	hooks.get("before_agent_start")({ systemPromptOptions: { sections: sensitivitySections } });
 	assert.equal(Object.keys(sensitivitySections).filter(name => name === "test-sensitivity").length, 1, "reinjection is stable after compaction");

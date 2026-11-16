@@ -87,7 +87,7 @@ function offExtensions() {
 	rmSync(dir, { recursive: true, force: true });
 	cpSync(path.join(repo, "extensions"), dir, { recursive: true });
 	writeFileSync(path.join(dir, "tool-loader.ts"), execFileSync("git", ["show", "HEAD:extensions/tool-loader.ts"], { cwd: repo, encoding: "utf8" }));
-	writeFileSync(path.join(dir, "self-verify.ts"), `export const SELF_VERIFY = "";\nexport const NUDGE = "";\nexport function handsOff() { return false; }\nexport function registerSelfVerify() {}\n`);
+	writeFileSync(path.join(dir, "self-verify.ts"), `export const SELF_VERIFY = "";\n`);
 	return dir;
 }
 
