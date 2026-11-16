@@ -552,7 +552,7 @@ const registry = {
 		let source;
 		try {
 			const payload = JSON.parse(task.slice(task.indexOf('\n') + 1));
-			source = payload.delta[1]?.source ?? JSON.parse(decodeMemory(payload.previous).tail).knowledge[0].sources[0];
+			source = payload.knowledge?.[0]?.sources[0] ?? payload.delta[1]?.source ?? JSON.parse(decodeMemory(payload.previous).tail).knowledge[0].sources[0];
 		}
 		catch (error) { assert.fail(`Invalid compaction request JSON: ${error.message}`); }
 		const text = responseMode === "invalid" ? "not JSON" : JSON.stringify({
@@ -587,18 +587,18 @@ for (const invalid of ["invalid", "large", "citation"]) {
 	assert(failed.summary.includes(decodeMemory(hybrid.summary).tail));
 	assert(decodeMemory(failed.summary).records.some(r => r.tool === "edit"));
 	assert.deepEqual(failed.knowledge, [], "rejected output cannot create knowledge");
-	assert.equal(failed.usage.output, 20, "rejected output still incurs usage");
+	assert.equal(failed.usage.output, invalid === "large" ? 40 : 20, "rejected output and size repair both incur usage");
 	assert(failed.summary.length <= 32000);
 }
-assert.equal(calls, 4, "without a current model, failures go straight to cleaned memory");
+assert.equal(calls, 5, "size failure gets one repair before cleaned memory");
 const switchedOff = await compactMemory({ messages: later, previousSummary: hybrid.summary, registry });
-assert.equal(calls, 4);
+assert.equal(calls, 5);
 assert.match(switchedOff.summary, /07:15 UTC/);
 const unavailable = await compactMemory({ messages, registry, model: "missing/model" });
 assert.equal(unavailable.mode, "fallback");
-assert.equal(calls, 4);
+assert.equal(calls, 5);
 await assert.rejects(compactMemory({ messages, registry, model: "test/summary", signal: AbortSignal.abort() }), /cancelled/);
-assert.equal(calls, 4);
+assert.equal(calls, 5);
 const longRequest = "Keep all original requirements. ".repeat(2200);
 const protectedMemory = await compactMemory({ messages: [{ role: "user", content: longRequest }], registry });
 assert.equal(decodeMemory(protectedMemory.summary).records[0].text, longRequest, "32k rolling target must not reject or clip protected user history");
@@ -647,7 +647,7 @@ const records = gather(later);
 const frame = { coreRecords: [], core: coreText([]) };
 const preserved = fallbackMemory(frame, decodeMemory(hybrid.summary).tail, records, 32000);
 assert(preserved.memory.includes(JSON.stringify(records.find(r => r.tool === "edit"))));
-// Each model gets at most one attempt; retain usage even for rejected responses.
+// Each model gets one full attempt, plus one size repair total; retain all rejected usage.
 async function retryCase(primary, secondary = "valid", options = {}) {
 	const attempted = [];
 	const result = await compactMemory({
@@ -676,10 +676,10 @@ for (const reason of ["invalid", "large", "citation", "throw", "unavailable", "a
 	const { result, attempted } = await retryCase(reason);
 	assert.equal(result.mode, "hybrid", reason);
 	assert.equal(result.model, "test/current");
-	assert.deepEqual(attempted, reason === "unavailable" ? ["current"] : ["summary", "current"]);
-	assert.equal(result.attempts.length, 2);
+	assert.deepEqual(attempted, reason === "unavailable" ? ["current"] : reason === "large" ? ["summary", "summary", "current"] : ["summary", "current"]);
+	assert.equal(result.attempts.length, reason === "large" ? 3 : 2);
 	assert(result.attempts[0].error);
-	const responses = ["throw", "unavailable"].includes(reason) ? 1 : 2;
+	const responses = ["throw", "unavailable"].includes(reason) ? 1 : reason === "large" ? 3 : 2;
 	assert.equal(result.usage.output, 20 * responses);
 	assert.equal(result.usage.cost.total, 0.3 * responses);
 	assert.equal(result.usage.cost.totalFromProvider, true, "a Pi 1.5 boolean stays a boolean when summed");
@@ -697,7 +697,7 @@ for (const reason of ["invalid", "large", "citation", "throw", "unavailable", "a
 			assert.match(result.attempts[0].error, new RegExp(`${JSON.stringify(JSON.parse(rejected.text)).length} > 16000 characters`));
 		}
 	}
-	assert.equal(result.attempts[1].rejectedResponse, undefined);
+	assert.equal(result.attempts.at(-1).rejectedResponse, undefined);
 }
 // Combined cost is provider-billed only when every part is; money still adds up.
 assert.deepEqual(addCost(addCost(undefined, { total: 1, totalFromProvider: true }), { total: 2, totalFromProvider: true }), { total: 3, totalFromProvider: true });

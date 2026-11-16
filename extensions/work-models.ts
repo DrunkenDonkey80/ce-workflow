@@ -1353,7 +1353,9 @@ async function compactSessionMemory(ctx, current, state, preparation, currentMes
 		redact: text => redactSecrets(text, 400_000),
 	});
 	if (result.fallback) ctx.ui?.notify?.(`Compaction used preserved-memory fallback: ${result.fallback}`, "warning");
-	else if (result.attempts?.length > 1) ctx.ui?.notify?.(`Compaction used current model ${result.model}: ${result.attempts[0].error}`, "warning");
+	else if (result.attempts?.length > 1) ctx.ui?.notify?.(result.attempts.at(-1)?.repair
+		? `Compaction shortened its checkpoint with ${result.model}: ${result.attempts.find(a => a.error)?.error}`
+		: `Compaction used current model ${result.model}: ${result.attempts[0].error}`, "warning");
 	return result;
 }
 

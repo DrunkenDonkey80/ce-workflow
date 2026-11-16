@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 1.0.1 — 2026-11-16
+
+### Fixed
+- Hub and terminal Pi give an oversized compaction checkpoint one shortening attempt on the same model before falling back. The size limit stays unchanged; the repair preserves knowledge fact counts, statuses and citations, records its cost and rejected reply, and honors cancellation. Recovery messages distinguish shortening from switching models. Meaning still needs model judgment; a repair that fails validation retains the existing safe fallback.
+
 ## 1.0.0 — 2026-11-15
 
 ### Added
