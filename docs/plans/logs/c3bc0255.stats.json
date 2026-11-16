@@ -1,0 +1,1039 @@
+{
+ "version": 1,
+ "activeMs": 2241499,
+ "runs": 6,
+ "waitingMs": 0,
+ "toolWallMs": 356815,
+ "compactions": {
+  "count": 0,
+  "ms": 0
+ },
+ "models": {
+  "anthropic/claude-opus-5-5:high": {
+   "replies": 193,
+   "thinkingMs": 1062240,
+   "actingMs": 432361,
+   "input": 500,
+   "output": 139925,
+   "cacheRead": 17460667,
+   "cacheWrite": 1588719,
+   "cost": 14.2362284,
+   "errors": 0
+  }
+ },
+ "tools": {
+  "bash": {
+   "count": 144,
+   "ms": 93426,
+   "maxMs": 8100,
+   "failures": 3
+  },
+  "plan3": {
+   "count": 25,
+   "ms": 1930,
+   "maxMs": 120,
+   "failures": 0
+  },
+  "codemode": {
+   "count": 16,
+   "ms": 38562,
+   "maxMs": 9284,
+   "failures": 0
+  },
+  "read": {
+   "count": 38,
+   "ms": 289,
+   "maxMs": 86,
+   "failures": 0
+  },
+  "compaction_note": {
+   "count": 3,
+   "ms": 0,
+   "maxMs": 0,
+   "failures": 0
+  },
+  "read_symbol": {
+   "count": 1,
+   "ms": 51,
+   "maxMs": 51,
+   "failures": 0
+  },
+  "edit": {
+   "count": 19,
+   "ms": 135,
+   "maxMs": 22,
+   "failures": 0
+  },
+  "test_sensitivity": {
+   "count": 15,
+   "ms": 120226,
+   "maxMs": 11553,
+   "failures": 6
+  },
+  "lens_diagnostics": {
+   "count": 4,
+   "ms": 19341,
+   "maxMs": 7131,
+   "failures": 1
+  },
+  "write": {
+   "count": 2,
+   "ms": 6,
+   "maxMs": 5,
+   "failures": 0
+  },
+  "schedule": {
+   "count": 1,
+   "ms": 430,
+   "maxMs": 430,
+   "failures": 0
+  }
+ },
+ "categories": {
+  "shell": {
+   "count": 122,
+   "ms": 42373,
+   "maxMs": 8100,
+   "failures": 2
+  },
+  "test": {
+   "count": 22,
+   "ms": 51053,
+   "maxMs": 7867,
+   "failures": 1
+  }
+ },
+ "commands": {
+  "bash\u0000git status --short && git log --oneline -3": {
+   "count": 1,
+   "ms": 111,
+   "maxMs": 111,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"PI_SUBAGENT_RUNNER_PID|isChildSession|SUBAGENT_CHILD|pi.on\\(\\\"input\\\"|on\\(\\\"session_start\\\"|compactColdCache\" extensions -g \"*.ts\"": {
+   "count": 1,
+   "ms": 88,
+   "maxMs": 88,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"### input|input event|\\\"input\\\"\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/docs/extensions.md\"": {
+   "count": 1,
+   "ms": 71,
+   "maxMs": 71,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"sections\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/docs/extensions.md\"": {
+   "count": 1,
+   "ms": 72,
+   "maxMs": 72,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"visionModel|designModel\" extensions/work-models.ts | head -40": {
+   "count": 1,
+   "ms": 89,
+   "maxMs": 89,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"PI_SUBAGENT_[A-Z_]+\" \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-subagents/src\" -o -N | sort | uniq -c": {
+   "count": 1,
+   "ms": 104,
+   "maxMs": 104,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"agent_settled|session_before_switch|session_shutdown\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/docs/extensions.md\" | head": {
+   "count": 1,
+   "ms": 126,
+   "maxMs": 126,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"_promptPreflightCount|isPromptPreflight|get isStreaming\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist\" -r \"\" | head -20": {
+   "count": 1,
+   "ms": 1053,
+   "maxMs": 1053,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"signal|export (async )?function (showListDialog|askConfirm|askText)\" extensions/ask-user/menu.ts | head -30": {
+   "count": 1,
+   "ms": 106,
+   "maxMs": 106,
+   "failures": 0
+  },
+  "bash\u0000ls \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-subagents\"; rg -o -N --no-filename \"PI_SUBAGENT_[A-Z_]+\" \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-subagents\" -g \"!node_modules\" | sort | uniq -c": {
+   "count": 1,
+   "ms": 138,
+   "maxMs": 138,
+   "failures": 0
+  },
+  "bash\u0000rg -o \".{0,120}_promptPreflightCount.{0,120}\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js\" | head -20": {
+   "count": 1,
+   "ms": 111,
+   "maxMs": 111,
+   "failures": 0
+  },
+  "bash\u0000rg -o \".{0,100}(isPromptPending|hasPendingPrompt|promptPreflight).{0,100}\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist/modes\" | head -10": {
+   "count": 1,
+   "ms": 114,
+   "maxMs": 114,
+   "failures": 0
+  },
+  "bash\u0000rg -l \"RUNNER_PID\" \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-subagents/src\" \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-subagents/docs\" | head; rg -o -N --no-filename \"PI_SUBAGENT[A-Z_]*\" \"C:/User": {
+   "count": 1,
+   "ms": 170,
+   "maxMs": 170,
+   "failures": 0
+  },
+  "bash\u0000rg -n -o \".{0,80}(parentSession|PI_SUBAGENT_CHILD).{0,80}\" \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-subagents/src\" | head -20": {
+   "count": 1,
+   "ms": 114,
+   "maxMs": 114,
+   "failures": 0
+  },
+  "bash\u0000ls \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-subagents/src\" | head -50": {
+   "count": 1,
+   "ms": 76,
+   "maxMs": 76,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-subagents\" && rg -n -o -uu \".{0,80}(parentSession|PI_SUBAGENT_CHILD\\b).{0,80}\" src | head -20": {
+   "count": 1,
+   "ms": 121,
+   "maxMs": 121,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-subagents\" && rg -n -o -uu \".{0,60}(SUBAGENT_CHILD|RUNNER_PID).{0,60}\" src | head": {
+   "count": 1,
+   "ms": 124,
+   "maxMs": 124,
+   "failures": 0
+  },
+  "bash\u0000rg -n -o \".{0,160}streamingBehavior.{0,120}\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/interactive-mode.js\" | head -12": {
+   "count": 1,
+   "ms": 77,
+   "maxMs": 77,
+   "failures": 0
+  },
+  "bash\u0000rg -n -o \".{0,160}streamingBehavior.{0,120}\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist/modes/rpc\" | head -8": {
+   "count": 1,
+   "ms": 89,
+   "maxMs": 89,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"sendUserMessage\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/docs/extensions.md\" | head": {
+   "count": 1,
+   "ms": 82,
+   "maxMs": 82,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add \"docs/plans/2026-11-15-opt-in-project-mapping-agent-c3bc0255-plan3.md\" \"docs/plans/logs/c3bc0255.md\" && git commit -q -m \"Plan3 c3bc0255 P3-01: mapping agent lifecycle contract\" && g": {
+   "count": 1,
+   "ms": 196,
+   "maxMs": 196,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"visionAltModel|imageModel\" scripts/test-work-settings.mjs | head -20 && wc -l scripts/test-work-settings.mjs": {
+   "count": 1,
+   "ms": 127,
+   "maxMs": 127,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"Project|clear|using global|ctrl|tab\" scripts/test-work-settings.mjs | head -40; rg -n \"action: \\\"clear\\\"|action === \\\"clear\\\"|clear\\\" \\\\}\" extensions/work-models.ts | head": {
+   "count": 1,
+   "ms": 158,
+   "maxMs": 158,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short && git log --oneline -3 && rg -n -o \".{0,60}(mappingModel|visionModel).{0,60}\" \"extensions/work-models.ts\" | head -40": {
+   "count": 1,
+   "ms": 157,
+   "maxMs": 157,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"4252,4268p;4380,4410p\" \"extensions/work-models.ts\" && rg -n -o \"^(export )?(async )?function (chooseModel|readSettings|readScopedSettings|writeScopedSettings)\\(.{0,150}\" extensions/*": {
+   "count": 1,
+   "ms": 149,
+   "maxMs": 149,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"617,700p;4700,4726p\" \"extensions/work-models.ts\"": {
+   "count": 1,
+   "ms": 47,
+   "maxMs": 47,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n -i -o \".{0,200}(epoch|mappingModel|malformed|unavailable).{0,200}\" \"docs/plans/2026-11-15-opt-in-project-mapping-agent-c3bc0255-plan3.md\" | head -20; sed -n \"560,616p\" extensions/work-": {
+   "count": 1,
+   "ms": 253,
+   "maxMs": 253,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"105p;220p\" \"docs/plans/2026-11-15-opt-in-project-mapping-agent-c3bc0255-plan3.md\" | cut -c 600-1600; sed -n \"300,366p\" extensions/work-models.ts; rg -n -o \"^import .{0,120}lock.{0,60": {
+   "count": 1,
+   "ms": 192,
+   "maxMs": 192,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"^export\" extensions/session-lock.ts extensions/locked-writes.ts | cut -c 1-200; rg -n \"SettingsManager|proper-lockfile\" -o node_modules/@earendil-works/pi-coding-agent/dist/core/setti": {
+   "count": 1,
+   "ms": 144,
+   "maxMs": 144,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n -A6 \"export function splitLevel|export const splitLevel\" extensions/work-vision.ts; rg -n \"THINKING_LEVELS =\" extensions/*.ts; sed -n \"2785,2796p\" extensions/work-models.ts | cut -c 1-": {
+   "count": 1,
+   "ms": 160,
+   "maxMs": 160,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"Image generation model|imageModel|Use global|customUi = |function customUi|getAvailable|const invoke|async function invoke\" scripts/test-work-settings.mjs | cut -c 1-220 | head -40": {
+   "count": 1,
+   "ms": 114,
+   "maxMs": 114,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node \"scripts/test-work-settings.mjs\" 2>&1 | tail -15": {
+   "count": 1,
+   "ms": 2552,
+   "maxMs": 2552,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git log --oneline -3 -- extensions/hub-channel.ts extensions/ask-user/menu.ts && sed -n \"10,40p\" extensions/hub-channel.ts && rg -n \"setStatus\" scripts/test-work-*.mjs | cut -c 1-160 | head": {
+   "count": 1,
+   "ms": 194,
+   "maxMs": 194,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n -A3 \"function hubActive\" extensions/hub-channel.ts": {
+   "count": 1,
+   "ms": 73,
+   "maxMs": 73,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && rg -n \"hubActive\" extensions/hub-channel.ts | head -3; rg -n -o \"PI_HUB[A-Z_]*\" extensions/hub-channel.ts | sort -u": {
+   "count": 1,
+   "ms": 160,
+   "maxMs": 160,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && PI_HUB= node \"scripts/test-work-settings.mjs\" 2>&1 | tail -15": {
+   "count": 1,
+   "ms": 1592,
+   "maxMs": 1592,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && PI_HUB= node \"scripts/test-work-dialogs.mjs\" 2>&1 | tail -5": {
+   "count": 1,
+   "ms": 177,
+   "maxMs": 177,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add \"extensions/work-models.ts\" \"scripts/test-work-settings.mjs\" && git commit -q -m \"Plan3 c3bc0255 P3-02: scoped Mapping agent setting (None default, project None wins, fresh-read clea": {
+   "count": 1,
+   "ms": 205,
+   "maxMs": 205,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/commit 18c2c7f0/commit 9ee519c0/\" \"docs/plans/2026-11-15-opt-in-project-mapping-agent-c3bc0255-plan3.md\" docs/plans/logs/c3bc0255* 2>/dev/null; rg -n \"9ee519c0|18c2c7f0\" docs/plans": {
+   "count": 1,
+   "ms": 163,
+   "maxMs": 163,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -c \"9ee519c0\" docs/plans/logs/c3bc0255.md docs/plans/2026-11-15-opt-in-project-mapping-agent-c3bc0255-plan3.md; git add \"docs/plans/2026-11-15-opt-in-project-mapping-agent-c3bc0255-plan3.": {
+   "count": 1,
+   "ms": 249,
+   "maxMs": 249,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"flag: \\\"wx\\\"|flag: 'wx'|withFileLock|function withLock|lockSync\" extensions/ --glob \"*.ts\" | cut -c 1-180; rg -n \"SECRET|secretLike|redact\" -l extensions/*.ts | head": {
+   "count": 1,
+   "ms": 191,
+   "maxMs": 191,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"^export\" extensions/redact.ts extensions/plan3-files.ts extensions/work-camera-state.ts | cut -c 1-200; sed -n \"1,40p\" extensions/redact.ts | cut -c 1-200": {
+   "count": 1,
+   "ms": 128,
+   "maxMs": 128,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"systemPrompt\" node_modules/@earendil-works/pi-ai/dist/types.d.ts 2>/dev/null | head -3; ls node_modules/@earendil-works/ 2>/dev/null; rg -n \"streamSimple\" -o extensions/*.ts | sort | ": {
+   "count": 1,
+   "ms": 160,
+   "maxMs": 160,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node \"scripts/test-work-project-map.mjs\" 2>&1 | tail -20": {
+   "count": 2,
+   "ms": 2758,
+   "maxMs": 2109,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add \"extensions/work-project-map.ts\" \"scripts/test-work-project-map.mjs\" && git commit -q -m \"Plan3 c3bc0255 P3-03: bounded read-only project map maintenance with locked atomic publicati": {
+   "count": 1,
+   "ms": 238,
+   "maxMs": 238,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/commit 7d2ba6d0-era HEAD/commit 32acd699/\" \"docs/plans/2026-11-15-opt-in-project-mapping-agent-c3bc0255-plan3.md\" docs/plans/logs/c3bc0255.md && rg -c \"32acd699\" \"docs/plans/2026-1": {
+   "count": 1,
+   "ms": 266,
+   "maxMs": 266,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && f=node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js; rg -n \"async prompt\\(|_emitInput|emitInput|isStreaming\\b.*throw|already processing\" $f | cut -c 1-200 | head -20": {
+   "count": 1,
+   "ms": 101,
+   "maxMs": 101,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && f=node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js; sed -n \"1640,1800p\" $f | cut -c 1-220": {
+   "count": 1,
+   "ms": 94,
+   "maxMs": 94,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && f=node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js; rg -n \"_promptPreflightCount\" $f | cut -c 1-200; rg -n \"session.prompt\\(|\\.prompt\\(text\" node_modules/@earendil-wor": {
+   "count": 1,
+   "ms": 166,
+   "maxMs": 166,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && f=node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js; sed -n \"3358,3368p\" $f | cut -c 1-200; g=node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/intera": {
+   "count": 1,
+   "ms": 150,
+   "maxMs": 150,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && g=node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/interactive-mode.js; sed -n \"2830,2860p\" $g | cut -c 1-200; rg -n \"getUserInput\\(\\) \\{|onInputCallback\" $g | head -5": {
+   "count": 1,
+   "ms": 106,
+   "maxMs": 106,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"sections\\[|pi.on\\(\\\"(input|before_agent_start|agent_settled|session_start|session_shutdown)\\\"\" extensions/work-models.ts | cut -c 1-200": {
+   "count": 1,
+   "ms": 107,
+   "maxMs": 107,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"3795,3870p;4020,4040p\" extensions/work-models.ts | cut -c 1-260": {
+   "count": 1,
+   "ms": 79,
+   "maxMs": 79,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"export (async )?function (showListDialog|askConfirm)|signal|forceCustom|ctx.ui.select|hasUI\" extensions/ask-user/menu.ts | cut -c 1-200 | head -30; rg -n \"C-lifecycle\" docs/plans/2026": {
+   "count": 1,
+   "ms": 150,
+   "maxMs": 150,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"async function compactColdCache\" -A 45 extensions/*.ts | cut -c 1-220": {
+   "count": 1,
+   "ms": 109,
+   "maxMs": 109,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"compactColdCache\" extensions | cut -c 1-200": {
+   "count": 1,
+   "ms": 86,
+   "maxMs": 86,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist\" && rg -n \"emitInput|\\\"input\\\"\" -g \"*.js\" . | cut -c 1-220 | head -20": {
+   "count": 1,
+   "ms": 125,
+   "maxMs": 125,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist\" && sed -n \"1625,1720p\" core/agent-session.js": {
+   "count": 1,
+   "ms": 68,
+   "maxMs": 68,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist\" && sed -n \"1720,1800p\" core/agent-session.js; rg -n \"async _preparePrompt\" -A 40 core/agent-sessio": {
+   "count": 1,
+   "ms": 103,
+   "maxMs": 103,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist\" && rg -n \"_promptPreflightCount|get isStreaming|get isIdle\" -A 3 core/agent-session.js | head -40;": {
+   "count": 1,
+   "ms": 144,
+   "maxMs": 144,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist\" && rg -n \"streamingBehavior|isStreaming|preflight\" modes/interactive/interactive-mode.js | cut -c ": {
+   "count": 1,
+   "ms": 83,
+   "maxMs": 83,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist\" && sed -n \"2810,2870p\" modes/interactive/interactive-mode.js": {
+   "count": 1,
+   "ms": 70,
+   "maxMs": 70,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist\" && rg -n \"pendingUserInputs|getUserInput\\(\\)\" -B2 -A8 modes/interactive/interactive-mode.js | sed ": {
+   "count": 1,
+   "ms": 99,
+   "maxMs": 99,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && wc -l extensions/work-project-map.ts && git log --oneline -4": {
+   "count": 1,
+   "ms": 87,
+   "maxMs": 87,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"^export|^\\t(async )?[a-zA-Z]+\\(.*\\) \\{$|return \\{\" extensions/work-project-map.ts | cut -c 1-200; rg -n \"mappingModelSettings|NONE_MODEL =|function getAgentDir|agentDir\\(\" extensions/": {
+   "count": 1,
+   "ms": 142,
+   "maxMs": 142,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"4710,4760p\" extensions/work-models.ts | cut -c 1-240": {
+   "count": 1,
+   "ms": 79,
+   "maxMs": 79,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && wc -l scripts/test-work-compaction-notifications.mjs && sed -n \"1,60p\" scripts/test-work-compaction-notifications.mjs | cut -c 1-220; rg -n \"PI_SUBAGENT_CHILD|__test|ForTest\" extensions/work": {
+   "count": 1,
+   "ms": 163,
+   "maxMs": 163,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"workModelsExtension\\(|handlers.get\\(\\\"input\\\"\\)|emit\\(\\\"before_agent_start\\\"|\\\"before_agent_start\\\"\" scripts/test-work-compaction-notifications.mjs | head -12 | cut -c 1-200": {
+   "count": 1,
+   "ms": 98,
+   "maxMs": 98,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist\" && sed -n \"1205,1250p\" core/extensions/runner.js": {
+   "count": 1,
+   "ms": 66,
+   "maxMs": 66,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"^(async )?function choose\\(|^export (async )?function choose\\(|^const choose|import .*choose\" extensions/work-models.ts | cut -c 1-250; rg -n \"readScopedSettings\\b\" extensions/work-mo": {
+   "count": 1,
+   "ms": 170,
+   "maxMs": 170,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"work-project-map|^import .*work-vision|getAgentDir|PI_SUBAGENT_CHILD\" extensions/work-models.ts | cut -c 1-200; rg -n \"PI_SUBAGENT_CHILD\" extensions -l": {
+   "count": 1,
+   "ms": 160,
+   "maxMs": 160,
+   "failures": 1
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-subagents\" && rg -n \"PI_SUBAGENT_CHILD\" -g \"*.ts\" -g \"*.js\" . | cut -c 1-200 | head -5": {
+   "count": 1,
+   "ms": 99,
+   "maxMs": 99,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-subagents\" && sed -n \"1,15p\" index.js; rg -n \"PI_SUBAGENT_CHILD|PI_SUBAGENT\" -g \"!node_modules\" . | cut -c 1-200 | head -10": {
+   "count": 1,
+   "ms": 126,
+   "maxMs": 126,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"30,40p\" extensions/work-models.ts | cut -c 1-200; rg -n \"^import .*node:fs|existsSync\" extensions/work-models.ts | head -3 | cut -c 1-200": {
+   "count": 1,
+   "ms": 112,
+   "maxMs": 112,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"async wait\\(s\" -A 26 extensions/work-project-map.ts": {
+   "count": 1,
+   "ms": 63,
+   "maxMs": 63,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const f='extensions/work-project-map.ts';let s=fs.readFileSync(f,'utf8'); const start=s.indexOf('\\t\\t/** One build attempt raced');const end=s.indexOf('\\t\\t/": {
+   "count": 1,
+   "ms": 134,
+   "maxMs": 134,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const f='extensions/work-project-map.ts';let s=fs.readFileSync(f,'utf8'); const a=s.indexOf('\\tasync function attempt');const b=s.indexOf('\\treturn {\\n\\t\\t/*": {
+   "count": 1,
+   "ms": 127,
+   "maxMs": 127,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s|return mapper.hasMap(s.root) ? { status: \\\"ready\\\" } : { status: \\\"failed\\\", error:|return mapper.hasMap(s.root) ? { status: \\\"ready\\\", error: undefined } : { status: \\\"failed\\\", e": {
+   "count": 1,
+   "ms": 1859,
+   "maxMs": 1859,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && wc -l scripts/test-work-project-map.mjs && sed -n \"1,40p\" scripts/test-work-project-map.mjs | cut -c 1-200 && tail -15 scripts/test-work-project-map.mjs | cut -c 1-200": {
+   "count": 1,
+   "ms": 95,
+   "maxMs": 95,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"git\\(\\\"init|plain =|const mapper = |isEnabled\" scripts/test-work-project-map.mjs | head | cut -c 1-200": {
+   "count": 1,
+   "ms": 92,
+   "maxMs": 92,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && PI_HUB= node scripts/test-work-project-map.mjs 2>&1 | tail -20": {
+   "count": 2,
+   "ms": 4947,
+   "maxMs": 2727,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s|assert.fail(\\\"no model call when mapping is off\\\"), undefined);|assert.fail(\\\"no model call when mapping is off\\\"), null);|; s|const late = session(stuck.complete, undefined, { dea": {
+   "count": 1,
+   "ms": 2517,
+   "maxMs": 2517,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s|, deadlineMs); timer.unref?.(); }),|, deadlineMs); }),|\" extensions/work-project-map.ts && PI_HUB= node scripts/test-work-project-map.mjs 2>&1 | tail -20": {
+   "count": 1,
+   "ms": 2675,
+   "maxMs": 2675,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"const hooks|hooks\\.input|hooks\\.before_agent_start\\(|^const ctx|^\\tconst ctx = \\{\" scripts/test-work-compaction-notifications.mjs | head | cut -c 1-200": {
+   "count": 1,
+   "ms": 79,
+   "maxMs": 79,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const f='scripts/test-work-compaction-notifications.mjs';let s=fs.readFileSync(f,'utf8'); s=s.replace('\\tsummarizeNativeContext,\\n} from \\\"../extensions/work": {
+   "count": 1,
+   "ms": 3226,
+   "maxMs": 3226,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-settings.mjs 2>&1 | tail -5; git status --short | head": {
+   "count": 1,
+   "ms": 1570,
+   "maxMs": 1570,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff --stat docs/plans/2026-11-15-opt-in-project-mapping-agent-c3bc0255-plan3.md && git add extensions/work-models.ts extensions/work-project-map.ts scripts/test-work-compaction-notifica": {
+   "count": 1,
+   "ms": 239,
+   "maxMs": 239,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add docs/plans/2026-11-15-opt-in-project-mapping-agent-c3bc0255-plan3.md && git commit -q -m \"Plan3 c3bc0255 P3-04: mark done\" && git log --oneline -1 && git status --short": {
+   "count": 1,
+   "ms": 216,
+   "maxMs": 216,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add docs/plans/logs/c3bc0255.md && git commit -q -m \"Plan3 c3bc0255 P3-04: step log\" && rg -n \"^- \\[\" docs/plans/2026-11-15-opt-in-project-mapping-agent-c3bc0255-plan3.md | cut -c 1-160": {
+   "count": 1,
+   "ms": 206,
+   "maxMs": 206,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -l \"PI_CODING_AGENT_DIR|PI_SUBAGENT_CHILD|spawn\\(.*pi|\\\"--mode\\\", \\\"(json|rpc)\\\"|\\\"-p\\\"\" scripts | head -30; rg -n \"PI_CODING_AGENT_DIR\" scripts | cut -c 1-180 | head -20": {
+   "count": 1,
+   "ms": 155,
+   "maxMs": 155,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -l \"spawn|execFile\" scripts/benchmark-*.mjs scripts/*lab*.mjs scripts/test-work-native-smoke.mjs scripts/test-work-microcompact-agent.mjs scripts/*live*.mjs 2>/dev/null | sort -u; rg -n \"": {
+   "count": 1,
+   "ms": 148,
+   "maxMs": 148,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for f in scripts/benchmark-context-cache-live.mjs scripts/benchmark-image-strip-live.mjs scripts/benchmark-jev-live.mjs scripts/benchmark-reasoning-strip-live.mjs scripts/benchmark-self-veri": {
+   "count": 1,
+   "ms": 465,
+   "maxMs": 465,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"piEnv =|Object.fromEntries\\(Object.entries\\(process.env|execFileSync\\(process.execPath|spawnSync\" scripts/skills-lab.mjs scripts/benchmark-self-verify-live.mjs scripts/rework-lab.mjs ": {
+   "count": 1,
+   "ms": 97,
+   "maxMs": 97,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"piCli|launcher|cli\\.js|\\\"pi\\\"\" scripts/benchmark-jev-live.mjs scripts/test-work-native-smoke.mjs scripts/test-work-microcompact-agent.mjs scripts/benchmark-image-strip-live.mjs | cut ": {
+   "count": 1,
+   "ms": 115,
+   "maxMs": 115,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"40,60p\" scripts/test-work-native-smoke.mjs | cut -c 1-160; rg -n \"spawn|execFile\" scripts/test-work-microcompact-agent.mjs | head -3 | cut -c 1-160; rg -n \"spawn|exec\" scripts/benchm": {
+   "count": 1,
+   "ms": 140,
+   "maxMs": 140,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for f in benchmark-context-cache-live benchmark-image-strip-live benchmark-reasoning-strip-live benchmark-self-verify-live rework-lab skills-lab test-work-microcompact-agent benchmark-jev-li": {
+   "count": 1,
+   "ms": 426,
+   "maxMs": 426,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"112,121p\" scripts/benchmark-reasoning-strip-live.mjs | cut -c 1-140; sed -n \"14,19p\" scripts/benchmark-jev-live.mjs | cut -c 1-140": {
+   "count": 1,
+   "ms": 1125,
+   "maxMs": 1125,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git checkout scripts/benchmark-reasoning-strip-live.mjs scripts/benchmark-jev-live.mjs && rg -n \"^import |^} from \" scripts/benchmark-reasoning-strip-live.mjs | head -12 | cut -c 1-120": {
+   "count": 1,
+   "ms": 121,
+   "maxMs": 121,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"5a process.env.PI_WORK_PROJECT_MAP ??= \\\"off\\\"; // live runs never map unless a fixture opts in (PI_WORK_PROJECT_MAP=on)\" scripts/benchmark-reasoning-strip-live.mjs && sed -n \"4,7p\" ": {
+   "count": 1,
+   "ms": 115,
+   "maxMs": 115,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s|\\tif (process.env.PI_SUBAGENT_CHILD === \\\"1\\\") return;|\\tif (process.env.PI_SUBAGENT_CHILD === \\\"1\\\" \\|\\| process.env.PI_WORK_PROJECT_MAP === \\\"off\\\") return; // children; live tes": {
+   "count": 1,
+   "ms": 132,
+   "maxMs": 132,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"1,20p\" scripts/test-work-settings.mjs | rg -n \"^import\" | cut -c 1-200": {
+   "count": 1,
+   "ms": 147,
+   "maxMs": 147,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"5s|import { pathToFileURL } from \\\"node:url\\\";|import { fileURLToPath, pathToFileURL } from \\\"node:url\\\";|\" scripts/test-work-settings.mjs && node scripts/test-work-settings.mjs 2>&1": {
+   "count": 1,
+   "ms": 1564,
+   "maxMs": 1564,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const f='scripts/test-work-settings.mjs';let s=fs.readFileSync(f,'utf8'); const old='\\t\\tprocess.env.PI_WORK_PROJECT_MAP = \\\"off\\\";\\n\\t\\ttry { assert(mod.pro": {
+   "count": 1,
+   "ms": 1590,
+   "maxMs": 1590,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');for(const n of fs.readdirSync('scripts').filter(f=>/^(benchmark-.*-live|.*-lab|test-work-microcompact-agent)\\.mjs$/.test(f))){const t=fs.readFileSync('script": {
+   "count": 1,
+   "ms": 295,
+   "maxMs": 295,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add docs/plans/2026-11-15-opt-in-project-mapping-agent-c3bc0255-plan3.md docs/plans/logs/c3bc0255.md && git commit -q -m \"Plan3 c3bc0255 P3-06: mark done\" && git log --oneline -1 && git ": {
+   "count": 1,
+   "ms": 219,
+   "maxMs": 219,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"C-dialogs|C-settings:|C-live|C-mapper\" docs/plans/2026-11-15-opt-in-project-mapping-agent-c3bc0255-plan3.md | cut -c 1-300; rg -n \"mappingCtx =|function mappingCtx\" -A 12 scripts/test": {
+   "count": 1,
+   "ms": 175,
+   "maxMs": 175,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"function customUi|notify|expectText\" scripts/test-work-settings.mjs | head -12 | cut -c 1-220": {
+   "count": 1,
+   "ms": 78,
+   "maxMs": 78,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-settings.mjs 2>&1 | tail -12 | cut -c 1-400": {
+   "count": 1,
+   "ms": 1975,
+   "maxMs": 1975,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s|], \\\"model\\\", { compact: true, purpose: \\`Map: \\${projectMaps.describe(ctx.cwd)}\\` });|], \\\"model\\\", { compact: true, forceCustom: true, purpose: \\`Map: \\${projectMaps.describe(ctx": {
+   "count": 1,
+   "ms": 1524,
+   "maxMs": 1524,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"244,262p\" scripts/test-work-settings.mjs | cut -c 1-160": {
+   "count": 1,
+   "ms": 68,
+   "maxMs": 68,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s|\\t\\t\\tassert(action, \\\"unexpected settings render\\\");|\\t\\t\\tassert(action, \\`unexpected settings render\\\\\\\\n\\${first.join(\\\"\\\\\\\\n\\\")}\\`);|\" scripts/test-work-settings.mjs && node s": {
+   "count": 1,
+   "ms": 125,
+   "maxMs": 125,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-settings.mjs 2>&1 | rg -v \"^\\s+at \" | tail -30 | cut -c 1-200": {
+   "count": 1,
+   "ms": 1749,
+   "maxMs": 1749,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"function compactDialog\" -A 40 extensions/ask-user/menu.ts | rg -n \"right|left|tab|down|up|matches\" | head -12 | cut -c 1-200": {
+   "count": 1,
+   "ms": 99,
+   "maxMs": 99,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cp scripts/test-work-settings.mjs \"$TEMP/tws.bak\" && sed -i \"s|\\t\\t\\tconst action = actions.shift();|\\t\\t\\tconst action = actions.shift(); if (process.env.DBG) console.log(\\\"RENDER\\\", first.": {
+   "count": 1,
+   "ms": 1632,
+   "maxMs": 1632,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"Rebuild map now\" -B 8 -A 14 extensions/work-models.ts | cut -c 1-220; sed -n \"125,180p\" scripts/test-work-settings.mjs | cut -c 1-200": {
+   "count": 1,
+   "ms": 164,
+   "maxMs": 164,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s|{ expectText: \\\"Map: missing\\\", target: \\\"Rebuild map now\\\", key: \\\"enter\\\" },|{ expectText: \\\"Map: missing\\\", preKeys: [\\\"down\\\"], key: \\\"enter\\\" },|; s|{ expectText: \\\"last error": {
+   "count": 1,
+   "ms": 1944,
+   "maxMs": 1944,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"forceCustom\" extensions/work-models.ts extensions/ask-user/menu.ts | head -8 | cut -c 1-220": {
+   "count": 1,
+   "ms": 105,
+   "maxMs": 105,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && export PI_HUB= && node scripts/test-work-project-map.mjs 2>&1 | tail -2; node scripts/test-work-compaction-notifications.mjs 2>&1 | tail -2": {
+   "count": 1,
+   "ms": 5555,
+   "maxMs": 5555,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n -i \"mapping agent|project map|PI_WORK_PROJECT_MAP\" README.md CHANGELOG.md docs/*.md 2>/dev/null | cut -c 1-200 | head; sed -n \"1,15p\" CHANGELOG.md | cut -c 1-200; rg -n \"Vision model|D": {
+   "count": 1,
+   "ms": 164,
+   "maxMs": 164,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"20,32p\" README.md | cut -c 1-260; rg -n \"^## Unreleased\" CHANGELOG.md; git log --oneline -8": {
+   "count": 1,
+   "ms": 119,
+   "maxMs": 119,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"homedir|agentDir|project-maps|cacheRoot|deadlineMs|MAX_|const [A-Z_]+ = \" extensions/work-project-map.ts | head -20 | cut -c 1-200": {
+   "count": 1,
+   "ms": 99,
+   "maxMs": 99,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short && git add extensions/work-models.ts scripts/test-work-settings.mjs README.md CHANGELOG.md && git commit -q -m \"Plan3 c3bc0255 P3-05: settings rebuild/status flow test, Ma": {
+   "count": 1,
+   "ms": 243,
+   "maxMs": 243,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -A docs/plans/2026-11-15-opt-in-project-mapping-agent-c3bc0255-plan3.md docs/plans/done/2026-11-15-opt-in-project-mapping-agent-c3bc0255-plan3.md docs/plans/logs/c3bc0255.md && git c": {
+   "count": 1,
+   "ms": 411,
+   "maxMs": 411,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short && git pull --rebase origin master 2>&1 | tail -15 && git log --oneline -5 && git status -sb | head -1": {
+   "count": 1,
+   "ms": 1230,
+   "maxMs": 1230,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff CHANGELOG.md | head -40 | cut -c 1-250": {
+   "count": 1,
+   "ms": 97,
+   "maxMs": 97,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \"const fs=require('fs');let t=fs.readFileSync('CHANGELOG.md','utf8');t=t.replace(/<<<<<<< HEAD\\r?\\n([\\s\\S]*?)=======\\r?\\n([\\s\\S]*?)>>>>>>> [^\\n]*\\n/,(m,a,b)=>b.replace(/\\n*$/,'\\n\\n')": {
+   "count": 1,
+   "ms": 174,
+   "maxMs": 174,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add CHANGELOG.md && GIT_EDITOR=true git rebase --continue 2>&1 | tail -3 && git status -sb | head -3 && git log --oneline -4": {
+   "count": 1,
+   "ms": 358,
+   "maxMs": 358,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && export PI_HUB= && node scripts/test-work-settings.mjs 2>&1 | tail -1; node scripts/test-work-project-map.mjs 2>&1 | tail -1; node scripts/test-work-compaction-notifications.mjs 2>&1 | tail -": {
+   "count": 2,
+   "ms": 15093,
+   "maxMs": 7867,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short && rg -n \"\\\"version\\\"\" package.json && git ls-files | rg \"lock\" ; git log --oneline origin/master -1": {
+   "count": 1,
+   "ms": 190,
+   "maxMs": 190,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \"const fs=require('fs');for(const f of ['package.json','package-lock.json']){const j=JSON.parse(fs.readFileSync(f,'utf8'));j.version='1.0.0';if(j.packages&&j.packages['']&&j.packages": {
+   "count": 1,
+   "ms": 198,
+   "maxMs": 198,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -u && git commit -q -m \"Release 1.0.0: opt-in project mapping agent\" && git push origin master 2>&1 | tail -3 && git status -sb | head -1": {
+   "count": 1,
+   "ms": 2513,
+   "maxMs": 2513,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n -i \"plain words|low-context|Simplified Technical|concise|busy human|end your reply|final report\" extensions/*.ts skills/*/SKILL.md 2>/dev/null | cut -c 1-220 | head -20": {
+   "count": 1,
+   "ms": 90,
+   "maxMs": 90,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls scripts | rg -i \"bench\" ; ls docs | rg -i bench; rg -n \"\\\"bench\" package.json | cut -c 1-200": {
+   "count": 1,
+   "ms": 236,
+   "maxMs": 236,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && wc -l scripts/benchmark-self-verify-live.mjs scripts/compare-benchmark-runs.mjs && sed -n \"1,80p\" scripts/benchmark-self-verify-live.mjs | cut -c 1-220; ls benchmarks 2>/dev/null | head": {
+   "count": 1,
+   "ms": 107,
+   "maxMs": 107,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"80,180p\" scripts/benchmark-self-verify-live.mjs | cut -c 1-260; sed -n \"1,40p\" scripts/compare-benchmark-runs.mjs | cut -c 1-200": {
+   "count": 1,
+   "ms": 96,
+   "maxMs": 96,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node \"$HOME/.pi/agent/bin/pi-launcher.js\" --help 2>&1 | rg -i \"append|system-prompt\" | cut -c 1-200; node \"$HOME/.pi/agent/bin/pi-launcher.js\" --list-models 2>&1 | rg -i \"opus-5|sol-6|fable|": {
+   "count": 1,
+   "ms": 8100,
+   "maxMs": 8100,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node \"$HOME/.pi/agent/bin/pi-launcher.js\" --list-models 2>&1 | rg -i \"sol\" | cut -c 1-120 | head -5": {
+   "count": 1,
+   "ms": 1178,
+   "maxMs": 1178,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const f='scripts/benchmark-self-verify-live.mjs';let t=fs.readFileSync(f,'utf8');const r=(a,b)=>{if(!t.includes(a))throw new Error('missing '+a);t=t.replace(": {
+   "count": 1,
+   "ms": 204,
+   "maxMs": 204,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git check-ignore -q .pi/x && echo ignored; mkdir -p .pi/reporting-style-bench && cat > .pi/reporting-style-bench/style.md <<'EOF' # Reporting Write for a smart reader who has not seen your t": {
+   "count": 1,
+   "ms": 206,
+   "maxMs": 206,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && B=.pi/reporting-style-bench && for m in \"anthropic/claude-opus-5-5:opus\" \"openai-codex/gpt-6.1-sol:sol\"; do id=${m%%:*}; n=${m##*:}; for arm in base style; do extra=\"\"; [ $arm = style ] && e": {
+   "count": 2,
+   "ms": 5247,
+   "maxMs": 5160,
+   "failures": 1
+  }
+ },
+ "steps": {
+  "P3-01": {
+   "ms": 162589,
+   "testMs": 0,
+   "replies": 12,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 12
+   }
+  },
+  "P3-02": {
+   "ms": 197602,
+   "testMs": 4321,
+   "replies": 28,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 28
+   },
+   "failures": 2
+  },
+  "P3-03": {
+   "ms": 336024,
+   "testMs": 2758,
+   "replies": 16,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 16
+   },
+   "failures": 1
+  },
+  "P3-04": {
+   "ms": 545511,
+   "testMs": 9743,
+   "replies": 61,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 61
+   },
+   "failures": 2
+  },
+  "P3-06": {
+   "ms": 120099,
+   "testMs": 2776,
+   "replies": 21,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 21
+   },
+   "failures": 1
+  },
+  "P3-05": {
+   "ms": 180223,
+   "testMs": 10911,
+   "replies": 26,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 26
+   },
+   "failures": 2
+  },
+  "(none)": {
+   "ms": 199040,
+   "testMs": 20544,
+   "replies": 29,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 29
+   },
+   "failures": 1
+  }
+ },
+ "spans": [
+  {
+   "start": "2026-11-15T21:12:54.185Z",
+   "ms": 487360
+  },
+  {
+   "start": "2026-11-15T21:21:01.576Z",
+   "ms": 1509004
+  },
+  {
+   "start": "2026-11-15T21:56:32.485Z",
+   "ms": 59878
+  },
+  {
+   "start": "2026-11-15T22:01:07.831Z",
+   "ms": 55337
+  },
+  {
+   "start": "2026-11-16T11:30:01.012Z",
+   "ms": 29621
+  },
+  {
+   "start": "2026-11-16T11:39:02.773Z",
+   "ms": 100299
+  }
+ ],
+ "hints": []
+}

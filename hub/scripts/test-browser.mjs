@@ -50,7 +50,7 @@ async function reload(ready) {
  await evaluate("window.__beforeReload = true");
  assert.equal(await evaluate(fresh), false, "reload readiness must reject the old document");
  await browser("reload");
- await browser("wait", "--fn", fresh);
+ await browser("wait", "--fn", fresh).catch(async error => { console.error("reload not ready:", JSON.stringify(await evaluate("({ old: !!window.__beforeReload, state: document.readyState, url: location.href, body: document.body?.innerText.slice(0, 300) })").catch(e => String(e))), JSON.stringify(await browser("errors").catch(e => String(e)))); throw error; });
 }
 const fixture = new URL("./fixtures/diagrams/upload-service.diagram.json", import.meta.url);
 let sample; try { sample = JSON.parse(await readFile(fixture, "utf8")); } catch (error) { throw new Error("Unreadable fixture " + fixture.pathname + ": " + error.message); }
@@ -1630,6 +1630,16 @@ try {
  assert.equal(messages.at(-1).text, "Restore version 1");
  await evaluate("document.querySelector('#files .design-step[aria-label=\"Newer version\"]').click()");
  await browser("wait", "--fn", "document.querySelector('#files .design-version')?.textContent === 'Live' && !document.querySelector('#files .design-restore')");
+ // The Light/Dark switch forces the page's prefers-color-scheme rules and data-theme; Auto gives the page its own back, and the choice survives a reload.
+ fs.writeFileSync(join(designDir, "index.html"), `<style>h1{color:rgb(0,0,1)}@media (prefers-color-scheme: dark){h1{color:rgb(0,0,2)}}@media (prefers-color-scheme: light) and (min-width: 1px){h1{color:rgb(0,0,3)}}</style><h1>Scheme</h1><script>addEventListener("message",e=>{if(e.data?.type==="test:scheme")parent.postMessage({type:"test:scheme-result",request:e.data.request,page:e.data.page,color:getComputedStyle(document.querySelector("h1")).color,theme:document.documentElement.getAttribute("data-theme")},"*")})</script>`);
+ const probeScheme = async () => { for (let i = 0; i < 40; i++) { const got = await evaluate(`new Promise(resolve=>{const frame=document.querySelector('#files .files-frame'),request=crypto.randomUUID(),timer=setTimeout(()=>{removeEventListener('message',reply);resolve(null);},500);const reply=event=>{if(event.source!==frame?.contentWindow||event.data?.type!=='test:scheme-result'||event.data.request!==request)return;clearTimeout(timer);removeEventListener('message',reply);resolve([event.data.color,event.data.theme,document.querySelector('#files .design-scheme').textContent]);};addEventListener('message',reply);frame?.contentWindow.postMessage({type:'test:scheme',request},'*');})`); if (got) return got; } assert.fail("scheme fixture did not reply"); };
+ const clickScheme = () => evaluate("document.querySelector('#files .design-scheme').click()");
+ assert.deepEqual(await probeScheme(), ["rgb(0, 0, 3)", null, "◐ Auto"], "Auto: the page follows the (light) system");
+ await clickScheme(); assert.deepEqual(await probeScheme(), ["rgb(0, 0, 3)", "light", "☀ Light"]);
+ await clickScheme(); assert.deepEqual(await probeScheme(), ["rgb(0, 0, 2)", "dark", "☾ Dark"], "Dark forces the dark rules over the light system");
+ await reload("!!document.querySelector('#files .design-scheme')");
+ assert.deepEqual(await probeScheme(), ["rgb(0, 0, 2)", "dark", "☾ Dark"], "the choice is kept per design and applied on load");
+ await clickScheme(); assert.deepEqual(await probeScheme(), ["rgb(0, 0, 3)", null, "◐ Auto"], "Auto restores the page's own rules");
  // S10: in Comment mode a click in the page comes back as one pick; another window, a stale load and malformed payloads do not.
  fs.writeFileSync(join(designDir, "index.html"), `<h1>Calm</h1><button data-id="cta">Get started</button><script>addEventListener("message", e => { const d = e.data || {}; if (d.mode !== "comment") return;
   const ok = { type: "design:pick", screen: "index.html", id: "cta", selector: "", tag: "button", text: "Fake", rect: { x: 0, y: 0, width: 1, height: 1 } };

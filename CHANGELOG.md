@@ -2,6 +2,12 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 1.0.4 — 2026-11-16
+
+### Added
+- Hub: the design preview bar has a ◐ Auto / ☀ Light / ☾ Dark switch. It flips a design between its light and dark versions without a Tweaks panel, is kept per design, and Mark renders the mode you see. `design look` takes `colorScheme` so design sessions can check both modes.
+![Design preview bar with the Auto light/dark switch](docs/changelog/1.0.4-design-scheme.png)
+
 ## 1.0.3 — 2026-11-16
 
 ### Changed

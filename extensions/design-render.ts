@@ -20,8 +20,8 @@ export const DESIGN_CSP = (origin: string) => `${SANDBOX_CSP(origin).replace("sa
 
 // The render-state (S06): what to show. folder is absolute (a design folder or a history version); width and height already
 // carry the rotation; hash is the deck slide (location.hash); styleEdits are the preview's live, unsaved inline edits.
-export type RenderState = { folder: string; screen?: string; width: number; height: number; hash?: string; input?: "mouse" | "touch"; reducedMotion?: boolean; pageState?: DesignJson; state?: string; styleEdits?: { selector: string; styles: Record<string, string> }[]; element?: string; full?: boolean; maxEdge?: number };
-export type RenderReport = { state?: { restored: true }; viewport: string; observedViewport: string; input: { requested: "mouse" | "touch"; requestedReducedMotion: boolean; touchPoints: number | null; coarse: boolean | null; reducedMotion: boolean | null }; readiness: { settled: boolean; ignoredAnimations: number; elapsedMs: number; error?: string }; scrollWidth: number; overflow: boolean; wide: string[]; errors: string[]; console: string[]; failed: string[]; missing?: string };
+export type RenderState = { folder: string; screen?: string; width: number; height: number; hash?: string; input?: "mouse" | "touch"; reducedMotion?: boolean; colorScheme?: "light" | "dark"; pageState?: DesignJson; state?: string; styleEdits?: { selector: string; styles: Record<string, string> }[]; element?: string; full?: boolean; maxEdge?: number };
+export type RenderReport = { state?: { restored: true }; viewport: string; colorScheme: "light" | "dark"; observedViewport: string; input: { requested: "mouse" | "touch"; requestedReducedMotion: boolean; touchPoints: number | null; coarse: boolean | null; reducedMotion: boolean | null }; readiness: { settled: boolean; ignoredAnimations: number; elapsedMs: number; error?: string }; scrollWidth: number; overflow: boolean; wide: string[]; errors: string[]; console: string[]; failed: string[]; missing?: string };
 export type Rendered = { png: Buffer; width: number; height: number; report: RenderReport };
 
 const MIME: Record<string, string> = { ".html": "text/html; charset=utf-8", ".htm": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".mjs": "text/javascript; charset=utf-8", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp", ".ico": "image/x-icon", ".woff": "font/woff", ".woff2": "font/woff2", ".ttf": "font/ttf", ".otf": "font/otf", ".mp4": "video/mp4", ".webm": "video/webm" };
@@ -80,7 +80,7 @@ const SETTLE_SCRIPT = `(async () => {
 		last = layout;
 	}
 	return { readiness: { settled: true, ignoredAnimations: ignored.size }, observedViewport: innerWidth + "×" + innerHeight,
-		input: { touchPoints: navigator.maxTouchPoints, coarse: matchMedia("(pointer: coarse)").matches, reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches } };
+		input: { touchPoints: navigator.maxTouchPoints, coarse: matchMedia("(pointer: coarse)").matches, reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches, dark: matchMedia("(prefers-color-scheme: dark)").matches } };
 })()`;
 
 // Runs in the page: applies the live edits, marks the target element, and measures overflow and broken images.
@@ -165,12 +165,13 @@ async function renderCdp(url: string, deadline: number) {
 }
 
 /** One isolated visit; input is set before navigation, readiness is bounded, and no failed settle returns a picture. */
-async function visit(url: string, width: number, height: number, script: string, shot: { element?: boolean; full?: boolean; input?: "mouse" | "touch"; reducedMotion?: boolean; tolerate?: (page) => boolean } = {}) {
+async function visit(url: string, width: number, height: number, script: string, shot: { element?: boolean; full?: boolean; input?: "mouse" | "touch"; reducedMotion?: boolean; colorScheme?: "light" | "dark"; tolerate?: (page) => boolean } = {}) {
 	const exe = agentBrowser();
 	if (!exe) throw new Error("agent-browser is not installed (npm i -g agent-browser); design rendering needs it.");
 	if (!(width >= 200 && width <= 4000 && height >= 200 && height <= 4000)) throw new Error("width and height must be 200 to 4000 pixels.");
 	if (shot.input !== undefined && shot.input !== "mouse" && shot.input !== "touch") throw new Error("input must be mouse or touch");
 	if (shot.reducedMotion !== undefined && typeof shot.reducedMotion !== "boolean") throw new Error("reducedMotion must be a boolean");
+	if (shot.colorScheme !== undefined && shot.colorScheme !== "light" && shot.colorScheme !== "dark") throw new Error("colorScheme must be light or dark");
 	const session = `design-${crypto.randomBytes(6).toString("hex")}`, dir = fs.mkdtempSync(path.join(os.tmpdir(), "design-render-")), file = path.join(dir, "shot.png").split(path.sep).join("/");
 	let cdp: Awaited<ReturnType<typeof renderCdp>> | undefined;
 	try {
@@ -192,14 +193,14 @@ async function visit(url: string, width: number, height: number, script: string,
 			const { sessionId } = await cdp.send("Target.attachToTarget", { targetId: target.targetId, flatten: true });
 			await cdp.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false }, sessionId);
 			await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: shot.input === "touch", ...shot.input === "touch" ? { maxTouchPoints: 1 } : {} }, sessionId);
-			await cdp.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: shot.reducedMotion ? "reduce" : "no-preference" }] }, sessionId);
+			await cdp.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: shot.reducedMotion ? "reduce" : "no-preference" }, { name: "prefers-color-scheme", value: shot.colorScheme ?? "light" }] }, sessionId);
 			await cdp.send("Page.enable", {}, sessionId);
 			await Promise.all([cdp.wait("Page.domContentEventFired"), cdp.send("Page.navigate", { url }, sessionId).then(result => { if (result.errorText) throw new Error(result.errorText); })]);
 			const evaluated = await cdp.send("Runtime.evaluate", { expression: script, awaitPromise: true, returnByValue: true }, sessionId);
 			if (evaluated.exceptionDetails) throw new Error(evaluated.exceptionDetails.exception?.description ?? evaluated.exceptionDetails.text);
 			page = JSON.parse(evaluated.result.value);
 			page.readiness.elapsedMs = Date.now() - started;
-			if (page.observedViewport !== `${width}×${height}` || page.input.coarse !== (shot.input === "touch") || (page.input.touchPoints > 0) !== (shot.input === "touch") || page.input.reducedMotion !== !!shot.reducedMotion) throw new Error("Requested viewport/input did not match the observed page");
+			if (page.observedViewport !== `${width}×${height}` || page.input.coarse !== (shot.input === "touch") || (page.input.touchPoints > 0) !== (shot.input === "touch") || page.input.reducedMotion !== !!shot.reducedMotion || page.input.dark !== (shot.colorScheme === "dark")) throw new Error("Requested viewport/input did not match the observed page");
 		} catch (error) {
 			page = { ...page, readiness: { settled: false, ignoredAnimations: page?.readiness?.ignoredAnimations ?? 0, elapsedMs: Date.now() - started, error: String(error) } };
 		}
@@ -227,9 +228,9 @@ export async function renderDesign(state: RenderState): Promise<Rendered> {
 	const server = await serve(state.folder);
 	const hash = state.hash ? `#${encodeURIComponent(state.hash.replace(/^#/, ""))}` : "";
 	try {
-		const { steps, page, png } = await visit(`${server.origin}/${screen.split("/").map(encodeURIComponent).join("/")}${hash}`, width, height, PAGE_SCRIPT(state), { element: !!state.element, full: state.full, input: state.input, reducedMotion: state.reducedMotion, tolerate: page => !!page.missing });
+		const { steps, page, png } = await visit(`${server.origin}/${screen.split("/").map(encodeURIComponent).join("/")}${hash}`, width, height, PAGE_SCRIPT(state), { element: !!state.element, full: state.full, input: state.input, reducedMotion: state.reducedMotion, colorScheme: state.colorScheme, tolerate: page => !!page.missing });
 		const report: RenderReport = {
-			state: page.state, viewport: `${width}×${height}`, observedViewport: page.observedViewport ?? "unavailable", readiness: page.readiness,
+			state: page.state, viewport: `${width}×${height}`, colorScheme: state.colorScheme ?? "light", observedViewport: page.observedViewport ?? "unavailable", readiness: page.readiness,
 			input: { requested: state.input ?? "mouse", requestedReducedMotion: !!state.reducedMotion, touchPoints: page.input?.touchPoints ?? null, coarse: page.input?.coarse ?? null, reducedMotion: page.input?.reducedMotion ?? null }, scrollWidth: page.scrollWidth, overflow: page.scrollWidth > page.vw + 1, wide: page.wide ?? [],
 			errors: (steps.find(step => step.command[0] === "errors")?.result?.errors ?? []).map(item => String(item.text).split("\n")[0]).slice(0, 20),
 			console: (steps.find(step => step.command[0] === "console")?.result?.messages ?? []).filter(item => ["error", "warning"].includes(item.type)).map(item => `${item.type}: ${item.text}`).slice(0, 20),
@@ -292,7 +293,7 @@ export async function captureSite(url: string, folder: string) {
 /** One line per finding, or "no overflow, no errors". */
 export function reportText(report: RenderReport) {
 	const lines = [
-		`${report.viewport} requested, ${report.observedViewport} observed; ${report.input.requested} requested, touch points ${report.input.touchPoints ?? "unknown"}, coarse ${report.input.coarse ?? "unknown"}; reduced motion ${report.input.requestedReducedMotion} requested, ${report.input.reducedMotion ?? "unknown"} observed.`,
+		`${report.viewport} requested, ${report.observedViewport} observed; ${report.input.requested} requested, touch points ${report.input.touchPoints ?? "unknown"}, coarse ${report.input.coarse ?? "unknown"}; reduced motion ${report.input.requestedReducedMotion} requested, ${report.input.reducedMotion ?? "unknown"} observed; ${report.colorScheme} color scheme.`,
 		report.readiness.settled ? `Settled in ${report.readiness.elapsedMs}ms; ignored ${report.readiness.ignoredAnimations} infinite animation(s).` : `Not settled: ${report.readiness.error}`,
 		report.state?.restored ? "Declared page state restored and acknowledged." : "",
 		report.missing,

@@ -450,6 +450,10 @@ try {
 		assert(hung.report.readiness.elapsedMs < 7000, "host watchdog fires even when page JavaScript never yields");
 		await assert.rejects(renderDesign({ folder: fixture, width: 360, height: 800, input: "invalid" }), /input/i);
 		await assert.rejects(renderDesign({ folder: fixture, width: 360, height: 800, reducedMotion: "true" }), /reducedMotion/i);
+		await assert.rejects(renderDesign({ folder: fixture, width: 360, height: 800, colorScheme: "blue" }), /colorScheme/i);
+		fs.writeFileSync(path.join(fixture, "scheme.html"), `<style>body{margin:0;background:rgb(255,255,255)}@media (prefers-color-scheme: dark){body{background:rgb(0,0,255)}}</style><p>Scheme</p>`);
+		const schemes = await Promise.all(["light", "dark"].map(colorScheme => renderDesign({ folder: fixture, screen: "scheme.html", width: 360, height: 800, colorScheme, maxEdge: 4000 })));
+		assert.deepEqual(schemes.map(shot => [shot.report.colorScheme, pixel(shot, 300, 700)]), [["light", [255, 255, 255]], ["dark", [0, 0, 255]]], "colorScheme emulates prefers-color-scheme");
 		assert.deepEqual(pixel(tablet, 800, 1100), [255, 0, 0], "the live edit shows");
 		assert.deepEqual(pixel(phone, 300, 700), [255, 255, 255]);
 		assert.equal(fs.readFileSync(path.join(fixture, "index.html"), "utf8"), page, "edits never reach the file");

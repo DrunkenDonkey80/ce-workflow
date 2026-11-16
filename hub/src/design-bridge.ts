@@ -31,6 +31,16 @@ export const DESIGN_BRIDGE = `<script data-design-chrome>(() => {
 			send("design:state", { ...reply, state, hash: location.hash, input: touch ? "touch" : "mouse", reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches });
 		} catch { if (load === at) send("design:state", { ...reply, error: "capture" }); }
 	}
+	// The preview's Light/Dark switch: data-theme (the design theme's convention) plus every readable
+	// prefers-color-scheme rule forced on or off. shortcut: linked sheets are cross-origin to this sandbox and keep following the system.
+	const rules = new Map(), root = document.documentElement, ownTheme = root.getAttribute("data-theme");
+	let scheme = "";
+	const walk = list => { for (const rule of list) { try { if (rule.media && rule.cssRules && (rules.has(rule) || /prefers-color-scheme/i.test(rule.media.mediaText))) { if (!rules.has(rule)) rules.set(rule, rule.media.mediaText); rule.media.mediaText = scheme ? rules.get(rule).replace(/\\(\\s*prefers-color-scheme\\s*:\\s*(light|dark)\\s*\\)/gi, (all, mode) => mode.toLowerCase() === scheme ? "(min-width: 0px)" : "(max-width: -1px)") : rules.get(rule); } if (rule.cssRules) walk(rule.cssRules); if (rule.styleSheet) walk(rule.styleSheet.cssRules); } catch { /* cross-origin */ } } };
+	const applyScheme = () => {
+		for (const sheet of document.styleSheets) { try { walk(sheet.cssRules); } catch { /* cross-origin sheet */ } }
+		if (scheme) root.setAttribute("data-theme", scheme); else if (ownTheme === null) root.removeAttribute("data-theme"); else root.setAttribute("data-theme", ownTheme);
+		root.style.colorScheme = scheme;
+	};
 	const chrome = el => { if (el?.nodeType === 3) el = el.parentElement; return !!(el && el.closest && el.closest("[data-design-chrome]")); };
 	const css = document.createElement("style"); css.setAttribute("data-design-chrome", "");
 	css.textContent = "[data-design-pins]::backdrop{pointer-events:none;background:transparent}"; document.head.append(css);
@@ -90,6 +100,7 @@ export const DESIGN_BRIDGE = `<script data-design-chrome>(() => {
 		if (Number.isSafeInteger(message.go) && slides()) location.hash = String(Math.min(slides(), Math.max(1, message.go)));
 		if (message.style && editing) { const el = find(editing); if (el) for (const name of STYLES) if (typeof message.style[name] === "string") el.style.setProperty(name, message.style[name].slice(0, 100)); }
 		if (Array.isArray(message.pins)) { pins = message.pins; drawPins(); }
+		if (message.scheme === "" || message.scheme === "light" || message.scheme === "dark") { scheme = message.scheme; applyScheme(); }
 	});
 	addEventListener("mouseover", event => { if (mode && !chrome(event.target)) outline(target(event.target)); }, true);
 	addEventListener("click", event => {
@@ -104,7 +115,7 @@ export const DESIGN_BRIDGE = `<script data-design-chrome>(() => {
 	addEventListener("design:tweaks", event => { if (event.detail && typeof event.detail === "object") send("design:tweaks", { values: event.detail }); });
 	for (const event of ["resize", "scroll", "toggle", "close", "transitionend", "animationend"]) addEventListener(event, queuePins, true);
 	addEventListener("hashchange", () => { position(); drawPins(); }); // Mark renders the slide shown; the counter follows
-	addEventListener("load", drawPins);
+	addEventListener("load", () => { drawPins(); if (scheme) applyScheme(); });
 })();</script>`;
 
 /** The page with the bridge before its closing body tag (or at the end when it has none). */

@@ -8,16 +8,17 @@ import { designStateJson, type DesignJson } from "./design-state.js?token=__TOKE
 export type DesignView = { key: string; name: string; handle?: string; screens?: string[]; versions?: number[]; version?: number; build?: { state: string; error?: string; generation?: string } };
 // screen: show another screen of this view; open: reopen the preview at a version (none = live); restore: ask the agent.
 // mark: render what the preview shows and open it in the annotator (S13, D13).
-export type MarkState = { pageState: DesignJson; input: "mouse" | "touch"; reducedMotion: boolean; screen: string; version?: number; buildGeneration?: string; width: number; height: number; hash?: string; styleEdits: { selector: string; styles: Record<string, string> }[] };
+export type MarkState = { pageState: DesignJson; input: "mouse" | "touch"; reducedMotion: boolean; colorScheme: "light" | "dark"; screen: string; version?: number; buildGeneration?: string; width: number; height: number; hash?: string; styleEdits: { selector: string; styles: Record<string, string> }[] };
 export type DesignActions = { screen: (screen: string) => void; open: (version: number | undefined, screen: string) => void; restore: (version: number) => void; mark: (state: Promise<MarkState>, isCurrent: () => boolean) => Promise<void> };
 
 // Desktop is the panel's own width (no frame); the rest mirror extensions/design-render.ts (the page cannot import it).
 const DEVICES: [string, number, number][] = [["Desktop", 0, 0], ["Phone small", 360, 800], ["Phone", 390, 844], ["Phone large", 430, 932], ["Foldable", 600, 960], ["Tablet", 820, 1180], ["Laptop", 1366, 768], ["Slide", 1920, 1080]];
-type Device = { preset: string; rotated: boolean };
+// scheme: the Light/Dark switch; none follows the system like the page itself.
+type Device = { preset: string; rotated: boolean; scheme?: "light" | "dark" };
 const storeKey = (view: DesignView) => "design-device:" + (view.handle ?? view.name);
 const saved = (view: DesignView) => { try { return !!localStorage.getItem(storeKey(view)); } catch { return false; } };
 function device(view: DesignView): Device {
- try { const saved = JSON.parse(localStorage.getItem(storeKey(view)) ?? "{}"); if (DEVICES.some(([name]) => name === saved.preset)) return { preset: saved.preset, rotated: !!saved.rotated }; } catch { /* unreadable: default */ }
+ try { const saved = JSON.parse(localStorage.getItem(storeKey(view)) ?? "{}"); if (DEVICES.some(([name]) => name === saved.preset)) return { preset: saved.preset, rotated: !!saved.rotated, scheme: ["light", "dark"].includes(saved.scheme) ? saved.scheme : undefined }; } catch { /* unreadable: default */ }
  return { preset: "Desktop", rotated: false };
 }
 
@@ -130,6 +131,11 @@ export function designFrame(view: DesignView, path: string, src: string, body: H
  picker.value = state.preset;
  const rotate = Object.assign(document.createElement("button"), { type: "button", className: "design-rotate", textContent: "⟳", title: "Rotate (landscape)" });
  rotate.setAttribute("aria-label", "Rotate");
+ // Auto → Light → Dark: the page's prefers-color-scheme and data-theme follow (hub/src/design-bridge.ts); Mark renders the same.
+ const scheme = Object.assign(document.createElement("button"), { type: "button", className: "design-scheme" });
+ const showScheme = () => { scheme.textContent = state.scheme === "dark" ? "☾ Dark" : state.scheme === "light" ? "☀ Light" : "◐ Auto"; scheme.title = `Color scheme: ${state.scheme ?? "follows your system"} (click to switch)`; };
+ showScheme();
+ scheme.addEventListener("click", () => { state.scheme = !state.scheme ? "light" : state.scheme === "light" ? "dark" : undefined; showScheme(); save(); tell({ scheme: state.scheme ?? "" }); });
  // Comment and Edit are one mode at a time; pressing the active one turns it off.
  const modes = ([["comment", "Comment", "Click an element in the page to comment on it"], ["edit", "Edit", "Click an element to change its styles live"]] as const).map(([value, text, title]) => {
   const button = Object.assign(document.createElement("button"), { type: "button", className: "design-" + value, textContent: text, title });
@@ -147,14 +153,14 @@ export function designFrame(view: DesignView, path: string, src: string, body: H
   if (!frame.isConnected) return;
   current?.pending?.reject(new Error("Preview reloaded during capture."));
   current = { frame, load: crypto.randomUUID(), screen: path, version: view.version ?? 0, hash: "", slides: 0, edits: new Map() };
-  frame.contentWindow?.postMessage({ type: "design:hello", load: current.load, mode, pins }, "*");
+  frame.contentWindow?.postMessage({ type: "design:hello", load: current.load, mode, pins, scheme: state.scheme ?? "" }, "*");
  });
  const mark = Object.assign(document.createElement("button"), { type: "button", className: "design-mark", textContent: "Mark", title: "Draw on a picture of this screen at this size" });
  mark.addEventListener("click", async () => {
   const [, presetWidth, presetHeight] = DEVICES.find(([name]) => name === state.preset)!, clamp = (value: number) => Math.min(4000, Math.max(200, Math.round(value)));
   const [width, height] = !presetWidth ? [frame.clientWidth, frame.clientHeight] : state.rotated ? [presetHeight, presetWidth] : [presetWidth, presetHeight];
   const live = current?.frame === frame ? current : undefined;
-  const base = { screen: path, ...view.version ? { version: view.version } : {}, ...view.build?.generation ? { buildGeneration: view.build.generation } : {}, width: clamp(width), height: clamp(height), styleEdits: [...live?.edits ?? []].filter(([, styles]) => Object.keys(styles).length).map(([selector, styles]) => ({ selector, styles })) };
+  const base = { screen: path, ...view.version ? { version: view.version } : {}, ...view.build?.generation ? { buildGeneration: view.build.generation } : {}, width: clamp(width), height: clamp(height), colorScheme: state.scheme ?? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" as const : "light" as const), styleEdits: [...live?.edits ?? []].filter(([, styles]) => Object.keys(styles).length).map(([selector, styles]) => ({ selector, styles })) };
   const captured = live ? captureState(live).then(value => ({ ...base, ...value })) : Promise.reject(new Error("The preview has not loaded yet."));
   mark.disabled = true;
   try { await act.mark(captured, () => !!live && current === live && frame.isConnected); } finally { mark.disabled = false; }
@@ -173,7 +179,7 @@ export function designFrame(view: DesignView, path: string, src: string, body: H
   deck.hidden = !slides; counter.textContent = `${at} / ${slides}`;
   if (slides && !saved(view) && state.preset !== "Slide") { state.preset = picker.value = "Slide"; fit(); }
  });
- const controls: HTMLElement[] = [...modes, keepTweaks, mark, deck, picker, rotate];
+ const controls: HTMLElement[] = [...modes, keepTweaks, mark, deck, scheme, picker, rotate];
  if ((view.screens?.length ?? 0) > 1) {
   const screens = Object.assign(document.createElement("select"), { className: "design-screen", title: "Screen" });
   screens.setAttribute("aria-label", "Screen");

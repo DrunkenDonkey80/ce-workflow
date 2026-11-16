@@ -355,11 +355,11 @@ try {
 	assert(Buffer.isBuffer(first) && Buffer.isBuffer(current), `renders give PNG files: ${first} ${current}`);
 	assert(!first.equals(second) && !first.equals(edited) && !version2.equals(current), "the slide, the inline edit and the version each change the picture");
 	assert.equal((await post(id, "designshot", { screen: "index.html", width: 400, height: 300 })).status, 400, "missing capture cannot silently render defaults");
-	for (const body of [{ pageState: { constructor: {} } }, { pageState: "é".repeat(8192) }, { pageState: Array(257).fill(0) }, { pageState: Array.from({ length: 9 }).reduce(value => [value], null) }, { input: "pen" }, { reducedMotion: "false" }]) assert.equal(await shot(body), 400, "invalid state/capability rejected before rendering");
+	for (const body of [{ pageState: { constructor: {} } }, { pageState: "é".repeat(8192) }, { pageState: Array(257).fill(0) }, { pageState: Array.from({ length: 9 }).reduce(value => [value], null) }, { input: "pen" }, { reducedMotion: "false" }, { colorScheme: "blue" }]) assert.equal(await shot(body), 400, "invalid state/capability rejected before rendering");
 	fs.writeFileSync(path.join(mine, "legacy.html"), "<p>No state support</p>");
 	assert.equal(await shot({ screen: "legacy.html" }), 502, "unsupported capture is not a success PNG");
 	fs.writeFileSync(path.join(mine, "state.html"), '<script>let current=null;window.designPreview={capture:()=>current,restore:value=>{current=value;document.body.style.background=value.color;}};</script><p>Restored</p>');
-	assert(Buffer.isBuffer(await shot({ screen: "state.html", pageState: { color: "red" }, input: "touch", reducedMotion: true })), "validated state and capability reach the renderer");
+	assert(Buffer.isBuffer(await shot({ screen: "state.html", pageState: { color: "red" }, input: "touch", reducedMotion: true, colorScheme: "dark" })), "validated state and capability reach the renderer");
 	hub.registry.update(id, { modes: undefined }); assert.equal(await shot({}), 404, "not a design session"); hub.registry.update(id, { modes: { design: "design-1" } });
 	assert.equal((await post(id, "explore", { path: ".pi/designs/design-1/index.html" })).status, 404, "other .pi files stay refused for chat links");
 	// Component Mark binds the capture to the exact generation, never a newer source build with a similar state schema.
