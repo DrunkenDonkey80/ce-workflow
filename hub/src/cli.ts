@@ -314,11 +314,12 @@ try {
 		const flag = (name: string) => { const at = rest.indexOf(`--${name}`); return at < 0 ? undefined : rest[at + 1]; };
 		const result = await call("/api/commands", { action: rest[0], folder: path.resolve(flag("folder") ?? "."), name: flag("name"), kind: flag("kind"), text: flag("text"), help: flag("help"), local: rest.includes("--local"), actions: flag("actions") && JSON.parse(flag("actions")!), menu: rest.includes("--menu") });
 		console.log(rest[0] === "list" ? JSON.stringify(result.commands) : rest[0] === "add" ? `Added "${result.name}".` : result.ok ? "Removed." : "No such command.");
-	} else if (verb === "peer" && ["ls", "grep", "read"].includes(rest[0])) {
-		// peer_ls/peer_grep/peer_read: pi-hub peer <op> --json '{"hub":..,"project":..,"path":..}'; ls with no hub lists the paired hubs.
+	} else if (verb === "peer" && ["ls", "grep", "read", "fetch"].includes(rest[0])) {
+		// peer_ls/peer_grep/peer_read/peer_fetch: pi-hub peer <op> --json '{"hub":..,"project":..,"path":..}'; ls with no hub lists the paired hubs.
 		const at = rest.indexOf("--json"), args = at < 0 ? {} : JSON.parse(rest[at + 1] ?? "{}");
-		const result = await call("/api/peer", { ...args, op: rest[0] });
-		console.log(result.hubs ? JSON.stringify(result.hubs, null, 1) : `${result.hub}:${result.project} ${result.path}\n${result.text}`);
+		const data = { ...args, op: rest[0], session: process.env.PI_HUB_SESSION }, result: any = rest[0] === "fetch" ? await callLong("/api/peer", data) : await call("/api/peer", data);
+		console.log(result.hubs ? JSON.stringify(result.hubs, null, 1) : result.saved ? `${result.hub}:${result.project} ${result.path} (${result.size} bytes) saved at ${result.saved}`
+			: `${result.hub}:${result.project} ${result.path}\n${result.text}`);
 	} else if (verb === "progress") {
 		// A long job's bar above the session's chat: pi-hub progress 2450 5000 downloading items, or --clear.
 		const at = rest.indexOf("--session"), session = at < 0 ? process.env.PI_HUB_SESSION : rest[at + 1];

@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-17
-updated: 2026-11-17T22:05:38.256Z
+updated: 2026-11-17T22:07:39.773Z
 reviewed: 2026-11-17
 started: 2026-11-17T21:32:10.397Z
 ---
@@ -91,7 +91,7 @@ None recorded.
 ### Phase 2: Remote reads and binary transfers [code]
 
 - [x] **S3** peer_ls/peer_grep/peer_read (deferred, hub sessions only) over /link/read and `pi-hub peer`; realpath confinement, D-10 secrets and .git refused, 2000-line/50 KB caps, remote-reads.log (b2af2729)
-- [ ] **S4** Binary streamed transfers: `peer_fetch` into `.pi/inbox` and send-file both stream raw bodies with resume; base64 path removed
+- [wip] **S4** Binary streamed transfers: `peer_fetch` into `.pi/inbox` and send-file both stream raw bodies with resume; base64 path removed
   - 200 MB per file, refused up front with the size named; free-space check before accepting (D-09). `FILES_MAX` per message becomes the per-file cap; the stand-in description and the `call()` timeout follow.
   - Fetch is a GET with Range; send is a PUT with an upload id and an offset query, partial files kept under the hub data folder and removed after 24 h idle. COMM, link credential and file details travel in headers.
   - Proof on real HTTP hubs as in `test-remote.mjs`: a file above 5 MB arrives byte-identical (sha256) both ways; a cut fetch and a cut send each resume from their offset; a 201 MB request refused before any bytes are written.
@@ -110,7 +110,7 @@ None recorded.
 
 ## Resume context
 
-S1 committed (db3cbee3): link.ts share/pair model, COMM 3, api.ts list/share/pair, hub.ts /api/hubs/share and /api/hubs/unpair; app.ts has an interim Share/Stop sharing menu in openHubLinks that S2 replaces with the Paired hubs dialog. Next: S2. S5 blocked until the Mac hub runs a COMM 3 release (needs an authorized push).
+S1–S3 committed (HEAD b8ced957; nothing pushed). Next: S4 binary streamed transfers (peer_fetch GET with Range into .pi/inbox; send-file PUT with upload id + offset; 200 MB/file; free-space check; partials under hub data folder, 24 h cleanup; base64 /link/file removed). Then S5 is blocked on the Mac hub. Leave untracked: f75ccea6 plan, logs/4d2fa07b.stats.json.
 
 ## Amendments
 

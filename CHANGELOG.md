@@ -6,8 +6,10 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ### Added
 - Hub sessions can read projects another paired hub shares: `peer_ls` lists paired hubs and their shared projects, `peer_grep` searches one with ripgrep and `peer_read` reads a file, including that project's Pi session files under `sessions/`. Reads stay inside the shared folder, never show `.env`, keys or `.git`, stop at 2000 lines or 50 KB, and each one is logged in the serving hub's `remote-reads.log`. Enable them with `tools_enable`.
+- `peer_fetch` copies one file (binary too) from a project another paired hub shares into this project's `.pi/inbox`; asking again resumes a dropped download.
 
 ### Changed
+- Files sent to a session on another hub may now be up to 200 MB each (was 5 MB in total). They travel as raw bytes and an interrupted transfer continues where it stopped.
 - Paired hubs share whole projects instead of single sessions: Settings → Remote access → Hubs lists each paired hub with a checkbox per project of this hub. A ticked project's sessions show up in the other hub's `@` list and can be messaged; replies always get back. New projects start unticked. Pairing and unpairing moved to the same dialog; the session menu's "Hub links…" is gone.
 - Upgrading turns old project links into ticked projects; old session-to-session links are dropped and named once in the Hubs dialog. Both hubs need this version (hub link protocol 3).
 

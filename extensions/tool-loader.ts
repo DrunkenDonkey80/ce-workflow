@@ -13,6 +13,7 @@ export const SITUATIONAL_TOOLS = {
 	peer_ls: "list paired hubs (other PCs), the projects they share with this one, and their folders",
 	peer_grep: "ripgrep a project another paired hub shares (code and its Pi session files)",
 	peer_read: "read a file from a project another paired hub shares",
+	peer_fetch: "copy a file (binary too, up to 200 MB) from a project another paired hub shares into .pi/inbox",
 	design: "Design sessions: start variants built live in the hub, pick one and export it",
 	video_digest: "digest a YouTube coding video: transcript plus code, diagrams and tables rebuilt as Markdown",
 };

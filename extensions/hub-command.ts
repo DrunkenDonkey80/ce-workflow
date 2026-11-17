@@ -333,14 +333,14 @@ const peerWhere = {
 	project: { type: "string", description: "Shared project: folder name or full folder" },
 	path: nullable({ type: "string", description: "Path relative to the project; a sessions/ prefix addresses the project's Pi session files on that hub" }),
 };
-const peerTool = (op: "ls" | "grep" | "read", description: string, properties: Record<string, unknown>, required: string[]) => ({
+const peerTool = (op: "ls" | "grep" | "read" | "fetch", description: string, properties: Record<string, unknown>, required: string[]) => ({
 	name: `peer_${op}`,
 	label: `Peer ${op}`,
 	description,
 	exposure: "deferred",
 	parameters: { type: "object", additionalProperties: false, required, properties },
 	async execute(_id, args) {
-		const result = await hubCli(["peer", op, "--json", JSON.stringify(Object.fromEntries(Object.entries(args ?? {}).filter(([, value]) => value != null)))], 60_000);
+		const result = await hubCli(["peer", op, "--json", JSON.stringify(Object.fromEntries(Object.entries(args ?? {}).filter(([, value]) => value != null)))], op === "fetch" ? 1_800_000 : 60_000);
 		if (!result.ok) throw new Error(result.text);
 		return { content: [{ type: "text", text: result.text }], details: {} };
 	},
@@ -349,6 +349,7 @@ export const peerTools = [
 	peerTool("ls", "List a project folder another paired hub (another PC) shares with this one. With no arguments: the paired hubs and the projects each shares. Secrets (.env, keys) and .git are hidden.", { hub: nullable(peerWhere.hub), project: nullable(peerWhere.project), path: peerWhere.path }, []),
 	peerTool("grep", "Search a project another paired hub shares with this one, with ripgrep (regex, includes gitignored files, never secrets or .git). Output: path:line:text, at most 2000 lines or 50 KB.", { ...peerWhere, pattern: { type: "string", description: "ripgrep regex" }, ignoreCase: nullable({ type: "boolean" }) }, ["hub", "project", "pattern"]),
 	peerTool("read", "Read a text file from a project another paired hub shares with this one, by lines (at most 2000 lines or 50 KB; continue with offset).", { ...peerWhere, path: { type: "string", description: peerWhere.path.anyOf[0].description }, offset: nullable({ type: "integer", description: "First line, 1-based" }), limit: nullable({ type: "integer" }) }, ["hub", "project", "path"]),
+	peerTool("fetch", "Copy one file (binary too, at most 200 MB) from a project another paired hub shares into this project's .pi/inbox; returns the saved path. Asking again resumes a dropped download.", { ...peerWhere, path: { type: "string", description: peerWhere.path.anyOf[0].description } }, ["hub", "project", "path"]),
 ];
 
 /** The menu for a hub status: Install or Start while stopped, page/session/remote controls while running. */

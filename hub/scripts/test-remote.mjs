@@ -2,6 +2,7 @@
 // approved on the local hub, revoke closing open streams at once, and never Funnel.
 import assert from "node:assert/strict";
 import { mock } from "node:test";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -15,7 +16,8 @@ process.env.PI_CODING_AGENT_DIR = root;
 process.env.PI_LENS_CONFIG_PATH = path.join(root, "lens.json");
 const { startHub } = await import("../src/hub.ts");
 const { createDeviceRegistry, tailscaleCommand } = await import("../src/remote.ts");
-const { COMM, FILE_BODY } = await import("../src/link.ts");
+const { COMM } = await import("../src/link.ts");
+const { fetchTransfer } = await import("../src/link-transfer.ts");
 const windowsTailscale = "/mnt/c/Program Files/Tailscale/tailscale.exe";
 assert.equal(tailscaleCommand("linux", true, candidate => candidate === windowsTailscale), windowsTailscale, "WSL reuses Windows Tailscale without depending on PATH");
 assert.equal(tailscaleCommand("linux", true, () => false), "tailscale", "WSL without Windows Tailscale keeps the native command");
@@ -49,7 +51,12 @@ const restarts = [];
 const app = { autoStage: async () => ({ staged: "0.2.0", running: true }), restart: () => restarts.push(1), status: spy("status"), install: spy("install"), stage: spy("stage"), uninstall: spy("uninstall"), setLogin: spy("login") };
 // Plan d21eefbf: hub-to-hub requests go to this same hub's /link/ through the fake serve headers, as if from another hub.
 const linkRequest = (_url, op, body, credential) => remote(`/link/${op}`, { method: "POST", origin: null, body, headers: credential ? { "x-hub-link": credential } : {} }).then(r => [r.status, r.json()]);
-const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], usage: false, run, openUrl: url => opened.push(url), app, linkRequest });
+// S4: binary transfers use the real fetch transport through a stand-in for tailscale serve, which adds its headers.
+const serve = http.createServer((request, response) => request.pipe(http.request({ host: "127.0.0.1", port: hub.config.port, path: request.url, method: request.method,
+	headers: { ...request.headers, host: remoteHost, "x-forwarded-proto": "https", "tailscale-user-login": "me@example.com" } }, upstream => { response.writeHead(upstream.statusCode, upstream.headers); upstream.pipe(response); })));
+await new Promise(done => serve.listen(0, "127.0.0.1", done));
+const serveUrl = `http://127.0.0.1:${serve.address().port}`, linkTransfer = (_url, ...args) => fetchTransfer(serveUrl, ...args);
+const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], usage: false, run, openUrl: url => opened.push(url), app, linkRequest, linkTransfer });
 const { port, localKey } = hub.config, remoteHost = `pc.tail.ts.net:${port}`, remoteOrigin = `https://${remoteHost}`;
 const local = async (route, body) => {
 	const response = await fetch(`http://127.0.0.1:${port}${route}`, { method: body ? "POST" : "GET", headers: { "x-hub-key": localKey, "content-type": "application/json" }, body: body && JSON.stringify(body) });
@@ -183,10 +190,9 @@ try {
 	assert.equal((await link("pair-finish", { comm: COMM + 1, offer: credential, hub: { name: "mac", url: "https://mac.tail.ts.net:7781" } }, credential))[0], 409);
 	assert.equal((await link("pair-finish", { comm: COMM, offer: "short", hub: { name: "mac", url: "https://mac.tail.ts.net:7781" } }, credential))[0], 400);
 	assert.equal((await link("pair-finish", { comm: COMM, offer: credential, hub: { name: "mac", url: "https://mac.tail.ts.net:7781" } }, credential))[0], 200);
-	// Plan 58d5c14f D-09: only /link/file takes a 5 MB file as base64 plus 64 KB; every other /link/ op keeps 64 KB.
+	// Files travel by the binary /link/upload and /link/fetch (plan 4d2fa07b S4); every JSON /link/ op but ping keeps 64 KB.
 	const sized = size => ({ comm: COMM, pad: "x".repeat(size - JSON.stringify({ comm: COMM, pad: "" }).length) });
-	assert.deepEqual(await link("file", sized(FILE_BODY), credential), [400, { comm: COMM, error: "file.data required." }], "exactly the cap is read");
-	assert.deepEqual(await link("file", sized(FILE_BODY + 1), credential), [413, { error: "Request too large." }], "one byte over is refused");
+	assert.equal((await link("file", { comm: COMM }, credential))[0], 404, "the base64 file op is gone");
 	assert.deepEqual(await link("deliver", sized(65_537), credential), [413, { error: "Request too large." }], "deliver keeps 64 KB");
 	assert.deepEqual((await local("/api/hubs")).body.hubs.map(h => [h.name, h.url, "credential" in h]), [["mac", "https://mac.tail.ts.net:7781", false]]);
 	// This hub's side: pairing with another hub (here served by itself) returns the code, then finishes after approval there.
@@ -207,6 +213,21 @@ try {
 	assert.match(await peerCli("ls"), /"name": "mac"[^]*"folder": ".*proj"/, "mac shares proj");
 	const cut = (await peerCli("read", "--json", JSON.stringify({ hub: "mac", project: "proj", path: "big.txt" }))).trim().split("\n");
 	assert.deepEqual([cut[0], cut[1], cut.length, cut.at(-1)], [`mac:${folder} big.txt`, "line 1", 2002, "[more: offset 2001]"]);
+	// S4 over real HTTP: a file past the old 5 MB cap arrives byte-identical both ways; an announced 200 MB + 1 upload writes nothing.
+	const blob = Buffer.from(Array.from({ length: 6 * 1024 * 1024 + 3 }, (_, i) => (i * 131 + (i >> 9)) % 256)), sha = data => createHash("sha256").update(data).digest("hex");
+	fs.writeFileSync(path.join(folder, "blob.bin"), blob);
+	const fetched = await promisify(execFile)(process.execPath, [fileURLToPath(new URL("../src/cli.ts", import.meta.url)), "peer", "fetch", "--json", JSON.stringify({ hub: "mac", project: "proj", path: "blob.bin" })], { env: { ...process.env, PI_HUB_SESSION: id }, windowsHide: true });
+	const fetchedPath = /saved at (.+)$/.exec(fetched.stdout.trim())?.[1];
+	assert.deepEqual([path.dirname(fetchedPath ?? ""), sha(fs.readFileSync(fetchedPath))], [fs.realpathSync(path.join(folder, ".pi", "inbox")), sha(blob)], "peer fetch over HTTP");
+	const uploadHeaders = (size, name = "up.bin") => ({ "x-hub-link": credential, "x-hub-comm": String(COMM), "x-hub-upload": encodeURIComponent(JSON.stringify({ id: `t${size}`, name, size, from: { record: "r1", name: "R1" }, to: id })) });
+	const uploaded = await fetchTransfer(serveUrl, "upload", { offset: "0" }, uploadHeaders(blob.length), fs.createReadStream(path.join(folder, "blob.bin")));
+	assert.deepEqual([uploaded.status, sha(fs.readFileSync(uploaded.json.path))], [200, sha(blob)], "upload over HTTP");
+	const huge = path.join(root, "huge.bin"), partials = path.join(root, "pi-control-hub", "partials");
+	fs.writeFileSync(huge, ""); fs.truncateSync(huge, 200 * 1024 * 1024 + 1);
+	const refused = await fetchTransfer(serveUrl, "upload", { offset: "0" }, uploadHeaders(200 * 1024 * 1024 + 1, "huge.bin"), fs.createReadStream(huge));
+	assert.deepEqual([refused.status, refused.json.error], [413, "huge.bin is 200.0 MB, over the 200 MB limit"]);
+	assert.deepEqual(fs.readdirSync(partials), [], "refused before any byte is written");
+	assert.deepEqual((await fetchTransfer(serveUrl, "upload", { offset: "0" }, { ...uploadHeaders(3), "x-hub-comm": "2" })).status, 409, "comm checked");
 
 	// Revoke: refused at once, and an open event stream is closed.
 	const devices = (await local("/api/devices")).body.devices.filter(device => !device.kind);
@@ -238,6 +259,7 @@ try {
 	console.log("remote ok");
 } finally {
 	await hub.stop();
+	serve.close();
 	mock.timers.reset();
 	fs.rmSync(root, { recursive: true, force: true, maxRetries: 5 });
 }

@@ -5,6 +5,7 @@ import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { Readable, Transform } from "node:stream";
 import { COMM, commMismatch, createLinks, createLinkStore, createPeers, loadIntercom, saveInbox } from "../src/link.ts";
 import { createDeviceRegistry, createPairing } from "../src/remote.ts";
 import { grep, ripgrep } from "../src/peer-read.ts";
@@ -51,12 +52,29 @@ try {
 	} else console.log("skipped: pi-intercom not installed here");
 
 	// S06: two hubs in one process, requests passed as JSON between their /link/ handlers; `offline` drops one.
-	const hubs = {}, offline = new Set(), login = "me@example.com", slow = { file: 0 };
+	const hubs = {}, offline = new Set(), login = "me@example.com", slow = { upload: 0 }, cut = { upload: 0, fetch: 0 };
 	const request = async (url, op, body, credential) => {
-		if (op === "file" && slow.file) await new Promise(done => setTimeout(done, slow.file));
 		if (offline.has(url)) throw new Error("connect ECONNREFUSED");
 		const [status, reply] = await hubs[url].links.serve(op, credential ? { "x-hub-link": credential } : {}, JSON.parse(JSON.stringify(body)), login, new Promise(() => {}));
 		return [status, JSON.parse(JSON.stringify(reply))];
+	};
+	// S4: binary fetch/upload passed as streams; `cut.<op> = N` drops that op's next body after N bytes, as a lost connection does.
+	const cutAfter = (source, limit) => {
+		let seen = 0;
+		return source.pipe(new Transform({ transform(chunk, _encoding, done) {
+			if (seen + chunk.length <= limit) { seen += chunk.length; return done(null, chunk); }
+			this.push(chunk.subarray(0, limit - seen)); source.destroy(); done(new Error("connection reset"));
+		} }));
+	};
+	const transfer = async (url, op, query, headers, body) => {
+		if (op === "upload" && body && slow.upload) await new Promise(done => setTimeout(done, slow.upload));
+		if (offline.has(url)) { body?.destroy(); throw new Error("connect ECONNREFUSED"); }
+		const dropped = body && cut[op] ? cut[op] : 0;
+		if (dropped) cut[op] = 0;
+		const reply = await hubs[url].links.serveTransfer(op, headers, query, dropped ? cutAfter(body, dropped) : body, login);
+		if (dropped) throw new Error("socket hang up");
+		if (reply.stream && cut[op]) { const limit = cut[op]; cut[op] = 0; reply.stream = cutAfter(reply.stream, limit); }
+		return reply;
 	};
 	// S07: each hub has its own in-memory broker; a session's intercom id is `pi-<record>`, and agents acknowledge receipts.
 	const broker = () => {
@@ -94,7 +112,7 @@ try {
 	for (const [name, url, records] of [["pc", "https://pc.t.ts.net:1", pcRecords], ["mac", "https://mac.t.ts.net:2", macRecords]]) {
 		const dataDir = path.join(root, name), devices = createDeviceRegistry(dataDir), pairing = createPairing(devices), fake = broker();
 		fs.mkdirSync(dataDir);
-		hubs[url] = { pairing, devices, broker: fake, links: createLinks({ dataDir, devices, pairing, request, self: () => ({ name, url, login }),
+		hubs[url] = { pairing, devices, broker: fake, links: createLinks({ dataDir, devices, pairing, request, transfer, self: () => ({ name, url, login }),
 			sessions: () => records.map(record => ({ record, name: state[record].name, folder: state[record].folder, live: state[record].live, sessionFile: state[record].sessionFile })),
 			intercom: { intercomId: async record => `pi-${record}`, load: async () => ({ IntercomClient: fake.Client }),
 				wake: async record => { woken.push(record); state[record].live = true; hubs[url].agents[record] = await fake.agent(record); } } }), agents: {} };
@@ -126,7 +144,7 @@ try {
 	assert.deepEqual(names(pc.links), ["belot-beta~mac", "belot-eps~mac", "belot-gamma~mac"]);
 	assert.deepEqual(pc.links.state().hubs[0].projects.map(p => [p.folder, p.sessions.map(s => s.name)]), [[belot, ["BETA", "GAMMA", "EPS"]]]);
 	const macDevice = pc.links.peers.get(macUrl).device, info = pc.broker.clients.get(`hublink-${macDevice}-beta`).info;
-	assert.deepEqual([info.name, info.cwd, info.model], ["belot-beta~mac", `mac (${OS}): ${belot}`, 'hub-link shared by mac; files: attach {type:"file", content:"@<absolute path>"}, 5 MB total'], "fixed id per remote session; intercom shows where it runs");
+	assert.deepEqual([info.name, info.cwd, info.model], ["belot-beta~mac", `mac (${OS}): ${belot}`, 'hub-link shared by mac; files: attach {type:"file", content:"@<absolute path>"}, 200 MB per file'], "fixed id per remote session; intercom shows where it runs");
 	// Send: the receipt comes only after the other hub's session took it; both hubs keep the reply pair (D-11).
 	assert.equal((await alpha.send("belot-beta~mac", { text: "hello" })).delivered, true);
 	assert.deepEqual(beta.inbox.map(m => [m.from, m.content.text]), [["emailupload-alpha~pc", "hello"]]);
@@ -218,12 +236,12 @@ try {
 	assert.deepEqual([path.dirname(saved()), path.basename(saved()).endsWith("-evil.dat")], [fs.realpathSync(macInbox), true], "a traversal name stays in the inbox");
 	// Refused before any upload, with the reason back to the sender.
 	fs.symlinkSync(outside, path.join(pcProj, "out"), "junction");
-	fs.writeFileSync(path.join(pcProj, "a.bin"), Buffer.alloc(3 * 1024 * 1024)); fs.writeFileSync(path.join(pcProj, "b.bin"), Buffer.alloc(3 * 1024 * 1024));
+	fs.writeFileSync(path.join(pcProj, "big.bin"), ""); fs.truncateSync(path.join(pcProj, "big.bin"), 200 * 1024 * 1024 + 1);
 	for (const [attachments, reason] of [
 		[[file(`@${process.execPath}`)], /is outside this project and the temp folder/],
 		[[file(`@${path.join(pcProj, "out", path.basename(process.execPath))}`)], /is outside this project and the temp folder/],
 		[[file("@bin.dat")], /bin\.dat is not an absolute path/],
-		[[file(`@${path.join(pcProj, "a.bin")}`), file(`@${path.join(pcProj, "b.bin")}`)], /the files total 6\.0 MB, over the 5 MB limit/],
+		[[file(`@${binFile}`), file(`@${path.join(pcProj, "big.bin")}`, "big.bin")], /big\.bin is 200\.0 MB, over the 200 MB limit/],
 	]) {
 		const before = fs.readdirSync(macInbox).length;
 		assert.equal((await fp.send(toFm, { text: "refused", attachments })).delivered, false);
@@ -234,17 +252,32 @@ try {
 	const jumped = path.join(root, "jumped"); fs.mkdirSync(jumped); fs.symlinkSync(path.join(root, "pc"), path.join(jumped, ".pi"), "junction");
 	await assert.rejects(saveInbox(jumped, binary, "x"), /leads outside the project/);
 	// Uploads past pi-intercom's receipt window: the sender hears the late outcome; a failed upload never takes the hub offline.
-	slow.file = 3_100;
+	slow.upload = 3_100;
 	assert.equal((await fp.send(toFm, { text: "slow", attachments: [file(`@${binFile}`)] })).delivered, false, "receipt window missed");
 	for (let i = 0; i < 50 && !/after all/.test(fp.inbox.at(-1).content.text); i++) await new Promise(done => setTimeout(done, 100));
 	assert.match(fp.inbox.at(-1).content.text, /^Delivered to mac-proj-fm~mac after all, with 1 file\(s\)/);
 	assert.match(fm.inbox.at(-1).content.text, /^slow\n/);
-	slow.file = 1_200; offline.add(macUrl);
+	slow.upload = 1_200; offline.add(macUrl);
 	assert.equal((await fp.send(toFm, { text: "late fail", attachments: [file(`@${binFile}`)] })).delivered, false);
 	for (let i = 0; i < 30 && !/was not saved/.test(fp.inbox.at(-1).content.text); i++) await new Promise(done => setTimeout(done, 100));
 	assert.match(fp.inbox.at(-1).content.text, /^Not delivered to mac-proj-fm~mac: bin\.dat was not saved on mac \(mac hub unreachable: connect ECONNREFUSED\)/);
 	assert.equal(pc.links.state().hubs[0].online, true, "a failed upload does not take the hub offline");
-	slow.file = 0; offline.delete(macUrl);
+	slow.upload = 0; offline.delete(macUrl);
+	// S4 D-09: a file larger than the old 5 MB cap, its upload cut at 300 KB, resumes from what arrived; no partial stays.
+	const blob = Buffer.from(Array.from({ length: 6 * 1024 * 1024 + 7 }, (_, i) => (i * 131 + (i >> 9)) % 256)), blobFile = path.join(pcProj, "blob.bin");
+	fs.writeFileSync(blobFile, blob);
+	const macPartials = path.join(root, "mac", "partials"), stale = path.join(macPartials, "old-partial");
+	fs.writeFileSync(stale, "x"); fs.utimesSync(stale, new Date(0), new Date(0));
+	cut.upload = 300_000;
+	assert.equal((await fp.send(toFm, { text: "big", attachments: [file(`@${blobFile}`, "blob.bin")] })).delivered, true);
+	assert.equal(cut.upload, 0, "the upload was cut");
+	assert.match(fm.inbox.at(-1).content.text, /File: blob\.bin \(6\.0 MB\) saved at /);
+	assert.equal(fs.readFileSync(saved()).equals(blob), true, "a cut upload resumes byte-identical");
+	assert.deepEqual(fs.readdirSync(macPartials), [], "the finished partial moved; a partial idle for 24 h swept");
+	// A resumed upload whose offset differs from what arrived is refused with the real offset, never appended out of place.
+	const misplaced = { "x-hub-link": pc.links.peers.get(macUrl).credential, "x-hub-comm": String(COMM), "x-hub-upload": encodeURIComponent(JSON.stringify({ id: "skip", name: "s.bin", size: 10, from: { record: "fp", name: "FP" }, to: "fm" })) };
+	assert.deepEqual(await transfer(macUrl, "upload", { offset: "4" }, misplaced, Readable.from([Buffer.alloc(6)])), { status: 409, json: { comm: COMM, offset: 0 } });
+	assert.deepEqual(fs.readdirSync(macPartials), [], "nothing appended");
 
 	// Plan 4d2fa07b S3: pc reads mac's shared project: confined to it (or its Pi session folder), secrets and .git refused, capped, logged.
 	fs.mkdirSync(path.join(macProj, "src")); fs.mkdirSync(path.join(macProj, ".git"));
@@ -286,6 +319,19 @@ try {
 	assert.deepEqual(await asPcRead({ project: emailupload }), [403, { comm: COMM, error: "not-shared" }]);
 	assert.equal(readLog().length, ripgrep() ? 11 : 7, "one log line per served read");
 	assert.match(readLog()[0], / pc ls .*mac proj \.$/);
+	// S4 peer_fetch: a shared binary into the asking session's .pi/inbox; a cut download resumes with Range; secrets and the cap hold.
+	fs.writeFileSync(path.join(macProj, "src", "blob.bin"), blob);
+	cut.fetch = 1_000_000;
+	const fetched = await pc.links.peer({ hub: "mac", project: "mac proj", op: "fetch", path: "src/blob.bin", session: "fp" });
+	assert.deepEqual([cut.fetch, fetched.size, path.dirname(fetched.saved)], [0, blob.length, fs.realpathSync(path.join(pcProj, ".pi", "inbox"))]);
+	assert.equal(fs.readFileSync(fetched.saved).equals(blob), true, "a cut download resumes byte-identical");
+	assert.match(readLog().at(-1), / pc fetch .*mac proj src\/blob\.bin from [1-9]\d+$/, "the resumed request is logged with its offset");
+	await assert.rejects(pc.links.peer({ hub: "mac", project: "mac proj", op: "fetch", path: ".env", session: "fp" }), /\.env is not readable/);
+	await assert.rejects(pc.links.peer({ hub: "mac", project: "mac proj", op: "fetch", path: "src/blob.bin" }), /run it from a session the hub started/);
+	fs.writeFileSync(path.join(macProj, "huge.bin"), ""); fs.truncateSync(path.join(macProj, "huge.bin"), 200 * 1024 * 1024 + 1);
+	const inboxBefore = fs.readdirSync(path.join(pcProj, ".pi", "inbox")).length;
+	await assert.rejects(pc.links.peer({ hub: "mac", project: "mac proj", op: "fetch", path: "huge.bin", session: "fp" }), /huge\.bin is 200\.0 MB, over the 200 MB limit/);
+	assert.deepEqual([fs.readdirSync(path.join(pcProj, ".pi", "inbox")).length, fs.readdirSync(path.join(root, "pc", "partials"))], [inboxBefore, []], "over the cap: nothing written");
 	await pc.links.stop();
 	assert.equal([...pc.broker.clients.keys()].some(id => id.startsWith("hublink-")), false, "stop disconnects stand-ins");
 	// Unpair: both hubs forget each other, its shares and its pairs; mac's stand-ins go.

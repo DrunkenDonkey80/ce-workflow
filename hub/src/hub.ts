@@ -27,7 +27,8 @@ import { browserExtension, changelogImage, hubVersion, readChangelog, since, VER
 import { agentDir } from "./rpc-client.ts";
 import { maintenanceCommand } from "./maintenance.ts";
 import { ICONS, iconSvg } from "../web/icons.ts";
-import { createLinks, FILE_BODY, PING_BODY, type LinkRequest } from "./link.ts";
+import { createLinks, PING_BODY, type LinkRequest } from "./link.ts";
+import type { Transfer } from "./link-transfer.ts";
 import { cookieOf, createDeviceRegistry, createPairing, deviceCookie, exec, serveAdd, serveRemove, tailscaleStatus, type Exec, type Tailnet } from "./remote.ts";
 import { sendExplored, viewers } from "./explore.ts";
 import { pruneSessions, sessionTrash, trimCompacted } from "./session-prune.ts";
@@ -95,7 +96,7 @@ function envCommand(): string[] | undefined {
 	try { return JSON.parse(value); } catch { throw new Error("PI_HUB_PI_COMMAND must be a JSON array of strings."); }
 }
 
-export async function startHub({ command = envCommand(), run = exec as Exec, openUrl = (_url: string) => {}, usage: usageOptions = {} as Partial<UsageOptions> | Usage | false, pool: poolOption = undefined as Pool | false | undefined, models = piModels() as ParkedModels | undefined, updates = undefined as UpdateCheck | undefined, app = undefined as ReturnType<typeof createAppInstall> | undefined, linkRequest = undefined as LinkRequest | undefined } = {}) {
+export async function startHub({ command = envCommand(), run = exec as Exec, openUrl = (_url: string) => {}, usage: usageOptions = {} as Partial<UsageOptions> | Usage | false, pool: poolOption = undefined as Pool | false | undefined, models = piModels() as ParkedModels | undefined, updates = undefined as UpdateCheck | undefined, app = undefined as ReturnType<typeof createAppInstall> | undefined, linkRequest = undefined as LinkRequest | undefined, linkTransfer = undefined as Transfer | undefined } = {}) {
 	try { applyLensDefaults(); } catch (error) { console.warn(`pi-lens defaults not applied: ${error.message}`); }
 	const dataDir = hubDataDir();
 	mkdirSync(dataDir, { recursive: true }); // `node src/hub.ts` on a fresh machine, not only through the CLI
@@ -116,7 +117,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 	let tailnet: Tailnet | undefined, serving = false, remoteError: string | undefined, importError: string | undefined;
 	// Inter-hub links (plan d21eefbf): pairing with other hubs over the tailnet; this hub's address exists only while serving.
 	const openApproval = () => { if (Date.now() - lastLocalPoll > 20_000) { lastLocalPoll = Date.now(); openUrl(`http://127.0.0.1:${config.port}/?token=${config.localKey}`); } };
-	const links = createLinks({ dataDir, devices, pairing, onPairing: openApproval, request: linkRequest, sessions: () => registry.list().map(record => ({ record: record.id, name: record.name, folder: record.folder, live: host.live.has(record.id), sessionFile: record.sessionFile })),
+	const links = createLinks({ dataDir, devices, pairing, onPairing: openApproval, request: linkRequest, transfer: linkTransfer, sessions: () => registry.list().map(record => ({ record: record.id, name: record.name, folder: record.folder, live: host.live.has(record.id), sessionFile: record.sessionFile })),
 		// A record's intercom id is its Pi session id (D10), read from the session file at each delivery.
 		intercom: { intercomId: async id => { const file = registry.get(id)?.sessionFile; return file ? (await readSessionSummary(file).catch(() => null))?.sessionId : undefined; }, wake: id => host.resume(id) }, self: () => serving && tailnet?.host && tailnet.login ? { name: os.hostname(), url: `https://${tailnet.host}:${config.port}`, login: tailnet.login } : undefined });
 	// H6-02: a corrupt or busy old registry is skipped (nothing imported) and retried at the next start.
@@ -284,8 +285,15 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 				if (request.headers["x-forwarded-proto"] !== "https" || request.headers["tailscale-user-login"] !== tailnet!.login) return send(403, { error: "Only the Tailscale owner may connect." });
 				// Another hub: its own path and credential, before the browser Origin and cookie rules (plan d21eefbf, comm protocol).
 				if (url.pathname.startsWith("/link/")) {
+					// S4: files travel as raw bodies, streamed both ways, never buffered whole.
+					if (url.pathname === "/link/fetch" && request.method === "GET" || url.pathname === "/link/upload" && request.method === "PUT") {
+						const reply = await links.serveTransfer(url.pathname.slice(6), request.headers, Object.fromEntries(url.searchParams), request.method === "PUT" ? request : undefined, tailnet!.login!);
+						if (!reply.stream) return send(reply.status, reply.json);
+						response.writeHead(reply.status, { "content-type": "application/octet-stream", "content-length": String(reply.length), "x-hub-size": String(reply.size), "cache-control": "no-store" });
+						return void reply.stream.on("error", () => response.destroy()).pipe(response);
+					}
 					if (request.method !== "POST") return send(405, { error: "POST only." });
-					const [status, value] = await links.serve(url.pathname.slice(6), request.headers, await body(request, ({ "/link/file": FILE_BODY, "/link/ping": PING_BODY } as Record<string, number>)[url.pathname] ?? PAGE_BODY), tailnet!.login!, new Promise(done => response.once("close", done)));
+					const [status, value] = await links.serve(url.pathname.slice(6), request.headers, await body(request, ({ "/link/ping": PING_BODY } as Record<string, number>)[url.pathname] ?? PAGE_BODY), tailnet!.login!, new Promise(done => response.once("close", done)));
 					return send(status, value);
 				}
 				if (request.method === "POST" && origin === undefined) return send(403, { error: "Missing Origin rejected." });
