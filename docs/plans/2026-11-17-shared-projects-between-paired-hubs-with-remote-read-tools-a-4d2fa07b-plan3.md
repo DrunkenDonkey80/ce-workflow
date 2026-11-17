@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-17
-updated: 2026-11-17T21:52:55.735Z
+updated: 2026-11-17T22:05:38.256Z
 reviewed: 2026-11-17
 started: 2026-11-17T21:32:10.397Z
 ---
@@ -90,12 +90,7 @@ None recorded.
 
 ### Phase 2: Remote reads and binary transfers [code]
 
-- [ ] **S3** Read-only remote tools `peer_ls`, `peer_grep`, `peer_read` scoped to shared folders and their Pi session files
-  - Interface: `peer_ls` with no arguments lists paired hubs and their shared projects; otherwise `hub`, `project` and a relative `path`, where a `sessions/` prefix addresses the project's Pi session folder. Tools reach the hub through new `pi-hub peer …` subcommands and are registered only when `PI_HUB_SESSION` is set.
-  - Every op applies D-10: real-path confinement, secret patterns and `.git/` refused. grep runs with `--hidden --no-ignore`, exclude globs for the D-10 patterns and `.git/`, never `-L`, on a confined path.
-  - ripgrep is looked up on PATH, then in `agentDir()/bin`; when missing, the tool returns `ripgrep unavailable on <hub>`.
-  - Output capped at 2000 lines or 50 KB; each remote read appended to `remote-reads.log` in the hub data folder, capped at 1 MB (oldest half dropped when full).
-  - Proof in `hub/scripts/test-link.mjs`: path escape (symlink and `..`), a refused secret for read and ls, grep for a string inside `.env` returns nothing, an unshared project refused, a capped result, one log line per read; one end-to-end tool call through `pi-hub peer` returning a capped result.
+- [x] **S3** peer_ls/peer_grep/peer_read (deferred, hub sessions only) over /link/read and `pi-hub peer`; realpath confinement, D-10 secrets and .git refused, 2000-line/50 KB caps, remote-reads.log (b2af2729)
 - [ ] **S4** Binary streamed transfers: `peer_fetch` into `.pi/inbox` and send-file both stream raw bodies with resume; base64 path removed
   - 200 MB per file, refused up front with the size named; free-space check before accepting (D-09). `FILES_MAX` per message becomes the per-file cap; the stand-in description and the `call()` timeout follow.
   - Fetch is a GET with Range; send is a PUT with an upload id and an offset query, partial files kept under the hub data folder and removed after 24 h idle. COMM, link credential and file details travel in headers.
