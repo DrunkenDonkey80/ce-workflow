@@ -111,6 +111,8 @@ try {
 	result = await mapper.refresh(repo, { model: MODEL });
 	assert.equal(result.status, "partial");
 	assert.equal(fake.prompts.length, calls, "an unchanged project costs no model call");
+	await mapper.refresh(repo, { model: MODEL, force: true });
+	assert.ok(fake.prompts.length === calls + 1 && fake.prompts.at(-1).startsWith("Evidence:"), "a deliberate rebuild re-reads everything even when unchanged");
 
 	// Add, delete, rename and a dirty tracked edit: stale, then an incremental update.
 	write("src/c.ts", "export function newHelper() {}\n");
@@ -123,7 +125,7 @@ try {
 	assert.ok(incremental.includes("### src/c.ts") && incremental.includes("### src/runner.ts") && incremental.includes("### src/a.ts"), "changed and added files are re-read");
 	assert.ok(/Deleted files:\nsrc\/b\.ts/.test(incremental), "the renamed-away path is reported deleted");
 	assert.ok(!incremental.includes("### README.md"), "unchanged files are not resent");
-	assert.match(fs.readFileSync(loc.map, "utf8"), /generation=2/);
+	assert.match(fs.readFileSync(loc.map, "utf8"), /generation=3/);
 
 	// Branch switch is just another content change.
 	git("add", "-A");
@@ -238,6 +240,17 @@ try {
 	result = await mod.createProjectMapper({ agentDir, complete: plainModel.complete, isEnabled: () => true }).refresh(plain, { git: false, model: MODEL });
 	assert.equal(result.status, "ready");
 	assert.ok(plainModel.prompts[0].includes("### tool.py") && !plainModel.prompts[0].includes("dependencyOnly"), "the non-Git walk skips dependencies");
+
+	// Over budget: outlines shrink so late-sorted folders still appear, instead of being dropped whole.
+	const wide = path.join(temp, "wide");
+	for (const dir of ["a", "z"]) for (let i = 0; i < 10; i++) {
+		fs.mkdirSync(path.join(wide, dir), { recursive: true });
+		fs.writeFileSync(path.join(wide, dir, `f${i}.ts`), Array.from({ length: 40 }, (_, n) => `export function ${dir}${i}fn${n}() {}`).join("\n"));
+	}
+	const wideModel = fakeModel();
+	result = await mod.createProjectMapper({ agentDir, complete: wideModel.complete, isEnabled: () => true, limits: { ...mod.MAP_LIMITS, evidenceChars: 6000 } }).refresh(wide, { git: false, model: MODEL });
+	assert.equal(result.status, "ready", "every file fits once outlines are shortened");
+	assert.ok(wideModel.prompts[0].includes("### z/f9.ts") && wideModel.prompts[0].includes("20 shortened to fit"), "the last folder is covered and the shortening is stated");
 
 	// Session glue: the first idle input waits for the map; guidance is stable; failures do not retry on their own.
 	{

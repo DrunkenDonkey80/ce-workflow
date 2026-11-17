@@ -320,5 +320,229 @@
     "status": "reviewed",
     "processedOn": "2026-11-09",
     "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "qh4vLlit97I",
+    "title": "Is Anthropic STEALING Your Data? (While You PAY FOR IT)",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-07-27-is-anthropic-stealing-your-data-while-you-pay-for-it/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "AQl5Q-0l7FQ",
+    "title": "Engineers... STOP Picking GPT-5.6 Sol OR Claude Fable 5… FUSE THEM",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-07-20-engineers-stop-picking-gpt-5-6-sol-or-claude-fable-5-fuse-th/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "haUfb1ievTE",
+    "title": "My Super Simple Software Factory (For Agentic Engineers)",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-08-03-my-super-simple-software-factory-for-agentic-engineers/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "SEI_qIW4o2c",
+    "title": "Engineers… Your Software Factory NEEDS Agent Sandboxes to SCALE (exe.dev)",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-08-10-engineers-your-software-factory-needs-agent-sandboxes-to-sca/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "S_QdQ1G4GlU",
+    "title": "FIXING Opus 5: PROOF that Prompt Engineering IS NOT DEAD",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-08-17-fixing-opus-5-proof-that-prompt-engineering-is-not-dead/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "rqZHR-hRllI",
+    "title": "Intelligence EXPLOSION: Harness Engineering with Pi Agent, Deepseek, and Gemini",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-08-24-intelligence-explosion-harness-engineering-with-pi-agent-dee/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "rPWCYB62wvI",
+    "title": "Agentic Engineering Operating Level: WHERE to FOCUS your AGENTS?",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-08-31-agentic-engineering-operating-level-where-to-focus-your-agen/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "S2sjyokoxeE",
+    "title": "Are Agent Swarms USEFUL? OpenAI’s GPT-6 Astra SWARM Takeaways",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-09-07-are-agent-swarms-useful-openai-s-gpt-6-astra-swarm-takeaways/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "9weiIHy9T_0",
+    "title": "Agentic Engineering Benchmarks: How I RANK Astra, Fable 5.1, and Open-Weights",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-09-14-agentic-engineering-benchmarks-how-i-rank-astra-fable-5-1-an/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "3b0U4_02bAE",
+    "title": "Self-Compact Pi Agent: ZERO HYPE Agentic Coding Devlog",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-09-21-self-compact-pi-agent-zero-hype-agentic-coding-devlog/digest.md (Takeaways for ce-workflow; transcript only, video_digest flagged by Luna)"
+  },
+  {
+    "id": "_U-O5lYhJ7Q",
+    "title": "10 Levels of Jev For Agentic Engineers",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-09-28-10-levels-of-jev-for-agentic-engineers/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "8BD6w5wELRo",
+    "title": "OpenRouter State Of Models: Jev, Open-Weights, and Tokenomics",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-10-05-openrouter-state-of-models-jev-open-weights-and-tokenomics/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "DNDYYHsypZg",
+    "title": "Pi Durable PROACTIVE Agents: Jev Triggers My ON-CALL Pi Agent",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-10-12-pi-durable-proactive-agents-jev-triggers-my-on-call-pi-agent/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "OLqP8jxJ0Wc",
+    "title": "My Jev Pi Durable Agent CURATES News: HYPE, FACT, or SIGNAL",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-10-19-my-jev-pi-durable-agent-curates-news-hype-fact-or-signal/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "52JX83rGPLc",
+    "title": "ELITE Agentic Engineers Are LEAVING THE LOOP... Here’s why",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-10-26-elite-agentic-engineers-are-leaving-the-loop-here-s-why/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "1v7ldJiyH-Y",
+    "title": "Tiny Software Factories: Agentic Engineering DONE WRONG",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-11-02-tiny-software-factories-agentic-engineering-done-wrong/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "GRlcm3wmOqs",
+    "title": "ZERO to RUNNING Software Factory In 16 Minutes (LIQUID Software)",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-11-09-zero-to-running-software-factory-in-16-minutes-liquid-softwa/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "zyQxyNQZ8B4",
+    "title": "The Home Repo Pattern",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-11-12-the-home-repo-pattern/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "hWe-j78vNpc",
+    "title": "The Home Repo: The effortless multi-repo agent setup",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-11-12-the-home-repo-the-effortless-multi-repo-agent-setup/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "hYIymEMB9x4",
+    "title": "Fable 5.2 is CRACKED but THIS goes BEYOND THE MODEL",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-11-16-fable-5-2-is-cracked-but-this-goes-beyond-the-model/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "WAFUMBLOjHo",
+    "title": "SEE CMUX SOLVE Multi-Agent Orchestration (Claude Code and Pi Agent)",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-07-06-see-cmux-solve-multi-agent-orchestration-claude-code-and-pi/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "VQy50fuxI34",
+    "title": "FORGET Loop Engineering. Agentic Engineering is about THIS",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-07-13-forget-loop-engineering-agentic-engineering-is-about-this/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "cFYdiynrxpQ",
+    "title": "GLM-5.2 vs MiniMax-M3: Opus Has REAL COMPETITION (Model Stacking)",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-06-29-glm-5-2-vs-minimax-m3-opus-has-real-competition-model-stacki/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "D1BHGv4gB6c",
+    "title": "Claude Fable 5 BANNED: The First Model Agentic Engineers DON'T NEED",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-06-15-claude-fable-5-banned-the-first-model-agentic-engineers-don/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "DzbqeO_diOQ",
+    "title": "PLANS For Fable 5: Rebuilding My /Plan Skill for Mythos Class Models",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-06-22-plans-for-fable-5-rebuilding-my-plan-skill-for-mythos-class/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "o4KZH_KSqYQ",
+    "title": "Pi Coding Agent Observability: HTML Specs with Gemini 3.5 Flash and GPT Image 2",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-06-01-pi-coding-agent-observability-html-specs-with-gemini-3-5-fla/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "YG4t7aMY81c",
+    "title": "I Ranked Cloudflare’s Software Factory and Wow… S TIER TOKENOMICS",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-06-08-i-ranked-cloudflare-s-software-factory-and-wow-s-tier-tokeno/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "2KcITKKJikA",
+    "title": "Top #1 Opportunity for Senior Engineers: Agentic Engineering",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-05-25-top-1-opportunity-for-senior-engineers-agentic-engineering/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "PIdETjcXNIk",
+    "title": "Pi to Pi: Two-Way Agent Orchestration with the Pi Coding Agent",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-05-18-pi-to-pi-two-way-agent-orchestration-with-the-pi-coding-agen/digest.md (Takeaways for ce-workflow; captions only, the Luna frame pass was refused by the provider's content filter)"
+  },
+  {
+    "id": "EnXKysJNz_8",
+    "title": "GPT-5.5 VERIFIED Opus 4.7: A Pi Coding Agent That REVIEWS Like YOU",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-05-04-gpt-5-5-verified-opus-4-7-a-pi-coding-agent-that-reviews-lik/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "yBcmIoA-vGs",
+    "title": "Engineers, DELETE the BASH Tool: Agentic Security For Pi Agent and Claude Code",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-05-11-engineers-delete-the-bash-tool-agentic-security-for-pi-agent/digest.md (Takeaways for ce-workflow)"
+  },
+  {
+    "id": "8IDzBRRFnQU",
+    "title": "MAXIMIZE Your Claude Code Subscription (Without Getting BANNED)",
+    "status": "reviewed",
+    "processedOn": "2026-11-17",
+    "evidence": "~/Downloads/video-digests/2026-04-27-maximize-your-claude-code-subscription-without-getting-banne/digest.md (Takeaways for ce-workflow)"
   }
 ]

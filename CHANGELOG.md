@@ -2,6 +2,12 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 1.0.6 — 2026-11-17
+
+### Fixed
+- Project maps of large repositories now cover every folder. When file outlines exceed the size budget, each outline is shortened evenly instead of dropping files that sort late, such as `src/`.
+- `/wo` Settings → Mapping agent → **Rebuild map now** rebuilds the whole map even when no files changed. Previously it did nothing, so a partial map stayed partial.
+
 ## 1.0.5 — 2026-11-17
 
 ### Changed
