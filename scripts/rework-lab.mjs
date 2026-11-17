@@ -9,6 +9,7 @@
 // --plan-only stops after the first /plan3 turn and copies the draft plan to <root>/<run>.plan.md.
 // --from-plan skips planning: --source is an earlier lab clone and --sha a commit where its plan is already decided (C1 coding arms).
 // --check runs CMD (bash) in the clone at the end; its result goes on the final line.
+// --ce-workflow DIR loads only DIR's extensions (e.g. a worktree at a baseline commit) instead of the installed packages: A/B of a ce-workflow change.
 // No plan after /plan3 (the planner sized it Tiny and just did it) ends as outcome "tiny", not a failure.
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -101,8 +102,10 @@ let lastNotify = "", lastTitle = "", repeats = 0;
 let child, running = false, lastActivity = Date.now(), buffer = "";
 const rpcOut = path.join(root, `${runName}.rpc.jsonl`);
 const sessions = path.join(root, `${runName}-sessions`);
+const ceWorkflow = value("--ce-workflow");
+const extensionArgs = ceWorkflow ? ["--no-extensions", ...JSON.parse(readFileSync(path.join(ceWorkflow, "package.json"), "utf8")).pi.extensions.flatMap((rel) => ["--extension", path.resolve(ceWorkflow, rel)])] : [];
 function start() {
-	child = spawn(process.execPath, [launcher, "--mode", "rpc", "--session-dir", sessions, "--model", thinker, "--thinking", "high"], { cwd: dir, env: Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("PI_HUB"))), stdio: ["pipe", "pipe", "pipe"], windowsHide: true }); // no hub: dialogs must come here, not to the user's hub
+	child = spawn(process.execPath, [launcher, "--mode", "rpc", "--session-dir", sessions, "--model", thinker, "--thinking", "high", ...extensionArgs], { cwd: dir, env: Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("PI_HUB"))), stdio: ["pipe", "pipe", "pipe"], windowsHide: true }); // no hub: dialogs must come here, not to the user's hub
 	child.stdout.on("data", (chunk) => {
 		appendFileSync(rpcOut, chunk);
 		buffer += chunk;
@@ -120,7 +123,8 @@ function answer(req) {
 	// The agent asking for a gate is the moment a human presses Alt+A; a proposal to replace the gate is refused.
 	const gate = nextGate();
 	if (gate && String(req.title).includes(gate)) grant(gate);
-	const pick = options.find((o) => /recommended|^start work here/i.test(o) && !GATE_DODGE.test(o)) ?? options.find((o) => /rework/i.test(o)) ?? options.find((o) => /type custom response/i.test(o)) ?? options.find((o) => !/^(cancel|other|skip|later|stop|no\b)/i.test(o)) ?? options[0];
+	// --ce-workflow runs have no pi-subagents, so a review offer would deadlock the plan on an advisor it cannot launch.
+	const pick = (ceWorkflow ? options.find((o) => /^finish without review/i.test(o)) : undefined) ?? options.find((o) => /recommended|^start work here/i.test(o) && !GATE_DODGE.test(o)) ?? options.find((o) => /rework/i.test(o)) ?? options.find((o) => /type custom response/i.test(o)) ?? options.find((o) => !/^(cancel|other|skip|later|stop|no\b)/i.test(o)) ?? options[0];
 	repeats = req.title === lastTitle ? repeats + 1 : 0;
 	lastTitle = req.title;
 	// Checklists (✓/○ rows) toggle a row per pick and save on Esc; leave them as they are. A dialog that keeps coming back is cancelled too.

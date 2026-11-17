@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: active
+status: complete
 created: 2026-11-17
-updated: 2026-11-17T12:50:57.014Z
+updated: 2026-11-17T14:25:42.281Z
 started: 2026-11-17T12:48:04.621Z
 ---
 
@@ -76,6 +76,8 @@ Rule sources (verified in code, line numbers at master 2026-11-17):
 - D-06 Benchmark: small fixture, plan and execute, 2 repetitions per arm. The rules serve every project: base them on as many recent plans as available. Source: user, Q-04 answer.
 - D-07 Use Astra's wording (rule sources 1–7) as the starting text, with two corrections to the earlier draft: standalone final-check, qualification, experiment and requested-deployment steps stay allowed; review findings move to Backlog unless they address a requirement, safety risk or acceptance gap (not only "a correctness bug"). Source: Astra audit, adopted by the agent; not yet confirmed by the user.
 - D-08 No in-prompt example list; at most the one-line bug-batch example inside `PLAN_SHAPE`. Source: Astra audit (prompt cost), agent agrees.
+- D-09 Execution benchmark skipped; S2 is judged on plan shape and the two quality-control re-plans only, and the execution cost of the new rules is unmeasured. Round 1 stalled on the review dialog in 3 of 4 runs (no pi-subagents in `--ce-workflow` runs); the rerun hit the ChatGPT usage limit with 0 tokens. Source: user, after the rerun failed.
+
 
 ## Open questions
 
@@ -109,12 +111,7 @@ None recorded.
 
 ### Phase 2: Measure [think]
 
-- [ ] **S2** Benchmark baseline against candidate on a three-bug fixture; keep only without material regression
-  - Reference shape: the 40b87278 and 11624e75 plans re-cut to about 5 steps each (Findings).
-  - Fixture: a tiny repo with three small reported bugs; both arms run `/plan3` then execute, 2 repetitions, from isolated copies pinned to the baseline commit and the S1 commit.
-  - Compare steps, phases, test commands, runtime, tokens, cost, turns and tool calls (all continuation sessions); all three bugs must be fixed with tests in both arms.
-  - Quality control, planning only: re-plan 1b037b9a (migration) and 27a11af3 (experiment) with the candidate rules; their safety and evidence boundaries must survive.
-  - On a material overall regression or undersplit quality-control plans, revert the offending sentence and record why in Decisions.
+- [x] **S2** Plan shape on three-bug fixture: base 3 steps, cand 4 (adds the shared final check); QC re-plans keep their boundaries (migration 7 vs 8, experiment 3 vs 3); execution cost unmeasured (D-09)
 
 ## Backlog
 
@@ -131,7 +128,7 @@ None recorded.
 
 ## Resume context
 
-Planning done; plan waits for /plan3 finish. D-07 (Astra wording, two corrections) is agent-adopted. No code changed.
+S1 done (75db6ce9). S2 running: 4 rework-lab runs c468-{base,cand}-{1,2} (fixture C:/SOFT/git/rework-lab/fixtures/three-bugs @8170ecc, hidden check three-bugs-check.mjs) and 2 plan-only QC runs c468-qc-{migration,experiment} (candidate rules), all under C:/SOFT/git/rework-lab. Arms load ce-workflow worktrees .pi/bench-wt/base (daf9682d) and cand (75db6ce9) via new rework-lab --ce-workflow. Next: when runs finish, count steps, phases and test commands per plan, build results.json per arm, run compare-benchmark-runs, judge QC plans, record verdict. No blockers.
 
 ## Amendments
 
