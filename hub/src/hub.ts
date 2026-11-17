@@ -27,7 +27,7 @@ import { browserExtension, changelogImage, hubVersion, readChangelog, since, VER
 import { agentDir } from "./rpc-client.ts";
 import { maintenanceCommand } from "./maintenance.ts";
 import { ICONS, iconSvg } from "../web/icons.ts";
-import { createLinks, FILE_BODY, type LinkRequest } from "./link.ts";
+import { createLinks, FILE_BODY, PING_BODY, type LinkRequest } from "./link.ts";
 import { cookieOf, createDeviceRegistry, createPairing, deviceCookie, exec, serveAdd, serveRemove, tailscaleStatus, type Exec, type Tailnet } from "./remote.ts";
 import { sendExplored, viewers } from "./explore.ts";
 import { pruneSessions, sessionTrash, trimCompacted } from "./session-prune.ts";
@@ -176,10 +176,8 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 		"GET /api/devices": () => ({ devices: devices.list() }),
 		"GET /api/hubs": () => links.state(),
 		"POST /api/hubs/pair": data => links.pairWith(String(data.url ?? "")),
-		"POST /api/hubs/sessions": data => links.remoteSessions(String(data.url ?? "")),
-		"GET /api/sessions/([0-9a-f-]{36})/links": (_d, m) => ({ links: links.linksOf(m[1]) }),
-		"POST /api/sessions/([0-9a-f-]{36})/links": (data, m) => typeof data.folder === "string" ? links.linkProject(m[1], String(data.hub ?? ""), data.folder) : links.link(m[1], String(data.hub ?? ""), String(data.record ?? "")),
-		"POST /api/links/([0-9a-f-]{36})/unlink": (_d, m) => links.unlink(m[1]),
+		"POST /api/hubs/share": data => links.share(String(data.url ?? ""), String(data.folder ?? ""), data.shared === true),
+		"POST /api/hubs/unpair": data => links.unpair(String(data.url ?? "")),
 		"POST /api/devices/([A-Za-z0-9_-]{12})/revoke": async (_d, m) => { const ok = await devices.revoke(m[1]); dropDevice(m[1]); return { ok }; },
 		"POST /api/sessions": data => host.create(String(data.folder ?? ""), String(data.name ?? "")),
 		"POST /api/sessions/([0-9a-f-]{36})/resume": (_d, m) => host.resume(m[1]),
@@ -284,7 +282,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 				// Another hub: its own path and credential, before the browser Origin and cookie rules (plan d21eefbf, comm protocol).
 				if (url.pathname.startsWith("/link/")) {
 					if (request.method !== "POST") return send(405, { error: "POST only." });
-					const [status, value] = await links.serve(url.pathname.slice(6), request.headers, await body(request, url.pathname === "/link/file" ? FILE_BODY : PAGE_BODY), tailnet!.login!, new Promise(done => response.once("close", done)));
+					const [status, value] = await links.serve(url.pathname.slice(6), request.headers, await body(request, ({ "/link/file": FILE_BODY, "/link/ping": PING_BODY } as Record<string, number>)[url.pathname] ?? PAGE_BODY), tailnet!.login!, new Promise(done => response.once("close", done)));
 					return send(status, value);
 				}
 				if (request.method === "POST" && origin === undefined) return send(403, { error: "Missing Origin rejected." });

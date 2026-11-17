@@ -1351,15 +1351,14 @@ async function updateSlash() {
   : list.pi.filter(item => item.name.startsWith(match[3])).map(item => ["/" + item.name, item.description]);
  showSlash(rows);
 }
-// This session's hub links (plan d21eefbf) for @: only a linked session can reach its name~hub stand-in. Cached 30 s.
+// Stand-ins this session may write to (plan 4d2fa07b): sessions of projects paired hubs share, and its reply partners. Cached 30 s.
 let linkCache: { at: number; rows: string[][] } | undefined;
 async function linkedRows() {
  if (linkCache && Date.now() - linkCache.at < 30_000) return linkCache.rows;
  let rows: string[][] = [];
  try {
   const list = await post("links", { session: sessionId, action: "list" });
-  // A project link offers each of its stand-ins (one per remote session); a session link its one stand-in.
-  rows = list.links.flatMap(link => (link.kind === "project" ? link.standins : [link.standin ?? `${link.remote.name}~${link.hubName}`]).map(name => [name, `linked: ${link.label}${link.online ? "" : " (offline)"}`, name]));
+  rows = list.standins.map(standin => [standin.name, standin.label, standin.name]);
  } catch { /* hub links off */ }
  linkCache = { at: Date.now(), rows }; return rows;
 }
@@ -2157,7 +2156,7 @@ function openSessionMenu(anchor: HTMLElement, session: HubSession, path: string)
   item("Copy folder path", () => void copyPath(path)),
   item("Copy git URL", () => void copyGitUrl(path)),
   item("Copy intercom id", () => void copyPath(sessionRef(path, session))),
-  item("Hub links…", () => void openHubLinks(anchor, session)),
+  item("Hub links…", () => void openHubLinks(anchor, session, path)),
   ...(session.timers ?? []).map(t => item(`Cancel ⏰ ${t.kind}: ${t.label.slice(0, 40)}`, () => void sessionAction({ action: "cancel-timer", id: session.id, timer: t.id }))),
   item("Open in terminal", () => void sessionAction({ action: "terminal", id: session.id })),
   parked ? item("Resume", () => void sessionAction({ action: "resume", id: session.id })) : item("Park", () => void sessionAction({ action: "park", id: session.id })),
@@ -2171,34 +2170,19 @@ function openSessionMenu(anchor: HTMLElement, session: HubSession, path: string)
  ]);
  placeMenu(anchor);
 }
-// Plan d21eefbf D7: this session's links to sessions on other hubs (their agents see each other over intercom as name~hub).
-async function openHubLinks(anchor: HTMLElement, session: HubSession) {
+// Plan 4d2fa07b D-02: share this session's project with a paired hub; its agents then reach the project's sessions as folder-name~hub.
+async function openHubLinks(anchor: HTMLElement, session: HubSession, folder: string) {
  try {
   const links = (data: Record<string, unknown>) => post("links", { session: session.id, ...data });
-  const state = await links({ action: "list" });
+  const state = await links({ action: "list" }), project = folder.split(/[\\/]/).filter(Boolean).pop() ?? folder, key = (path: string) => path.replace(/[\\/]+$/, "").toLowerCase();
   if (state.unavailable) showNotice(state.unavailable);
   showMenu(anchor, [
-   ...state.links.map(link => [`Unlink ${link.kind === "project" ? link.label : link.standin ?? link.remote.name + "~" + link.hubName}${link.online ? "" : " (offline)"}`, async () => {
-    if (!await confirmBox(`Unlink "${session.name}" from ${link.label}?`)) return;
-    try { const done = await links({ action: "unlink", link: link.id }); showNotice(done.pending ? `Unlinked here; ${link.hubName} hears it when it is back.` : "Unlinked."); } catch (error) { showNotice(error.message); }
-   }] as [string, () => void]),
-   ...state.hubs.map(hub => [`Link to a session on ${hub.name}${hub.online ? "" : " (offline)"}…`, async () => {
-    try {
-     const remote = await links({ action: "sessions", hub: hub.url });
-     if (!remote.sessions.length) return showNotice(`${hub.name} has no sessions.`);
-     // A tree: each project folder (sorted by name; same-named ones show their parent) heads its sessions; the heading links the whole project (plan 58d5c14f).
-     const parts = (folder: string) => folder.split(/[\\/]/).filter(Boolean), base = (folder: string) => (parts(folder).at(-1) ?? folder).toLowerCase(), byFolder = new Map<string, typeof remote.sessions>();
-     for (const other of [...remote.sessions].sort((a, b) => a.name.localeCompare(b.name))) byFolder.set(other.folder, [...byFolder.get(other.folder) ?? [], other]);
-     const label = (folder: string) => parts(folder).slice([...byFolder.keys()].some(other => other !== folder && base(other) === base(folder)) ? -2 : -1).join("/") || folder;
-     const groups = [...byFolder].map(([folder, list]) => ({ folder, name: label(folder), list })).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
-     sessionMenu.replaceChildren(...groups.flatMap(({ folder, name, list }) => [menuItem(`${name}: link the whole project`, async () => {
-      try { const made = await links({ action: "link", hub: hub.url, folder }); showNotice(`Linked project ${name}: agents of this project reach ${made.standins.join(", ") || `its sessions as name~${hub.name} once they run`}.`); } catch (error) { showNotice(error.message); }
-     }, "menu-group"), ...list.map(other => menuItem(`${other.name}${other.live ? "" : " (parked)"}`, async () => {
-      try { const made = await links({ action: "link", hub: hub.url, record: other.record }); showNotice(`Linked: agents here reach it as ${made.standin}.`); } catch (error) { showNotice(error.message); }
-     }, "menu-child"))]));
-     placeMenu(anchor);
-    } catch (error) { showNotice(error.message); }
-   }] as [string, () => void]),
+   ...state.hubs.map(hub => {
+    const shared = hub.shared.some(other => key(other) === key(folder));
+    return [`${shared ? "Stop sharing" : "Share"} ${project} with ${hub.name}${hub.online ? "" : " (offline)"}`, async () => {
+     try { await links({ action: "share", hub: hub.url, shared: !shared }); linkCache = undefined; showNotice(shared ? `${hub.name} no longer sees ${project}.` : `${hub.name} now sees ${project}: its sessions can write to this project's sessions.`); } catch (error) { showNotice(error.message); }
+    }] as [string, () => void];
+   }),
    ["Pair with another hub…", async () => {
     const url = prompt("The other hub's address (its Remote access link), e.g. mac.tail1234.ts.net:7781");
     if (!url?.trim()) return;
