@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-17
-updated: 2026-11-17T22:07:39.773Z
+updated: 2026-11-17T22:22:45.673Z
 reviewed: 2026-11-17
 started: 2026-11-17T21:32:10.397Z
 ---
@@ -91,16 +91,14 @@ None recorded.
 ### Phase 2: Remote reads and binary transfers [code]
 
 - [x] **S3** peer_ls/peer_grep/peer_read (deferred, hub sessions only) over /link/read and `pi-hub peer`; realpath confinement, D-10 secrets and .git refused, 2000-line/50 KB caps, remote-reads.log (b2af2729)
-- [wip] **S4** Binary streamed transfers: `peer_fetch` into `.pi/inbox` and send-file both stream raw bodies with resume; base64 path removed
-  - 200 MB per file, refused up front with the size named; free-space check before accepting (D-09). `FILES_MAX` per message becomes the per-file cap; the stand-in description and the `call()` timeout follow.
-  - Fetch is a GET with Range; send is a PUT with an upload id and an offset query, partial files kept under the hub data folder and removed after 24 h idle. COMM, link credential and file details travel in headers.
-  - Proof on real HTTP hubs as in `test-remote.mjs`: a file above 5 MB arrives byte-identical (sha256) both ways; a cut fetch and a cut send each resume from their offset; a 201 MB request refused before any bytes are written.
+- [x] **S4** Files between paired hubs travel as raw HTTP bodies (PUT /link/upload, GET /link/fetch), up to 200 MB each, resuming from a partial after a drop; peer_fetch copies a shared file into .pi/inbox (commit 90d7fd9d).
 
 ### Phase 3: Cross-machine qualification [code]
 
-- [ ] **S5** [blocked] This PC and the Mac hub on the new release: share Belot, message, grep and read a session file, fetch a large file
+- [blocked] **S5** [blocked] This PC and the Mac hub on the new release: share Belot, message, grep and read a session file, fetch a large file
   - Blocked on: the Mac hub updated to the release with COMM 3 (needs a push the user authorizes).
   - Also checks on the Mac: ripgrep found by the login-started hub, and a 200 MB transfer through `tailscale serve` without its own timeout.
+  - note: Waits for the user to authorize a version bump and push, then update the Mac hub.
 
 ## Global validation
 
@@ -110,7 +108,7 @@ None recorded.
 
 ## Resume context
 
-S1–S3 committed (HEAD b8ced957; nothing pushed). Next: S4 binary streamed transfers (peer_fetch GET with Range into .pi/inbox; send-file PUT with upload id + offset; 200 MB/file; free-space check; partials under hub data folder, 24 h cleanup; base64 /link/file removed). Then S5 is blocked on the Mac hub. Leave untracked: f75ccea6 plan, logs/4d2fa07b.stats.json.
+S1-S4 committed locally (HEAD 90d7fd9d, nothing pushed). S5 blocked: it needs a release push the user authorizes (version bump + CHANGELOG heading per the Version Before Push rule), then the Mac hub updated, then the live two-PC check.
 
 ## Amendments
 
