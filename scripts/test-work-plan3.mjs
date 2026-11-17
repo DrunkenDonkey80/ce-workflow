@@ -555,7 +555,7 @@ try {
 		const beforeOptimize = await readFile(leanFile, "utf8");
 		await run("plan3", "optimize 9a9a9a9a");
 		assert.match(messages.at(-1).message, /^Plan3: optimize the plan at[\s\S]*logs[\s\S]*Resume context is ONE current checkpoint/);
-		assert.match(messages.at(-1).message, /Group scenarios sharing an environment and prerequisites under one step[\s\S]*Merge command, file-area and reproduce\/fix\/check fragments of one outcome[\s\S]*one step per bug report/);
+		assert.match(messages.at(-1).message, /Group scenarios sharing an environment and prerequisites under one step[\s\S]*Merge command, file-area and reproduce\/fix\/check fragments of one outcome[\s\S]*one step per bug report; drop a final step that only repeats the completion full suite/);
 		assert.doesNotMatch(messages.at(-1).message, /full suite runs at phase boundaries|do not merge large steps only to reduce the count/);
 		assert.deepEqual(events.at(-1), { name: "plan3:research", enabled: true }, "optimize runs in research mode");
 		assert((await readFile(leanLog, "utf8")).includes(beforeOptimize.split("\n").map((line) => `> ${line}`).join("\n")), "code snapshots the full plan before the agent rewrites it");
