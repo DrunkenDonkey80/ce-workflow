@@ -752,6 +752,8 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 .recent-text { display: flex; flex-direction: column; min-width: 0; } .recent-text > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .switcher[data-open=false] :is(.session-more, .session-group, .session-git, .session-git-branch, .session-recents, .session-archives, .session-devices) { display: none; }
 .session-devices { margin: 8px 6px; font-size: 12px; }
+.hub-list { display: grid; gap: 12px; } .hub-list fieldset { border: 1px solid var(--line); border-radius: 6px; margin: 0; padding: 6px 10px; display: grid; gap: 4px; } .hub-list legend { display: flex; gap: 8px; align-items: center; } .hub-list label { display: flex; gap: 6px; align-items: center; overflow-wrap: anywhere; } .hub-list small { color: var(--muted); }
+.hub-pair { display: flex; gap: 8px; margin-top: 12px; } .hub-pair input { flex: 1; } .hubs-dropped { color: var(--muted); font-size: 13px; }
 .device-list { list-style: none; padding: 0; display: grid; gap: 6px; } .device-list li { display: flex; gap: 8px; align-items: center; } .device-list span { flex: 1; }
 .mobile-tabs { display: none; }
 .drawer-toggle, .drawer, .drawer-backdrop { display: none; }

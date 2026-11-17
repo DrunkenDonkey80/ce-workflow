@@ -178,6 +178,8 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 		"POST /api/hubs/pair": data => links.pairWith(String(data.url ?? "")),
 		"POST /api/hubs/share": data => links.share(String(data.url ?? ""), String(data.folder ?? ""), data.shared === true),
 		"POST /api/hubs/unpair": data => links.unpair(String(data.url ?? "")),
+		// D-04: the Paired hubs dialog showed the dropped session links once.
+		"POST /api/hubs/seen": () => { links.store.clearDropped(); return { ok: true }; },
 		"POST /api/devices/([A-Za-z0-9_-]{12})/revoke": async (_d, m) => { const ok = await devices.revoke(m[1]); dropDevice(m[1]); return { ok }; },
 		"POST /api/sessions": data => host.create(String(data.folder ?? ""), String(data.name ?? "")),
 		"POST /api/sessions/([0-9a-f-]{36})/resume": (_d, m) => host.resume(m[1]),

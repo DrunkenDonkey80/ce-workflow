@@ -324,16 +324,12 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 		throw fail(400, "Unknown session action.");
 	}
 
-	/** The session menu's paired hubs (plan 4d2fa07b): list with the stand-ins this session reaches, share its project, pair a hub. */
-	async function hubLinks(data: Record<string, unknown>) {
+	/** The `@` list's hub stand-ins (plan 4d2fa07b); pairing and sharing live in the local page's Paired hubs dialog (/api/hubs). */
+	function hubLinks(data: Record<string, unknown>) {
 		if (!links) throw fail(404, "Hub links are off.");
-		const session = String(data.session ?? ""), hub = String(data.hub ?? ""), record = registry.get(session);
-		if (data.action !== "pair" && !record) throw fail(404, "Unknown session.");
-		switch (data.action) {
-			case "list": return { ...links.state(), standins: links.standinsFor(session) };
-			case "share": return links.share(hub, record!.folder, data.shared === true);
-			case "pair": return links.pairWith(String(data.url ?? ""));
-		}
+		const session = String(data.session ?? "");
+		if (!registry.get(session)) throw fail(404, "Unknown session.");
+		if (data.action === "list") return { ...links.state(), standins: links.standinsFor(session) };
 		throw fail(400, "Unknown links action.");
 	}
 

@@ -1911,7 +1911,7 @@ async function hub(route: string, data?: unknown) {
 const pairDialog = () => $("pair-approve") as HTMLDialogElement;
 async function checkPairing() {
  if (!token) return;
- $("devices-button").hidden = false;
+ $("devices-button").hidden = false; $("hubs-button").hidden = false;
  let pending; try { ({ pending } = await hub("pairing")); } catch { return; }
  if (!pending) { if (pairDialog().open) pairDialog().close(); return; }
  $("pair-device").textContent = `${pending.label} · ${pending.login} · ${pending.address}`; $("pair-approve-code").textContent = pending.code;
@@ -1939,6 +1939,40 @@ async function showDevices() {
 }
 $("devices-button").addEventListener("click", () => void (closeMenus(), showDevices()).catch(error => showNotice("Devices: " + error.message)));
 $("devices-close").addEventListener("click", () => ($("devices") as HTMLDialogElement).close());
+// Plan 4d2fa07b D-02, D-05: per paired hub, which of this hub's projects it sees (unticked by default); pairing and unpairing.
+async function showHubs() {
+ const state = await hub("hubs"), name = (folder: string) => folder.split(/[\\/]/).filter(Boolean).pop() ?? folder, key = (folder: string) => folder.replace(/[\\/]+$/, "").toLowerCase();
+ const act = (route: string, data: unknown) => void hub(route, data).then(showHubs, error => showNotice(error.message));
+ // D-04: the session links the upgrade dropped, named once; seen as soon as shown.
+ const dropped = $("hubs-dropped");
+ if (!($("hubs") as HTMLDialogElement).open) dropped.hidden = true; // stays while the dialog that showed it is open
+ if (state.dropped.length) { dropped.textContent = "Session links are gone; share projects instead. Dropped: " + state.dropped.join("; ") + "."; dropped.hidden = false; void hub("hubs/seen", {}).catch(() => {}); }
+ $("hub-list").replaceChildren(...state.hubs.length ? state.hubs.map(peer => {
+  const box = html("fieldset"), legend = html("legend"), unpair = html("button", { type: "button", className: "danger", textContent: "Unpair" });
+  unpair.addEventListener("click", async () => { if (await confirmBox(`Unpair ${peer.name}? Both hubs stop sharing projects with each other.`)) act("hubs/unpair", { url: peer.url }); });
+  legend.append(html("strong", { textContent: peer.name }), html("small", { textContent: peer.online ? "online" : "offline" }), unpair);
+  box.append(legend, ...state.projects.map(folder => {
+   const row = html("label", { title: folder }), check = html("input", { type: "checkbox", checked: peer.shared.some(shared => key(shared) === key(folder)) });
+   check.addEventListener("change", () => act("hubs/share", { url: peer.url, folder, shared: check.checked }));
+   row.append(check, `${name(folder)} `, html("small", { textContent: folder }));
+   return row;
+  }), html("small", { textContent: peer.projects.length ? `${peer.name} shares: ${peer.projects.map(project => name(project.folder)).join(", ")}` : `${peer.name} shares no projects with this hub.` }));
+  return box;
+ }) : [html("p", { className: "dialog-purpose", textContent: "No paired hubs. Pair one by its Remote access link below." })]);
+ const pairing = $("hub-pairing");
+ pairing.hidden = !state.pairing;
+ if (state.pairing) pairing.textContent = state.pairing.state === "pending" ? `Approve on ${state.pairing.url} if it shows code ${state.pairing.code}.` : `Pairing with ${state.pairing.url}: ${state.pairing.state}${state.pairing.error ? ` (${state.pairing.error})` : ""}.`;
+ const dialog = $("hubs") as HTMLDialogElement; if (!dialog.open) dialog.showModal();
+ linkCache = undefined;
+}
+$("hubs-button").addEventListener("click", () => void (closeMenus(), showHubs()).catch(error => showNotice("Hubs: " + error.message)));
+$("hubs-close").addEventListener("click", () => ($("hubs") as HTMLDialogElement).close());
+$("hub-pair").addEventListener("submit", event => {
+ event.preventDefault();
+ const input = $("hub-pair-url") as HTMLInputElement, url = input.value.trim();
+ if (!url) return;
+ void hub("hubs/pair", { url }).then(() => { input.value = ""; return showHubs(); }, error => showNotice("Pair: " + error.message));
+});
 const words: Record<Tone, string> = { working: "working", waiting: "waiting for an answer", scheduled: "scheduled", unseen: "idle, new activity", seen: "idle", parked: "parked", terminal: "open in a terminal" };
 for (const id of ["env-var", "drawer-env-var"]) $(id).prepend(icon("env"));
 function html<K extends keyof HTMLElementTagNameMap>(tag: K, properties: Partial<HTMLElementTagNameMap[K]> = {}) { return Object.assign(document.createElement(tag), properties); }
@@ -2156,7 +2190,6 @@ function openSessionMenu(anchor: HTMLElement, session: HubSession, path: string)
   item("Copy folder path", () => void copyPath(path)),
   item("Copy git URL", () => void copyGitUrl(path)),
   item("Copy intercom id", () => void copyPath(sessionRef(path, session))),
-  item("Hub links…", () => void openHubLinks(anchor, session, path)),
   ...(session.timers ?? []).map(t => item(`Cancel ⏰ ${t.kind}: ${t.label.slice(0, 40)}`, () => void sessionAction({ action: "cancel-timer", id: session.id, timer: t.id }))),
   item("Open in terminal", () => void sessionAction({ action: "terminal", id: session.id })),
   parked ? item("Resume", () => void sessionAction({ action: "resume", id: session.id })) : item("Park", () => void sessionAction({ action: "park", id: session.id })),
@@ -2169,27 +2202,6 @@ function openSessionMenu(anchor: HTMLElement, session: HubSession, path: string)
   }, "danger"),
  ]);
  placeMenu(anchor);
-}
-// Plan 4d2fa07b D-02: share this session's project with a paired hub; its agents then reach the project's sessions as folder-name~hub.
-async function openHubLinks(anchor: HTMLElement, session: HubSession, folder: string) {
- try {
-  const links = (data: Record<string, unknown>) => post("links", { session: session.id, ...data });
-  const state = await links({ action: "list" }), project = folder.split(/[\\/]/).filter(Boolean).pop() ?? folder, key = (path: string) => path.replace(/[\\/]+$/, "").toLowerCase();
-  if (state.unavailable) showNotice(state.unavailable);
-  showMenu(anchor, [
-   ...state.hubs.map(hub => {
-    const shared = hub.shared.some(other => key(other) === key(folder));
-    return [`${shared ? "Stop sharing" : "Share"} ${project} with ${hub.name}${hub.online ? "" : " (offline)"}`, async () => {
-     try { await links({ action: "share", hub: hub.url, shared: !shared }); linkCache = undefined; showNotice(shared ? `${hub.name} no longer sees ${project}.` : `${hub.name} now sees ${project}: its sessions can write to this project's sessions.`); } catch (error) { showNotice(error.message); }
-    }] as [string, () => void];
-   }),
-   ["Pair with another hub…", async () => {
-    const url = prompt("The other hub's address (its Remote access link), e.g. mac.tail1234.ts.net:7781");
-    if (!url?.trim()) return;
-    try { const started = await links({ action: "pair", url: url.trim() }); showNotice(`Approve on that hub if it shows code ${started.code}.`); } catch (error) { showNotice(error.message); }
-   }],
-  ]);
- } catch (error) { showNotice(error.message); }
 }
 document.addEventListener("pointerdown", event => { if (!sessionMenu.contains(event.target as Node)) sessionMenu.hidden = true; });
 // The clipboard needs a secure page (localhost or the tailnet https link); otherwise show the path to copy by hand.
@@ -2514,7 +2526,7 @@ $("pi-commands").addEventListener("click", () => void pickCommand("pi"));
 $("wo-commands").addEventListener("click", () => void pickCommand("wo"));
 $("command-close").addEventListener("click", () => ($("command-picker") as HTMLDialogElement).close());
 // A click on the backdrop closes the view-only dialogs; questions, approvals and the note editor keep theirs.
-for (const id of ["command-picker", "devices", "usage-window", "changelog"]) {
+for (const id of ["command-picker", "devices", "hubs", "usage-window", "changelog"]) {
  const dialog = $(id) as HTMLDialogElement, outside = (event: MouseEvent) => { const box = dialog.getBoundingClientRect(); return event.target === dialog && (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom); };
  let pressed = false; // pressed on the backdrop too, so a text selection dragged out of the dialog does not close it
  dialog.addEventListener("pointerdown", event => { pressed = outside(event); });

@@ -2,6 +2,12 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Changed
+- Paired hubs share whole projects instead of single sessions: Settings → Remote access → Hubs lists each paired hub with a checkbox per project of this hub. A ticked project's sessions show up in the other hub's `@` list and can be messaged; replies always get back. New projects start unticked. Pairing and unpairing moved to the same dialog; the session menu's "Hub links…" is gone.
+- Upgrading turns old project links into ticked projects; old session-to-session links are dropped and named once in the Hubs dialog. Both hubs need this version (hub link protocol 3).
+
 ## 1.0.7 — 2026-11-17
 
 ### Changed

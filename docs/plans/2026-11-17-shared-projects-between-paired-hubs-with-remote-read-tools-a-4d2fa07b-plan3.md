@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-17
-updated: 2026-11-17T21:42:22.200Z
+updated: 2026-11-17T21:52:55.735Z
 reviewed: 2026-11-17
 started: 2026-11-17T21:32:10.397Z
 ---
@@ -86,9 +86,7 @@ None recorded.
 ### Phase 1: Shared projects replace links [code]
 
 - [x] **S1** Projects are shared per paired hub (COMM 3): ping lists shared projects, stand-ins for every session of a shared project, deliver authorized by share or reply pair (403 not-shared), v1 links migrated to shares; REST/page menu Share/Stop sharing + Pair.
-- [ ] **S2** Hub UI: a "Paired hubs" dialog beside Devices with pairing, unpairing, a project checklist per hub and the one-time migration notice
-  - The session menu's "Hub links…" entry goes; pairing moves to the new dialog. The migration notice shows once in the dialog, naming dropped session links, and is marked seen in the link store when shown.
-  - Proof: two hubs started as in `test-remote.mjs` (fake tailscale, `linkRequest`) with a fake Pi, driven in agent-browser: pair, tick a project and see it listed on the other hub, and `@` lists its stand-ins.
+- [x] **S2** "Hubs" button beside Devices opens a Paired hubs dialog: per hub online state, Unpair, a checkbox per local project, what that hub shares, a Pair field with the pending code, and the D-04 notice shown once (POST /api/hubs/seen); session menu's "Hub links…" and the session-scoped share/pair actions removed.
 
 ### Phase 2: Remote reads and binary transfers [code]
 
@@ -117,7 +115,7 @@ None recorded.
 
 ## Resume context
 
-Decisions D-01 to D-11 settled; no open questions. Review (Claude advisor, run 4476211e) done: all 13 findings accepted and applied to files, S1 to S5 (see Amendments). Next: /plan3 finish, then S1. S5 stays blocked until the Mac hub runs a COMM 3 release, which needs a push the user authorizes.
+S1 committed (db3cbee3): link.ts share/pair model, COMM 3, api.ts list/share/pair, hub.ts /api/hubs/share and /api/hubs/unpair; app.ts has an interim Share/Stop sharing menu in openHubLinks that S2 replaces with the Paired hubs dialog. Next: S2. S5 blocked until the Mac hub runs a COMM 3 release (needs an authorized push).
 
 ## Amendments
 

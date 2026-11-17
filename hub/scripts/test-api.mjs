@@ -686,11 +686,13 @@ try {
 	execFileSync("git", ["init", "-q"], { cwd: folder }); execFileSync("git", ["remote", "add", "origin", "https://me:tok3n@github.com/me/proj.git"], { cwd: folder });
 	assert.deepEqual((await post(id, "session", { action: "git-url", folder })).body, { url: "https://github.com/me/proj.git" });
 	fs.rmSync(path.join(folder, ".git"), { recursive: true, force: true });
-	// Plan d21eefbf S08: the session menu's hub links; pairing needs remote access (the tailnet) first.
-	assert.deepEqual((await post(id, "links", { action: "list", session: created.id })).body, { comm: 2, hubs: [], pairing: null, links: [] });
+	// Plan 4d2fa07b: the `@` list's stand-ins; pairing (local page only) needs remote access (the tailnet) first.
+	const hubList = (await post(id, "links", { action: "list", session: created.id })).body;
+	assert.deepEqual([hubList.comm, hubList.hubs, hubList.dropped, hubList.pairing, hubList.standins], [3, [], [], null, []]);
 	assert.equal((await post(id, "links", { action: "list", session: "nope" })).status, 404);
-	assert.match((await post(id, "links", { action: "pair", url: "mac.tail.ts.net:7781" })).body.error, /Turn on remote access first/);
-	assert.equal((await post(id, "links", { action: "sessions", hub: "https://mac.tail.ts.net:7781" })).status, 404, "not paired");
+	assert.equal((await post(id, "links", { action: "pair", session: created.id, url: "mac.tail.ts.net:7781" })).status, 400, "pairing is not a session action");
+	assert.match((await hubRoute("/api/hubs/pair", { url: "mac.tail.ts.net:7781" })).error, /Turn on remote access first/);
+	assert.deepEqual(await hubRoute("/api/hubs/seen", {}), { ok: true });
 	await hub.host.prompt(created.id, "hi"); await until(async () => (await tones()).Docs === "unseen" && "ok");
 	assert.equal((await post(id, "session", { action: "park", id: created.id })).status, 200);
 	const docs = async () => (await get(id, "sessions")).body.groups.flatMap(group => group.sessions).find(session => session.name === "Docs");
