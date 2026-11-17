@@ -2,7 +2,7 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 1.0.7 — 2026-11-17
 
 ### Changed
 - Plan3 plans split work by outcome, not by command or file: usually one step per bug report, with reproduction, fix and test inside it. A final step is added only for checks the completion full suite cannot cover, such as device, VM, manual or release runs.
