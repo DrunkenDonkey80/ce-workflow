@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-17
-updated: 2026-11-17T22:22:45.673Z
+updated: 2026-11-17T22:37:13.174Z
 reviewed: 2026-11-17
 started: 2026-11-17T21:32:10.397Z
 ---
@@ -95,10 +95,11 @@ None recorded.
 
 ### Phase 3: Cross-machine qualification [code]
 
-- [blocked] **S5** [blocked] This PC and the Mac hub on the new release: share Belot, message, grep and read a session file, fetch a large file
+- [human] **S5** [blocked] This PC and the Mac hub on the new release: share Belot, message, grep and read a session file, fetch a large file
   - Blocked on: the Mac hub updated to the release with COMM 3 (needs a push the user authorizes).
   - Also checks on the Mac: ripgrep found by the login-started hub, and a 200 MB transfer through `tailscale serve` without its own timeout.
   - note: Waits for the user to authorize a version bump and push, then update the Mac hub.
+  - note: Release 1.1.0 pushed; needs the Mac hub updated and a live check with the user.
 
 ## Global validation
 
@@ -108,7 +109,7 @@ None recorded.
 
 ## Resume context
 
-S1-S4 committed locally (HEAD 90d7fd9d, nothing pushed). S5 blocked: it needs a release push the user authorizes (version bump + CHANGELOG heading per the Version Before Push rule), then the Mac hub updated, then the live two-PC check.
+1.1.0 (S1-S4) pushed as a9d708e6. S5 now waits only on the Mac hub updating to 1.1.0, then the live two-PC check (share Belot, message, grep/read a session file, fetch a large file; ripgrep found on the Mac; 200 MB through tailscale serve).
 
 ## Amendments
 
