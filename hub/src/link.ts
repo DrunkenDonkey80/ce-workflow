@@ -7,6 +7,7 @@ import { mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { logRead, runRead } from "./peer-read.ts";
 import { writeJsonAtomic } from "./registry.ts";
 import type { createDeviceRegistry, createPairing } from "./remote.ts";
 import { agentDir } from "./rpc-client.ts";
@@ -134,7 +135,7 @@ export function createLinks(options: {
 	/** This hub's name and tailnet address; undefined while remote access is off. */
 	self: () => { name: string; url: string; login: string } | undefined;
 	/** This hub's sessions: its active projects (D-02) and the ends of messages. */
-	sessions: () => { record: string; name: string; folder: string; live: boolean }[];
+	sessions: () => { record: string; name: string; folder: string; live: boolean; sessionFile?: string }[];
 	onPairing?: () => void;
 	request?: LinkRequest;
 	/** Stand-ins (S07): a record's current intercom id (D10), resuming a parked record, and the pi-intercom client loader. */
@@ -205,6 +206,7 @@ export function createLinks(options: {
 			if (offline.delete(caller!.url)) await sync();
 			// Both halves travel in one ping, so a share change reaches the other hub with the next call either way.
 			if (op === "ping") { apply(caller!.url, body as Record<string, unknown>); void sync(); return [200, { comm: COMM, ...mine(caller!.url) }]; }
+			if (op === "read") return [200, { comm: COMM, ...await serveRead(caller!, body as Record<string, unknown>) }];
 			if (op === "file") {
 				const file = body.file as { name?: unknown; data?: unknown } | undefined;
 				if (typeof file?.data !== "string") return fail(400, "file.data required.");
@@ -231,6 +233,39 @@ export function createLinks(options: {
 			return fail((error as { status?: number }).status ?? 500, (error as Error).message);
 		}
 		return fail(404, "Unknown link operation.");
+	}
+
+	/** S3: a paired hub reads a project this hub shares with it: its folder, or with a `sessions/` path its Pi session folder. */
+	async function serveRead(caller: Peer, body: Record<string, unknown>) {
+		const folder = typeof body.project === "string" ? sharedWith(caller.url).find(shared => sameFolder(shared, body.project as string)) : undefined;
+		if (!folder) throw Object.assign(new Error("not-shared"), { status: 403 });
+		const wanted = typeof body.path === "string" && body.path.trim() ? body.path.trim().replaceAll("\\", "/") : ".", inSessions = /^sessions(\/|$)/.test(wanted);
+		// Pi owns the session folder's name: the folder of this project's session files, never recomputed here.
+		const file = inSessions ? sessions().find(session => sameFolder(session.folder, folder) && session.sessionFile)?.sessionFile : undefined;
+		if (inSessions && !file) throw Object.assign(new Error("This project has no Pi session files here."), { status: 404 });
+		const root = file ? path.dirname(file) : folder, rel = inSessions ? wanted.replace(/^sessions\/?/, "") || "." : wanted;
+		const result = await runRead(root, rel, body, self()?.name ?? "this hub");
+		await logRead(path.join(options.dataDir, "remote-reads.log"), `${caller.name} ${body.op} ${folder} ${inSessions ? "sessions/" : ""}${result.path}${body.op === "grep" ? ` /${body.pattern}/` : ""}`).catch(() => {});
+		return result;
+	}
+
+	/** A paired hub by name, address or the address's first label. */
+	function peerNamed(name: string) {
+		const wanted = name.toLowerCase(), found = peers.list().filter(item => item.name.toLowerCase() === wanted || item.url === name || item.url.slice(8).split(/[.:]/)[0].toLowerCase() === wanted);
+		if (found.length !== 1) throw Object.assign(new Error(found.length ? `${name} names several paired hubs; use its address.` : `No paired hub ${name}; peer_ls lists them.`), { status: 404 });
+		return found;
+	}
+
+	/** S3, for this hub's sessions (peer_ls, peer_grep, peer_read): no hub lists what each paired hub shares; else one read there. */
+	async function peer(data: Record<string, unknown>) {
+		if (!data.hub && data.op !== "ls") throw Object.assign(new Error("hub required; peer_ls with no hub lists the paired hubs."), { status: 400 });
+		if (!data.hub) return { hubs: peers.list().map(({ name, url }) => ({ name, url, online: !offline.has(url), projects: (remotes.get(url)?.projects ?? []).map(project => ({ folder: project.folder, sessions: project.sessions.map(session => session.name) })) })) };
+		const found = peerNamed(String(data.hub)), projects = remotes.get(found[0].url)?.projects ?? [], name = String(data.project ?? "");
+		const matches = projects.filter(project => sameFolder(project.folder, name) || folderName(project.folder)?.toLowerCase() === name.toLowerCase());
+		if (matches.length !== 1) throw Object.assign(new Error(matches.length ? `${name} names several shared projects; use the full folder.` : `${found[0].name} shares no project ${name}; peer_ls lists them.`), { status: 404 });
+		const { reply, error } = await call(found[0].url, "read", { project: matches[0].folder, op: data.op, path: data.path, pattern: data.pattern, ignoreCase: data.ignoreCase, offset: data.offset, limit: data.limit });
+		if (error) throw Object.assign(new Error(error), { status: reply[0] === 502 ? 502 : 400 });
+		return { hub: found[0].name, project: matches[0].folder, path: reply[1].path, text: reply[1].text };
 	}
 
 	/** D-03, D-11: a `deliver` or `file` from any session of the caller lands on `to` when this hub shares `to`'s project with the
@@ -464,6 +499,7 @@ export function createLinks(options: {
 		pairWith,
 		share,
 		unpair,
+		peer,
 		tick,
 		sync,
 		state,

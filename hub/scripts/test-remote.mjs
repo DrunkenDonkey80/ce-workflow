@@ -7,6 +7,8 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "hub-remote-"));
 process.env.PI_CODING_AGENT_DIR = root;
@@ -198,6 +200,13 @@ try {
 	assert.equal(hubs.pairing.state, "paired", JSON.stringify(hubs.pairing));
 	assert.deepEqual(hubs.hubs.map(h => h.url).sort(), [`https://pc.tail.ts.net:${port}`, "https://mac.tail.ts.net:7781", "https://wsl.tail.ts.net:7782"].sort(), "both directions stored");
 	assert.deepEqual((await local("/api/devices")).body.devices.filter(d => d.kind === "hub").length, 3, "approved hubs and the offered credential are hub devices");
+	// Plan 4d2fa07b S3 end to end: a session's `pi-hub peer read` reaches "mac" (this hub again) over /link/read and gets a capped file.
+	fs.writeFileSync(path.join(folder, "big.txt"), Array.from({ length: 3000 }, (_, i) => `line ${i + 1}`).join("\n"));
+	assert.equal((await local("/api/hubs/share", { url: "https://mac.tail.ts.net:7781", folder, shared: true })).status, 200);
+	const peerCli = (...args) => promisify(execFile)(process.execPath, [fileURLToPath(new URL("../src/cli.ts", import.meta.url)), "peer", ...args], { env: process.env, windowsHide: true }).then(r => r.stdout);
+	assert.match(await peerCli("ls"), /"name": "mac"[^]*"folder": ".*proj"/, "mac shares proj");
+	const cut = (await peerCli("read", "--json", JSON.stringify({ hub: "mac", project: "proj", path: "big.txt" }))).trim().split("\n");
+	assert.deepEqual([cut[0], cut[1], cut.length, cut.at(-1)], [`mac:${folder} big.txt`, "line 1", 2002, "[more: offset 2001]"]);
 
 	// Revoke: refused at once, and an open event stream is closed.
 	const devices = (await local("/api/devices")).body.devices.filter(device => !device.kind);

@@ -116,7 +116,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 	let tailnet: Tailnet | undefined, serving = false, remoteError: string | undefined, importError: string | undefined;
 	// Inter-hub links (plan d21eefbf): pairing with other hubs over the tailnet; this hub's address exists only while serving.
 	const openApproval = () => { if (Date.now() - lastLocalPoll > 20_000) { lastLocalPoll = Date.now(); openUrl(`http://127.0.0.1:${config.port}/?token=${config.localKey}`); } };
-	const links = createLinks({ dataDir, devices, pairing, onPairing: openApproval, request: linkRequest, sessions: () => registry.list().map(record => ({ record: record.id, name: record.name, folder: record.folder, live: host.live.has(record.id) })),
+	const links = createLinks({ dataDir, devices, pairing, onPairing: openApproval, request: linkRequest, sessions: () => registry.list().map(record => ({ record: record.id, name: record.name, folder: record.folder, live: host.live.has(record.id), sessionFile: record.sessionFile })),
 		// A record's intercom id is its Pi session id (D10), read from the session file at each delivery.
 		intercom: { intercomId: async id => { const file = registry.get(id)?.sessionFile; return file ? (await readSessionSummary(file).catch(() => null))?.sessionId : undefined; }, wake: id => host.resume(id) }, self: () => serving && tailnet?.host && tailnet.login ? { name: os.hostname(), url: `https://${tailnet.host}:${config.port}`, login: tailnet.login } : undefined });
 	// H6-02: a corrupt or busy old registry is skipped (nothing imported) and retried at the next start.
@@ -178,6 +178,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 		"POST /api/hubs/pair": data => links.pairWith(String(data.url ?? "")),
 		"POST /api/hubs/share": data => links.share(String(data.url ?? ""), String(data.folder ?? ""), data.shared === true),
 		"POST /api/hubs/unpair": data => links.unpair(String(data.url ?? "")),
+		"POST /api/peer": data => links.peer(data),
 		// D-04: the Paired hubs dialog showed the dropped session links once.
 		"POST /api/hubs/seen": () => { links.store.clearDropped(); return { ok: true }; },
 		"POST /api/devices/([A-Za-z0-9_-]{12})/revoke": async (_d, m) => { const ok = await devices.revoke(m[1]); dropDevice(m[1]); return { ok }; },

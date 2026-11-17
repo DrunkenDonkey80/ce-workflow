@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { COMM, commMismatch, createLinks, createLinkStore, createPeers, loadIntercom, saveInbox } from "../src/link.ts";
 import { createDeviceRegistry, createPairing } from "../src/remote.ts";
+import { grep, ripgrep } from "../src/peer-read.ts";
 import { agentDir } from "../src/rpc-client.ts";
 
 assert.equal(Number.isSafeInteger(COMM) && COMM >= 1, true, "comm is a plain integer of its own");
@@ -94,7 +95,7 @@ try {
 		const dataDir = path.join(root, name), devices = createDeviceRegistry(dataDir), pairing = createPairing(devices), fake = broker();
 		fs.mkdirSync(dataDir);
 		hubs[url] = { pairing, devices, broker: fake, links: createLinks({ dataDir, devices, pairing, request, self: () => ({ name, url, login }),
-			sessions: () => records.map(record => ({ record, name: state[record].name, folder: state[record].folder, live: state[record].live })),
+			sessions: () => records.map(record => ({ record, name: state[record].name, folder: state[record].folder, live: state[record].live, sessionFile: state[record].sessionFile })),
 			intercom: { intercomId: async record => `pi-${record}`, load: async () => ({ IntercomClient: fake.Client }),
 				wake: async record => { woken.push(record); state[record].live = true; hubs[url].agents[record] = await fake.agent(record); } } }), agents: {} };
 	}
@@ -244,6 +245,47 @@ try {
 	assert.match(fp.inbox.at(-1).content.text, /^Not delivered to mac-proj-fm~mac: bin\.dat was not saved on mac \(mac hub unreachable: connect ECONNREFUSED\)/);
 	assert.equal(pc.links.state().hubs[0].online, true, "a failed upload does not take the hub offline");
 	slow.file = 0; offline.delete(macUrl);
+
+	// Plan 4d2fa07b S3: pc reads mac's shared project: confined to it (or its Pi session folder), secrets and .git refused, capped, logged.
+	fs.mkdirSync(path.join(macProj, "src")); fs.mkdirSync(path.join(macProj, ".git"));
+	fs.writeFileSync(path.join(macProj, "src", "a.txt"), "one\nneedle here\n");
+	fs.writeFileSync(path.join(macProj, ".env"), "TOKEN=needle-secret\n");
+	fs.writeFileSync(path.join(macProj, ".git", "config"), "needle in git\n");
+	fs.writeFileSync(path.join(macProj, "big.txt"), Array.from({ length: 3000 }, (_, i) => `line ${i + 1} needle`).join("\n"));
+	fs.symlinkSync(path.join(root, "mac"), path.join(macProj, "esc"), "junction");
+	const sessionDir = path.join(root, "pi sessions", "--mac-proj--"); fs.mkdirSync(sessionDir, { recursive: true });
+	state.fm.sessionFile = path.join(sessionDir, "s1.jsonl"); fs.writeFileSync(state.fm.sessionFile, '{"type":"session"}\n');
+	const peerRead = body => pc.links.peer({ hub: "mac", project: "mac proj", ...body });
+	const readLog = () => fs.readFileSync(path.join(root, "mac", "remote-reads.log"), "utf8").trim().split("\n");
+	assert.deepEqual((await pc.links.peer({ op: "ls" })).hubs.map(h => [h.name, h.projects.map(p => p.folder)]), [["mac", [macProj]]], "no hub: what each paired hub shares");
+	await assert.rejects(pc.links.peer({ op: "read", path: "x" }), /hub required/);
+	assert.deepEqual((await peerRead({ op: "ls" })).text.split("\n"), [".pi/", "big.txt", "esc@", "src/"], "ls hides .env and .git; a link is marked");
+	assert.equal((await peerRead({ op: "read", path: "src/a.txt" })).text, "one\nneedle here");
+	assert.equal((await peerRead({ op: "read", path: "sessions/s1.jsonl" })).text, '{"type":"session"}', "sessions/ is the project's Pi session folder");
+	assert.equal((await peerRead({ op: "ls", path: "sessions" })).text, "s1.jsonl");
+	for (const [wanted, refused] of [[".env", /not readable/], [".git/config", /not readable/], ["../pc/peers.json", /not readable/], ["esc/peers.json", /not readable/], ["sessions/../../mac/peers.json", /not readable/], [path.join(root, "mac", "peers.json"), /not readable/], ["nope.txt", /does not exist/]])
+		await assert.rejects(peerRead({ op: "read", path: wanted }), refused, wanted);
+	await assert.rejects(peerRead({ op: "ls", path: "esc" }), /not readable/, "a junction out of the project");
+	const big = await peerRead({ op: "read", path: "big.txt" });
+	assert.deepEqual([big.text.split("\n").length, big.text.split("\n").at(-1)], [2001, "[more: offset 2001]"], "capped at 2000 lines");
+	fs.writeFileSync(path.join(macProj, "wide.txt"), Array.from({ length: 100 }, () => "x".repeat(1023)).join("\n"));
+	assert.equal((await peerRead({ op: "read", path: "wide.txt", limit: 5000 })).text.split("\n").at(-1), "[more: offset 51; cut at 2000 lines or 50 KB]", "and at 50 KB");
+	assert.equal((await peerRead({ op: "read", path: "big.txt", offset: 2999, limit: 5 })).text, "line 2999 needle\nline 3000 needle");
+	if (ripgrep()) {
+		const found = (await peerRead({ op: "grep", pattern: "needle", path: "." })).text.split("\n");
+		assert.equal(found.some(line => /secret|in git/.test(line)), false, "grep never sees .env or .git");
+		assert.deepEqual([found.length > 1000 && Buffer.byteLength(found.join("\n")) <= 51_300, found.slice(0, -1).every(line => /^(big|wide|src\/a)\.txt:\d+:/.test(line)), found.at(-1)], [true, true, "[cut at 2000 lines or 50 KB]"], "capped, project-relative");
+		assert.equal((await peerRead({ op: "grep", pattern: "needle", path: "src" })).text, "src/a.txt:2:needle here");
+		assert.equal((await peerRead({ op: "grep", pattern: "NEEDLE-SECRET", ignoreCase: true })).text, "No matches.");
+		assert.equal((await peerRead({ op: "grep", pattern: "session", path: "sessions/" })).text, 's1.jsonl:1:{"type":"session"}');
+	} else console.log("skipped grep: no ripgrep here");
+	await assert.rejects(grep(macProj, ".", "x", false, null), /ripgrep unavailable/);
+	// Unshared: belot is a mac project pc cannot read, and pc's own folders are not mac's to read.
+	const asPcRead = body => request(macUrl, "read", { comm: COMM, op: "ls", ...body }, pc.links.peers.get(macUrl).credential);
+	assert.deepEqual(await asPcRead({ project: belot }), [403, { comm: COMM, error: "not-shared" }]);
+	assert.deepEqual(await asPcRead({ project: emailupload }), [403, { comm: COMM, error: "not-shared" }]);
+	assert.equal(readLog().length, ripgrep() ? 11 : 7, "one log line per served read");
+	assert.match(readLog()[0], / pc ls .*mac proj \.$/);
 	await pc.links.stop();
 	assert.equal([...pc.broker.clients.keys()].some(id => id.startsWith("hublink-")), false, "stop disconnects stand-ins");
 	// Unpair: both hubs forget each other, its shares and its pairs; mac's stand-ins go.

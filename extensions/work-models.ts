@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { askConfirm, askText, showListDialog } from "./ask-user/menu.ts";
 import { publish } from "./hub-channel.ts";
-import { handleDesignLibraryCommand, handleHubCommand, intercomParkedSessions, projectCommandsTool, scheduleTool, sessionDialogTool, longSleepWait, LONG_WAIT_REASON, undeclaredBackground, BACKGROUND_REASON } from "./hub-command.ts";
+import { handleDesignLibraryCommand, handleHubCommand, intercomParkedSessions, peerTools, projectCommandsTool, scheduleTool, sessionDialogTool, longSleepWait, LONG_WAIT_REASON, undeclaredBackground, BACKGROUND_REASON } from "./hub-command.ts";
 import { handleEnvCommand } from "./work-env.ts";
 import { registerSelfUpdate } from "./work-self-update.ts";
 import { registerLensDefaults } from "./work-lens-format.ts";
@@ -3640,6 +3640,7 @@ export default function workModelsExtension(pi) {
 		});
 	}
 	if (process.env.PI_HUB_SESSION) registerConstrainedTool(pi, { ...projectCommandsTool, exposure: "deferred" });
+	if (process.env.PI_HUB_SESSION) for (const tool of peerTools) registerConstrainedTool(pi, tool);
 	registerConstrainedTool(pi, {
 		name: "research_note",
 		label: "Research Note",
