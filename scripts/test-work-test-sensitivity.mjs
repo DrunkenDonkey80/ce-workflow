@@ -95,6 +95,7 @@ try {
 	registerTestSensitivity({ registerTool: value => { tool = value; }, exec });
 	assert.equal(tool.name, "test_sensitivity");
 	assert(tool.promptSnippet && TEST_SENSITIVITY.includes("every project"));
+	assert(TEST_SENSITIVITY.includes("genuine red/green or one targeted mutation, not both") && !TEST_SENSITIVITY.includes("put this check in the relevant implementation step"), "one proof per behavior");
 	const result = await tool.execute("test", input, undefined, undefined, { cwd });
 	reports.push(result.details);
 	assert.equal(result.isError, false);

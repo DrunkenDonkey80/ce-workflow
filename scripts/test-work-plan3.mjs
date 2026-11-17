@@ -478,6 +478,8 @@ try {
 		assert.match(openMenu[0], /Answer open questions \(1\)/);
 		assert.equal(messages.length, beforeHuman + 1);
 		assert.match(messages.at(-1).message, /^Plan3: execute\/resume the plan/, "blocked + started executes");
+		assert.match(messages.at(-1).message, /Run the full suite on the final relevant state before completion and before an authorized release or push; reuse that result/);
+		assert.doesNotMatch(messages.at(-1).message, /at each phase boundary/, "phase boundaries alone do not trigger the full suite");
 		await rm(humanFile);
 		// [code] phases that read like judgment work are offered once for [think]; the user's unchecks stay [code].
 		const judgeFile = path.join(directory, "2026-10-08-judge-8d8d8d8d-plan3.md");
@@ -553,6 +555,8 @@ try {
 		const beforeOptimize = await readFile(leanFile, "utf8");
 		await run("plan3", "optimize 9a9a9a9a");
 		assert.match(messages.at(-1).message, /^Plan3: optimize the plan at[\s\S]*logs[\s\S]*Resume context is ONE current checkpoint/);
+		assert.match(messages.at(-1).message, /Group scenarios sharing an environment and prerequisites under one step[\s\S]*Merge command, file-area and reproduce\/fix\/check fragments of one outcome[\s\S]*one step per bug report/);
+		assert.doesNotMatch(messages.at(-1).message, /full suite runs at phase boundaries|do not merge large steps only to reduce the count/);
 		assert.deepEqual(events.at(-1), { name: "plan3:research", enabled: true }, "optimize runs in research mode");
 		assert((await readFile(leanLog, "utf8")).includes(beforeOptimize.split("\n").map((line) => `> ${line}`).join("\n")), "code snapshots the full plan before the agent rewrites it");
 		await hooks.get("agent_end")({ messages: [{ role: "assistant", stopReason: "error", errorMessage: "terminated" }] }, ctx);
@@ -736,7 +740,8 @@ try {
 		await mkdir(path.join(directory, "logs"), { recursive: true });
 		await writeFile(path.join(directory, "logs", "5b5b5b5b.md"), "# Log\n\n## 2026-10-01T00:00:00.000Z Imported source snapshot (unverified task data)\n\nSource: \"old.md\"\n\n> Paper 80 mm on COM21.\n>\n> - [ ] **S-01** Parser\n\n## Later\n\nRetried90mm outside the snapshot.\n");
 		await run("resume3", "5b5b5b5b");
-		assert.match(messages.at(-1).message, /bind only this turn: never write them into the plan[\s\S]*Plan shape: every step line under 200 characters/, "planning prompts carry the turn-only rule and the shape rules");
+		assert.match(messages.at(-1).message, /bind only this turn: never write them into the plan[\s\S]*Plan shape: each step delivers a reviewable outcome[\s\S]*one step per bug report[\s\S]*under 200 characters; put detail in indented sub-bullets, not extra steps[\s\S]*group qualification scenarios sharing an environment and prerequisites into one step/, "planning prompts carry the turn-only rule and the shape rules");
+		assert.doesNotMatch(messages.at(-1).message, /its own \[blocked\] step|keep judgment work in its own phase/);
 		await writeFile(shapeFile, (await readFile(shapeFile, "utf8")).replace("Start with A-01.", "Paper measured80mm on COM21."));
 		const sent = messages.length;
 		await hooks.get("agent_end")({}, ctx);
@@ -1028,6 +1033,7 @@ try {
 	await run("plan3", "review");
 	assert.match(messages.at(-1).message, /agent: "plan3-advisor", model: "openai-codex\/gpt-6-astra:high", context: "fresh", async: true/);
 	assert(messages.at(-1).message.includes(JSON.stringify(csvFile)) && /authorized this delegation by running \/plan3 review/.test(messages.at(-1).message));
+	assert.match(messages.at(-1).message, /unnecessary step splits and duplicate proof[\s\S]*optional hardening and process additions go to Backlog[\s\S]*new acceptance requirements need the user's decision/, "reviews look for redundancy, not only omissions");
 	// H3-09: the hub runs a plan command on the browser's plan B while the session's current plan is A; results come back by id.
 	{
 		const results = [], setStatus = ctx.ui.setStatus;
@@ -1303,7 +1309,7 @@ try {
 	assert.doesNotMatch(conversionPrompt, /commit locally \(never push\)/, "only execution commits");
 	assert.match(conversionPrompt, /Never edit the source file/);
 	assert.match(conversionPrompt, /Saved source snapshot: .*logs.*never copies it wholesale/);
-	assert.match(conversionPrompt, /Resume context is ONE current checkpoint[\s\S]*Split implementation from external qualification[\s\S]*## Backlog[\s\S]*never hash files manually/);
+	assert.match(conversionPrompt, /Resume context is ONE current checkpoint[\s\S]*Keep independently gated external qualification separate from implementation[\s\S]*## Backlog[\s\S]*never hash files manually/);
 	assert.match(conversionPrompt, /stated request quoted verbatim; if absent, explicitly note that absence in a quote/);
 	assert.match(conversionPrompt, /Attribute decisions and proposals to the source; do not invent missing details/);
 	assert.match(conversionPrompt, /rejected options, non-goals, acceptance examples, references, findings, open questions/);
@@ -2158,7 +2164,7 @@ try {
 	}
 	const planning = messages.find(entry => entry.message.startsWith("Plan3: planning only."))?.message;
 	assert.match(planning, /For new or substantially redesigned web UI, read the frontend-design skill/);
-	assert.match(planning, /\*\*Project care\*\*: plan the change[\s\S]*fit check[\s\S]*One adapter is a hypothetical seam[\s\S]*thin end-to-end slices[\s\S]*expand \(add the new form beside the old\), migrate callers in batches, contract[\s\S]*Keep the plan proportional: affected files, the chosen approach/);
+	assert.match(planning, /\*\*Project care\*\*: plan the change[\s\S]*fit check[\s\S]*One adapter is a hypothetical seam[\s\S]*outcome-sized end-to-end slices[\s\S]*expand \(add the new form beside the old\), migrate callers in batches, contract[\s\S]*Keep the plan proportional: affected files, the chosen approach/);
 	assert.match(planning, /\*\*Locked writes in plans\*\*[\s\S]*runs the same write twice at once[\s\S]*version that input/, "planning carries the locked-writes test guidance");
 	const system = hooks.get("before_agent_start")({ systemPrompt: "BASE" })?.systemPrompt;
 	assert.match(system, /^BASE\n\n\*\*Locked writes\*\*: [\s\S]*read taken before the lock is only a hint/, "every turn's system prompt carries the locked-writes rule, so compaction cannot drop it");
@@ -2180,7 +2186,7 @@ try {
 	assert.match(execution, /For web UI steps, consult frontend-design as needed/);
 	assert.match(execution, /follow settled design decisions and existing tokens\/components without restarting brainstorming or expanding scope/);
 	assert.match(execution, /Check usability and accessibility with available project tools; native\/TUI work follows platform rules/);
-	assert.match(execution, /run the smallest existing checks that cover the change/);
+	assert.match(execution, /run the smallest existing checks covering the changed behavior/);
 	assert.doesNotMatch(execution, /\*\*Locked writes\*\*/, "the rule comes from the system prompt, not a compactable handoff");
 	assert.doesNotMatch(execution, /version that input/, "plan-only test guidance stays out of coding");
 	assert.match(execution, /Prefer running independent work in parallel: test suites or modules and build jobs \(not individual assertions\)/);
