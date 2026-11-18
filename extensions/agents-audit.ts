@@ -110,6 +110,18 @@ export function registerAgentsAudit(pi) {
 		showing = true;
 		review(ctx, pi, pending).catch((e) => ctx.ui.notify(`AGENTS.md audit: ${e instanceof Error ? e.message : e}`, "warning")).finally(() => { showing = false; });
 	};
+	const audit = async (ctx, files: File[]) => {
+		const { stdout } = await promisify(execFile)(process.execPath, [REPORT_SCRIPT, "--cwd", ctx.cwd, "--system"], { maxBuffer: 16 * 1024 * 1024 });
+		const model = ctx.modelRegistry?.find?.("openai-codex", "gpt-6-astra"); // Luna dropped rules' meaning in a side-by-side run; Astra kept it
+		if (!model) throw new Error("the Astra model is unavailable");
+		const recs = await proposeRecommendations(files, JSON.parse(stdout), async (systemPrompt, user) => {
+			const response = await ctx.modelRegistry.complete(model, { systemPrompt, messages: [{ role: "user", content: [{ type: "text", text: user }] }] }, { cacheRetention: "none" });
+			if (response.stopReason === "error") throw new Error(response.errorMessage ?? "Astra failed");
+			return response.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+		});
+		writeState({ ...readState(), lastRun: new Date().toISOString(), files: fileHashes(files), pending: recs.length ? recs : undefined });
+		return recs;
+	};
 	pi.on("session_start", (_event, ctx) => {
 		if (!ctx.hasUI) return; // print-mode runs and subagents
 		const files = loadedFiles(ctx.getSystemPrompt?.() ?? "");
@@ -118,18 +130,19 @@ export function registerAgentsAudit(pi) {
 		if (!files.length || !auditDue(state, files)) return;
 		// shortcut: the claim is a plain write, so two sessions started in the same second may both audit; harmless, add a lock if it ever matters.
 		writeState({ ...state, lastRun: new Date().toISOString() });
-		(async () => {
-			const { stdout } = await promisify(execFile)(process.execPath, [REPORT_SCRIPT, "--cwd", ctx.cwd, "--system"], { maxBuffer: 16 * 1024 * 1024 });
-			const model = ctx.modelRegistry?.find?.("openai-codex", "gpt-6-astra"); // Luna dropped rules' meaning in a side-by-side run; Astra kept it
-			if (!model) throw new Error("the Astra model is unavailable");
-			const recs = await proposeRecommendations(files, JSON.parse(stdout), async (systemPrompt, user) => {
-				const response = await ctx.modelRegistry.complete(model, { systemPrompt, messages: [{ role: "user", content: [{ type: "text", text: user }] }] }, { cacheRetention: "none" });
-				if (response.stopReason === "error") throw new Error(response.errorMessage ?? "Astra failed");
-				return response.content.filter((b) => b.type === "text").map((b) => b.text).join("");
-			});
-			writeState({ ...readState(), files: fileHashes(files), pending: recs.length ? recs : undefined });
-			if (recs.length) show(ctx);
-		})().catch((e) => ctx.ui.notify(`AGENTS.md audit failed: ${e instanceof Error ? e.message : e}`, "warning"));
+		audit(ctx, files).then((recs) => { if (recs.length) show(ctx); }).catch((e) => ctx.ui.notify(`AGENTS.md audit failed: ${e instanceof Error ? e.message : e}`, "warning"));
 	});
 	pi.on("agent_end", (_event, ctx) => { if (ctx.hasUI) show(ctx); });
+	// /wo agents_audit: audit now, whether due or not, and review the result right away.
+	return async (ctx) => {
+		const files = loadedFiles(ctx.getSystemPrompt?.() ?? "");
+		if (!files.length) return ctx.ui.notify("AGENTS.md audit: no AGENTS.md or CLAUDE.md is loaded in this project.", "info");
+		ctx.ui.notify(`AGENTS.md audit: Astra is reviewing ${files.length} file(s) (about 30 s)…`, "info");
+		try {
+			const recs = await audit(ctx, files);
+			if (!recs.length) return ctx.ui.notify("AGENTS.md audit: nothing to change.", "info");
+			await ctx.waitForIdle?.();
+			show(ctx);
+		} catch (e) { ctx.ui.notify(`AGENTS.md audit failed: ${e instanceof Error ? e.message : e}`, "warning"); }
+	};
 }

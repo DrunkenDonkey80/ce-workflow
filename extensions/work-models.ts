@@ -285,7 +285,7 @@ const extensionScoutRuns = new Map();
 export function extensionScoutEnabled(env = process.env) {
 	return env.CE_WORK_EXTENSION_SCOUT === "1";
 }
-const woSubcommands = () => ({compact:"Compact the current context",plan:"Plan3: start a plan or run a subcommand",plans:"Plan3: browse plans",resume:"Plan3: continue the current or named plan",settings:"Open Settings",hub:"Pi control hub: status, install, open, restart",design:"Browse design examples and collect references",review:"Review changes since the last commit or review with the other-provider model",reload:"Reload Pi after the current run (works from the browser)",env:"Set an environment variable or secret; the agent only sees its name",fact:"Store, search, correct or forget durable knowledge","context-report":"What a blank session sends with every request, by owner, with ideas for ce-workflow's own parts",...(maintenanceCheckout()?{"catch-up":"Catch up packages",context:"Context guard settings"}:{}),...(extensionScoutEnabled()?{scout:"Scout Pi extensions"}:{})});
+const woSubcommands = () => ({compact:"Compact the current context",plan:"Plan3: start a plan or run a subcommand",plans:"Plan3: browse plans",resume:"Plan3: continue the current or named plan",settings:"Open Settings",hub:"Pi control hub: status, install, open, restart",design:"Browse design examples and collect references",review:"Review changes since the last commit or review with the other-provider model",reload:"Reload Pi after the current run (works from the browser)",env:"Set an environment variable or secret; the agent only sees its name",fact:"Store, search, correct or forget durable knowledge",context_report:"What a blank session sends with every request, by owner, with ideas for ce-workflow's own parts",agents_audit:"Audit the loaded AGENTS.md/CLAUDE.md files now and pick which proposed edits to make",...(maintenanceCheckout()?{"catch-up":"Catch up packages",context:"Context guard settings"}:{}),...(extensionScoutEnabled()?{scout:"Scout Pi extensions"}:{})});
 
 function settingsPath(cwd) {
 	return join(cwd, CONFIG_DIR_NAME, "settings.json");
@@ -3813,7 +3813,7 @@ if(event.toolName === "ask_user" && event.input && event.input.allowComment == n
 });
 
 	registerRemoteAskAnswers(pi);
-	registerAgentsAudit(pi);
+	const runAgentsAudit = registerAgentsAudit(pi);
 
 	pi.on("session_start", (_event, ctx) => {
 // Every extension has registered its tools by now, so the loader lists only those on this machine.
@@ -4222,7 +4222,8 @@ if (blockedInternalBackgroundCompletionTurn) {
   if(utility && (maintenanceCheckout(ctx.cwd)||!["work-context","work-catch-up"].includes(utility))) return executeUtilityAction(utility,rest,ctx,pi);
   if(action==="compact") return rest==="early park" ? void startEarlyCompact(ctx, "before parking", true) : rest==="early" ? void startEarlyCompact(ctx) : requestMicrocompact(ctx);
   if(action==="fact") return handleKnowledgeCommand(rest,ctx);
-  if(action==="context-report") return contextReport(ctx,pi);
+  if(action==="context_report") return contextReport(ctx,pi);
+  if(action==="agents_audit") return runAgentsAudit(ctx);
   if(action==="hub") return handleHubCommand(rest,ctx);
   if(action==="design") return handleDesignLibraryCommand(rest,ctx,pi);
   if(action==="review") return pi.events?.emit?.("wo:review",{ctx});
