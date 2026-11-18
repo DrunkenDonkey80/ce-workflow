@@ -5,6 +5,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { askText, showListDialog } from "./ask-user/menu.ts";
 import { hubActive } from "./hub-channel.ts";
+import { destructiveCommand } from "./command-guard.ts";
 
 // Night mode: unattended Plan3 execution. Continues at Pi's settle boundary until the plan is done,
 // nothing is runnable, two continues change nothing, or the user cancels.
@@ -24,10 +25,14 @@ const ASK_BLOCK = "Night mode: no human is available and this question was not s
 const POWER = /(?:^|[\s;&|(`"'])(?:shutdown(?:\.exe)?|Restart-Computer|Stop-Computer|logoff|psshutdown|reboot|poweroff|halt)(?=$|[\s;&|)`"'])|powrprof|SetSuspendState|systemctl\s+(?:reboot|poweroff|halt|suspend|hibernate)/i;
 
 export const nightMessage = (rules = "") => rules.trim() ? `${NIGHT_MESSAGE}\n\nProject rules (.pi/night.md):\n${rules.trim()}` : NIGHT_MESSAGE;
-export function nightBlockReason(event) {
+export function nightBlockReason(event, cwd = process.cwd()) {
 	if (event.toolName === "ask_user") return ASK_BLOCK;
-	if (["bash", "hypa_shell"].includes(event.toolName) && POWER.test(String(event.input?.command ?? "")))
+	if (!["bash", "hypa_shell"].includes(event.toolName)) return "";
+	const command = String(event.input?.command ?? "");
+	if (POWER.test(command))
 		return "Night mode blocks reboot, shutdown, sleep and logoff commands. Mark the step [human] with the reason and continue with other runnable work.";
+	const destructive = destructiveCommand(command, cwd);
+	if (destructive) return `Night mode blocks ${destructive}. Mark the step [human] with the reason and continue with other runnable work.`;
 	return "";
 }
 
@@ -137,9 +142,9 @@ export function createNight(pi, { listPlans, currentPlan, resume, research, exec
 			if (want === "on" ? !night : want === "off" ? night : true) await toggle(ctx);
 		},
 	});
-	pi.on?.("tool_call", (event) => {
+	pi.on?.("tool_call", (event, ctx) => {
 		if (!night || night.paused || night.complete) return;
-		const reason = nightBlockReason(event);
+		const reason = nightBlockReason(event, ctx?.cwd);
 		if (reason) return { block: true, reason };
 	});
 	const runPlan = async (ctx) => {

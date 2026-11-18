@@ -2,6 +2,12 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Changed
+
+- Plan3 execute runs can no longer `git push` (blocked in code, not just asked in the prompt); a later ordinary request can still push. Night mode also blocks `git push`, `git reset --hard`, `git clean -f` and recursive deletes outside the project and temp folders.
+
 ## 1.1.1 — 2026-11-18
 
 ### Changed

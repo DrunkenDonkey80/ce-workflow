@@ -110,6 +110,16 @@ try {
 	assert.equal(Object.keys(sensitivitySections).filter(name => name === "test-sensitivity").length, 1, "reinjection is stable after compaction");
 	assert.match(sensitivitySections.reporting ?? "", /lead with the result[\s\S]*not a fixed template[\s\S]*verification gaps[\s\S]*up to five useful options[\s\S]*recommend one/, "reporting guidance reaches ordinary sessions without an active plan");
 	assert(sensitivityLegacy.startsWith("BASE") && sensitivityLegacy.includes(sensitivitySections.reporting), "legacy prompts keep existing instructions and the same reporting guidance");
+	// D-06: an execute run never pushes; the block ends with that run, and other runs may push.
+	const push = (command) => hooks.get("tool_call")({ toolName: "bash", toolCallId: `push-${command}`, input: { command } }, ctx);
+	hooks.get("before_agent_start")({ prompt: "Plan3: execute/resume the plan at \"x.md\".", systemPrompt: "BASE" });
+	for (const command of ["git push", "bash -lc \"git push origin master\"", "git status && git --no-pager push"])
+		assert.match(push(command)?.reason ?? "", /execute runs never push/, command);
+	assert.equal(push("git commit -m G1"), undefined, "local commits stay allowed");
+	for (const end of endHandlers) await end({ messages: [] }, ctx);
+	assert.equal(push("git push"), undefined, "the block ends with the execute run");
+	hooks.get("before_agent_start")({ prompt: "commit and push", systemPrompt: "BASE" });
+	assert.equal(push("git push"), undefined, "ordinary chat runs may push");
 	const freshSections = { unrelated: "keep me" };
 	assert.equal(hooks.get("before_agent_start")({ systemPrompt: "BASE", systemPromptOptions: { sections: freshSections } }), undefined, "structured injection does not force a full prompt replacement");
 	assert.equal(freshSections.reporting, sensitivitySections.reporting, "fresh turns restore reporting guidance after compaction");

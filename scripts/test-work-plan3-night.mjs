@@ -47,6 +47,12 @@ try {
 		assert(hooks.get("tool_call")({ toolName: "bash", input: { command } })?.block, command);
 	for (const command of ["cargo test reboot_handling", "grep -n shutdown_hook src/main.rs", "git commit -m x"])
 		assert.equal(hooks.get("tool_call")({ toolName: "bash", input: { command } }), undefined, command);
+	// Push and destructive commands (G1); deletes inside the project or temp stay allowed.
+	const repo = path.join(os.homedir(), "night-guard-repo"), guardCtx = { cwd: repo }; // outside temp, so temp and project are distinct
+	for (const command of ["git push", "git -C x push origin master", "bash -lc \"git push\"", "git reset --hard HEAD~1", "git clean -fdx", "git clean --force", `rm -rf "${os.homedir()}"`, "rm -r ~/projects", "rm -rf $HOME/x", "Remove-Item -Recurse -Force C:/Users", "powershell -Command \"Remove-Item C:/x -Recurse\""])
+		assert.match(hooks.get("tool_call")({ toolName: "bash", input: { command } }, guardCtx)?.reason ?? "", /Night mode blocks[\s\S]*\[human\]/, command);
+	for (const command of ["git reset --soft HEAD~1", "git clean -n", "rm -rf dist node_modules/.cache", `rm -rf "${path.join(os.tmpdir(), "scratch")}"`, "rm -rf $TEMP/scratch", "rm notes.txt", `Remove-Item -Recurse "${path.join(repo, "out")}"`])
+		assert.equal(hooks.get("tool_call")({ toolName: "bash", input: { command } }, guardCtx), undefined, command);
 
 	// Continue while something changes; two unchanged continues pause.
 	await writeFile(file, "v2");

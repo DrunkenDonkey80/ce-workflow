@@ -27,6 +27,7 @@ import { docCandidates, slug as docSlug, writeDocs } from "./plan3-docs.ts";
 import { lockedWritesNote } from "./locked-writes.ts";
 import { registerTestSensitivity, TEST_SENSITIVITY } from "./test-sensitivity.ts";
 import { SELF_VERIFY } from "./self-verify.ts";
+import { runsGit } from "./command-guard.ts";
 
 const POINTER = "plan3-current";
 const RUN = "plan3-run";
@@ -2089,7 +2090,9 @@ export default function plan3(pi) {
 		if (sessionLock) { releaseSessionLock(sessionLock.file, sessionLock.info); sessionLock = undefined; }
 	});
 	pi.on?.("session_tree", (_event, ctx) => refresh(ctx));
+	let executeRun = false; // D-06: a run started by an execute prompt never pushes; a later chat request may.
 	pi.on?.("before_agent_start", event => {
+		executeRun = String(event?.prompt ?? "").startsWith("Plan3: execute/resume the plan at ");
 		const sections = event?.systemPromptOptions?.sections;
 		if (sections && typeof sections === "object") { sections["locked-writes"] = LOCKED_WRITES; sections["test-sensitivity"] = TEST_SENSITIVITY; sections["self-verify"] = SELF_VERIFY; sections["reporting"] = REPORTING; return; }
 		return { systemPrompt: `${event.systemPrompt ?? ""}\n\n${LOCKED_WRITES}\n\n${TEST_SENSITIVITY}\n\n${SELF_VERIFY}\n\n${REPORTING}` };
@@ -2102,6 +2105,8 @@ export default function plan3(pi) {
 	const planWrites = new Map<string, () => void>();
 	// shortcut: shell writes and external editors do not take this lock; use Edit/Write for plan prose.
 	pi.on?.("tool_call", (event, ctx) => {
+		if (executeRun && ["bash", "hypa_shell"].includes(event.toolName) && runsGit(event.input?.command, /^push$/i))
+			return { block: true, reason: "Plan3 execute runs never push: commit locally and continue. The user pushes, or asks for a push after this run ends." };
 		if (!["edit", "write"].includes(event.toolName) || typeof event.input?.path !== "string") return;
 		// Match native file-tool path forms before choosing the lock (not an SDK-private import).
 		let target = event.input.path.replace(/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, " ").replace(/^@/, "");
@@ -2146,6 +2151,7 @@ export default function plan3(pi) {
 		await afterResolve(ctx, event?.aborted).catch((error) => report(ctx, error));
 	});
 	pi.on?.("agent_end", async (_event, ctx) => {
+		executeRun = false;
 		if (tagging) return; // agent_settled starts execution.
 		const optimizing = await verifyOptimize(ctx, _event?.messages).catch((error) => report(ctx, error)) !== false;
 		if (optimizing || await verifyShape(ctx, _event?.messages).catch((error) => report(ctx, error)) || !pointer(ctx).planning) return;
