@@ -107,7 +107,7 @@ function sessionFiles(dir) {
 		d.isDirectory() ? sessionFiles(path.join(dir, d.name)) : d.name.endsWith(".jsonl") ? [path.join(dir, d.name)] : []);
 }
 
-function piCli() {
+export function piCli() {
 	const releases = path.join(os.homedir(), ".pi", "agent", "install", "releases");
 	const installed = (existsSync(releases) ? readdirSync(releases) : []).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
 		.map((v) => path.join(releases, v, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "bundle", "cli.js"));

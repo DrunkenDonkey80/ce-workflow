@@ -284,7 +284,7 @@ const extensionScoutRuns = new Map();
 export function extensionScoutEnabled(env = process.env) {
 	return env.CE_WORK_EXTENSION_SCOUT === "1";
 }
-const woSubcommands = () => ({compact:"Compact the current context",plan:"Plan3: start a plan or run a subcommand",plans:"Plan3: browse plans",resume:"Plan3: continue the current or named plan",settings:"Open Settings",hub:"Pi control hub: status, install, open, restart",design:"Browse design examples and collect references",review:"Review changes since the last commit or review with the other-provider model",reload:"Reload Pi after the current run (works from the browser)",env:"Set an environment variable or secret; the agent only sees its name",fact:"Store, search, correct or forget durable knowledge",...(maintenanceCheckout()?{"catch-up":"Catch up packages",context:"Context guard settings"}:{}),...(extensionScoutEnabled()?{scout:"Scout Pi extensions"}:{})});
+const woSubcommands = () => ({compact:"Compact the current context",plan:"Plan3: start a plan or run a subcommand",plans:"Plan3: browse plans",resume:"Plan3: continue the current or named plan",settings:"Open Settings",hub:"Pi control hub: status, install, open, restart",design:"Browse design examples and collect references",review:"Review changes since the last commit or review with the other-provider model",reload:"Reload Pi after the current run (works from the browser)",env:"Set an environment variable or secret; the agent only sees its name",fact:"Store, search, correct or forget durable knowledge","context-report":"What a blank session sends with every request, by owner, with ideas for ce-workflow's own parts",...(maintenanceCheckout()?{"catch-up":"Catch up packages",context:"Context guard settings"}:{}),...(extensionScoutEnabled()?{scout:"Scout Pi extensions"}:{})});
 
 function settingsPath(cwd) {
 	return join(cwd, CONFIG_DIR_NAME, "settings.json");
@@ -2612,6 +2612,17 @@ function npmBin() {
 	return process.platform === "win32" ? "npm.cmd" : "npm";
 }
 
+// Starts a throwaway Pi in this project and reports its first request; a child process, so the script is never stale.
+async function contextReport(ctx, pi) {
+	notify(ctx, "Measuring a blank session in this project (about 10 s)…", "info");
+	try {
+		const { stdout } = await promisify(execFile)(process.execPath, [join(WORKFLOW_REPO_DIR, "scripts", "context-report.mjs"), "--cwd", ctx.cwd], { maxBuffer: 8 * 1024 * 1024 });
+		pi.sendMessage({ customType: "work-context-report", content: stdout.trim(), display: true });
+	} catch (error) {
+		notify(ctx, `Context report failed: ${error.stderr?.toString().trim() || error.message}`, "error");
+	}
+}
+
 // Async so progress notices reach the TUI and the hub page while npm runs (sync calls froze Pi for minutes).
 async function npmExec(args, options) {
 	const windows = process.platform === "win32";
@@ -4209,6 +4220,7 @@ if (blockedInternalBackgroundCompletionTurn) {
   if(utility && (maintenanceCheckout(ctx.cwd)||!["work-context","work-catch-up"].includes(utility))) return executeUtilityAction(utility,rest,ctx,pi);
   if(action==="compact") return rest==="early park" ? void startEarlyCompact(ctx, "before parking", true) : rest==="early" ? void startEarlyCompact(ctx) : requestMicrocompact(ctx);
   if(action==="fact") return handleKnowledgeCommand(rest,ctx);
+  if(action==="context-report") return contextReport(ctx,pi);
   if(action==="hub") return handleHubCommand(rest,ctx);
   if(action==="design") return handleDesignLibraryCommand(rest,ctx,pi);
   if(action==="review") return pi.events?.emit?.("wo:review",{ctx});
