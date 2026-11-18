@@ -37,6 +37,20 @@ fs.mkdirSync(folder);
  view.close();
 }
 
+// Extension reports (custom entries with data.markdown, e.g. /wo context_report) show as chat rows, live and from the file.
+{
+ const { SessionView } = await import("../src/view.ts"), file = path.join(root, "report.jsonl"), at = new Date(1_760_000_000_000).toISOString();
+ const report = { type: "custom", customType: "work-context-report", timestamp: at, data: { markdown: "# Context report" } };
+ fs.writeFileSync(file, [report, { type: "custom", customType: "state", timestamp: at, data: { n: 1 } }].map(entry => `${JSON.stringify(entry)}\n`).join(""));
+ const parked = new SessionView({ file: () => file, idle: () => true }); await parked.hydrate();
+ assert.deepEqual(parked.snapshot().chat.map(row => row.text), ["# Context report"], "report from the file; plain state entries stay hidden");
+ parked.close();
+ const live = new SessionView({ file: () => undefined, idle: () => true }); await live.hydrate([]);
+ live.feed({ type: "entry_appended", entry: { ...report, data: { markdown: "# Live report" } } });
+ assert.deepEqual(live.snapshot().chat.map(row => row.text), ["# Live report"], "a live report appears without a reload");
+ live.close();
+}
+
 // Old duplicate cache cards disappear on reload without hiding other saved warnings.
 {
  const { readNotices } = await import("../src/notices.ts");

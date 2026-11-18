@@ -4,7 +4,7 @@ import { createReadStream } from "node:fs";
 import { createInterface } from "node:readline";
 import type { ServerResponse } from "node:http";
 import { createActivityMirror } from "../../extensions/plan3-web.ts";
-import { checkIn, createChatMirror } from "./chat.ts";
+import { checkIn, createChatMirror, reportMessage } from "./chat.ts";
 import type { RpcRecord } from "./rpc-client.ts";
 
 type Row = { id: string; role: string; text: string };
@@ -36,6 +36,9 @@ export async function branchMessages(file: string): Promise<{ type: "message"; m
 	}
 	return branch.flatMap(entry => {
 		if (entry?.type === "message" && entry.message) return [entry];
+		// shortcut: a live session hydrates from get_messages, which has no custom entries, so a reloaded page loses its reports until the session parks.
+		const report = reportMessage(entry);
+		if (report) return [{ type: "message" as const, message: report }];
 		const role = entry?.type === "compaction" ? "compactionSummary" : entry?.type === "branch_summary" ? "branchSummary" : entry?.type === "usage" && entry.kind === "cache_warm" ? "cacheWarm" : null;
 		return role ? [{ type: "message" as const, message: { role, timestamp: Date.parse(entry.timestamp), usage: entry.usage, provider: entry.provider, model: entry.model } }] : [];
 	});

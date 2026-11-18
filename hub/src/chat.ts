@@ -40,6 +40,8 @@ function toolTitle(name: string, args: Record<string, unknown>) {
 	const line = String(value ?? "").split("\n").find(item => item.trim())?.trim() ?? "";
 	return (name + " " + (line.length > 90 ? line.slice(0, 89) + "\u2026" : line)).trim();
 }
+/** An extension report (a custom entry with `data.markdown`, e.g. /wo context_report) as a chat row: the page has no custom-entry view. */
+export const reportMessage = (entry) => entry?.type === "custom" && typeof entry.data?.markdown === "string" ? { role: "assistant", timestamp: Date.parse(entry.timestamp) || Date.now(), content: entry.data.markdown } : undefined;
 export function createChatMirror(pi, publish: (event: string, data: unknown) => void) {
 	const rows: ChatRow[] = [], active = new Map<string, string>(), sent = new Map<string, { length: number; blocks: string }>();
 	let next = 0;
@@ -99,6 +101,7 @@ export function createChatMirror(pi, publish: (event: string, data: unknown) => 
 	pi.on("message_update", event => put(event.message, true));
 	pi.on("message_end", event => put(event.message, false, true, false, cache.observe(event.message)));
 	pi.on("session_compact", () => cache.reset());
+	pi.on("entry_appended", event => { const message = reportMessage(event.entry); if (message) put(message, false, true, true); });
 	return {
 		snapshot: () => structuredClone(rows),
 		/** The `count` rows before `before` (default: newest) as excerpts, and whether older rows exist. */
