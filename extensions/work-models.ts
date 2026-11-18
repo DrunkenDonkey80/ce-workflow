@@ -12,6 +12,8 @@ import { publish } from "./hub-channel.ts";
 import { handleDesignLibraryCommand, handleHubCommand, intercomParkedSessions, peerTools, projectCommandsTool, scheduleTool, sessionDialogTool, longSleepWait, LONG_WAIT_REASON, undeclaredBackground, BACKGROUND_REASON } from "./hub-command.ts";
 import { handleEnvCommand } from "./work-env.ts";
 import { registerAgentsAudit } from "./agents-audit.ts";
+import { getMarkdownTheme } from "@earendil-works/pi-coding-agent";
+import { Markdown, Text } from "@earendil-works/pi-tui";
 import { registerSelfUpdate } from "./work-self-update.ts";
 import { registerLensDefaults } from "./work-lens-format.ts";
 import { createImageTools, imageModelCanDraw } from "./work-images.ts";
@@ -2618,7 +2620,8 @@ async function contextReport(ctx, pi) {
 	notify(ctx, "Measuring a blank session in this project (about 10 s)…", "info");
 	try {
 		const { stdout } = await promisify(execFile)(process.execPath, [join(WORKFLOW_REPO_DIR, "scripts", "context-report.mjs"), "--cwd", ctx.cwd], { maxBuffer: 8 * 1024 * 1024 });
-		pi.sendMessage({ customType: "work-context-report", content: stdout.trim(), display: true });
+		// An entry, not sendMessage: an idle sendMessage is only stored for the model's next turn and never shown.
+		pi.appendEntry("work-context-report", { markdown: stdout.trim() });
 	} catch (error) {
 		notify(ctx, `Context report failed: ${error.stderr?.toString().trim() || error.message}`, "error");
 	}
@@ -3814,6 +3817,10 @@ if(event.toolName === "ask_user" && event.input && event.input.allowComment == n
 
 	registerRemoteAskAnswers(pi);
 	const runAgentsAudit = registerAgentsAudit(pi);
+	pi.registerEntryRenderer?.("work-context-report", (entry) => {
+		const markdown = entry.data?.markdown ?? "";
+		try { const theme = getMarkdownTheme(); theme.bold(""); return new Markdown(markdown, 1, 1, theme); } catch { return new Text(markdown, 1, 1); }
+	});
 
 	pi.on("session_start", (_event, ctx) => {
 // Every extension has registered its tools by now, so the loader lists only those on this machine.
