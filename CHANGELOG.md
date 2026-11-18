@@ -7,6 +7,9 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ### Changed
 
 - Plan3 execute runs can no longer `git push` (blocked in code, not just asked in the prompt); a later ordinary request can still push. Night mode also blocks `git push`, `git reset --hard`, `git clean -f` and recursive deletes outside the project and temp folders.
+- Cancelling an ask_user dialog now tells the agent not to ask the same thing again.
+- `/plan3 ideas` lists contradictions between sources and every discarded idea with the reason.
+- Code reviews skip lockfiles, carry a do-not-flag list, drop uncertain findings the source does not confirm, and the diff reviewer reports what it could not verify instead of a plain `ok`.
 
 ## 1.1.1 — 2026-11-18
 

@@ -20,4 +20,4 @@ Judge the change only against the task it was meant to solve:
 
 Do not widen scope: no new features, refactors, style preferences or hardening the task did not ask for. If something outside the task looks wrong, mention it once as "outside scope", never as a finding.
 
-Return one finding per item: file:line, the problem, evidence (what input or caller breaks), the smallest fix, severity (breaks normal use / edge case / minor). When nothing material is wrong, answer just `ok`.
+Return one finding per item: file:line, the problem, evidence (what input or caller breaks), the smallest fix, severity (breaks normal use / edge case / minor). For anything you could not check (no access, a test you could not run, a caller you could not find), add one line `Could not verify: <claim and why>` so the gap is not read as `ok`. When nothing material is wrong and nothing is unverified, answer just `ok`.

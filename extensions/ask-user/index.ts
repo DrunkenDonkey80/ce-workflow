@@ -220,6 +220,10 @@ function isBatchDetails(details: AskToolDetails | AskBatchDetails): details is A
    return (details as AskBatchDetails).kind === "batch";
 }
 
+// A cancel is an answer: re-asking the same thing only annoys the user.
+const cancelText = (batch: boolean) => batch
+   ? "User cancelled the questions. Do not ask them again: continue without them or stop where you are."
+   : "User cancelled the question. Do not ask it again: continue without it or stop where you are.";
 const BATCH_MIN_QUESTIONS = 2;
 const BATCH_MAX_QUESTIONS = 4;
 // Single-question fields that a batch sets per entry instead of at the top level.
@@ -2789,7 +2793,7 @@ async function executeBatch(
    if (batch.signal.aborted || answers === null) {
       subjects.forEach((subject, index) => events.cancelled(subject, { index, total: subjects.length }));
       return {
-         content: [{ type: "text", text: "User cancelled the questions" }],
+         content: [{ type: "text", text: cancelText(true) }],
          details: details([], true),
       };
    }
@@ -3062,7 +3066,7 @@ export function registerAskUser(pi: ExtensionAPI) {
             if (!response) {
                events.cancelled(subject);
                return {
-                  content: [{ type: "text", text: "User cancelled the question" }],
+                  content: [{ type: "text", text: cancelText(false) }],
                   details: { question, context: normalizedContext, options, response: null, cancelled: true } as AskToolDetails,
                };
             }
@@ -3122,7 +3126,7 @@ ${normalizedContext}` : question, initialText))
          if (signal?.aborted || result === null) {
             events.cancelled(subject);
             return {
-               content: [{ type: "text", text: "User cancelled the question" }],
+               content: [{ type: "text", text: cancelText(false) }],
                details: { question, context: normalizedContext, options, response: null, cancelled: true } as AskToolDetails,
             };
          }

@@ -480,7 +480,7 @@ function researchHandoffPrompt(cwd, question, { advisors = "ask", currentModel =
 		: "No other configured advisor slots are available; continue with the inline agent alone and say so.";
 	return [
 		`Explore this research request without implementation or work-store capture: ${question}`,
-		"Research mode remains on after the answer. Read project context when relevant; verify external load-bearing claims with primary sources. Ask at most one genuinely blocking clarification.",
+		"Research mode remains on after the answer. Read project context when relevant; verify key external claims with primary sources. Ask at most one genuinely blocking clarification.",
 		"Independently draft the baseline answer and materially different options, with evidence, trade-offs, uncertainty, and open questions.",
 		advisors === "ask"
 			? `Before consulting anyone, ask the user directly with ask_user to choose None (inline agent only), Narrow (first other available advisor in list order), or Wide (all other available advisors). None: do not consult advisors. Narrow/Wide: ${advisorStep}`

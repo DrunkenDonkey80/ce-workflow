@@ -1145,6 +1145,7 @@ try {
 	assert.deepEqual([...messages.at(-1).message.matchAll(/model: "([^"]+)"/g)].map(match => match[1]), ["openai-codex/gpt-6-astra:high", "anthropic/claude-opus-5-5:high"]);
 	assert.match(notices.at(-1).message, /selected 2 advisor\(s\)[\s\S]*parallel[\s\S]*gpt-6-astra[\s\S]*claude-opus/);
 	assert.match(messages.at(-1).message, /Wait for EVERY launched advisor/);
+	assert.match(messages.at(-1).message, /list contradictions between sources and every discarded idea with the reason/);
 	assert.match(messages.at(-1).message, /Call plan3 action ideas[\s\S]*one expanded ask_user popup per idea/);
 	ctx.model = { provider: "anthropic", id: "claude-opus-5-5" };
 	const plansBefore = (await files()).length;

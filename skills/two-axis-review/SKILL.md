@@ -13,7 +13,7 @@ The axes stay apart so one cannot mask the other. When the user has authorized d
 
 ## 1. Pin the fixed point
 
-Use the fixed point the user named (a SHA, branch, tag, `main`, `HEAD~5`, ...); if none, ask for it. Capture `git diff <fixed-point>...HEAD` (three dots: against the merge-base) and `git log <fixed-point>..HEAD --oneline`. For uncommitted work, also include `git diff HEAD`.
+Use the fixed point the user named (a SHA, branch, tag, `main`, `HEAD~5`, ...); if none, ask for it. Capture `git diff <fixed-point>...HEAD -- . ":(exclude)package-lock.json" ":(exclude)*.lock"` (three dots: against the merge-base; lockfiles are generated noise) and `git log <fixed-point>..HEAD --oneline`. For uncommitted work, also include `git diff HEAD` with the same excludes.
 
 Confirm first that the ref resolves (`git rev-parse <fixed-point>`) and the diff is not empty; a bad ref or an empty diff fails here, not inside the reviews.
 
@@ -54,11 +54,13 @@ Each smell reads *what it is* → *how to fix*:
 
 **Standards** gets the diff command and commit list, the standards files from step 3 and the whole smell baseline (a subagent has no other copy). Brief: "Report, per file or hunk, (a) every place the diff breaks a documented standard, citing the file and rule; (b) any baseline smell, named, with the hunk quoted. Separate hard violations from judgement calls: documented-standard breaches can be hard, baseline smells never are, and a documented standard overrides the baseline. Skip what tooling enforces. Under 400 words."
 
+Both axes get this **do-not-flag** list: theoretical risks whose preconditions are unlikely; extra hardening when the main defense already holds; unchanged code the diff does not affect; "consider library X" suggestions.
+
 **Spec** gets the diff command and commit list and the spec (path or contents). Brief: "Report (a) requirements that are missing or partial; (b) behaviour the spec did not ask for (scope creep, including unrelated edits); (c) requirements that look implemented but wrong. Quote the spec line for each finding. Under 400 words."
 
 ## 5. Report
 
-Show the two reports under `## Standards` and `## Spec`, verbatim or lightly cleaned. Do **not** merge or rerank findings across axes. End with one line: findings per axis and the worst issue within each axis. Do not pick one winner across axes; that is the reranking the separation prevents. When no fresh-context reviewer ran and you wrote the change yourself, say so in that line ("same-context self-review"): an agent reviewing code it just wrote misses more.
+First confirm each finding a reviewer marked uncertain against the source; drop it if the source does not bear it out. Then show the two reports under `## Standards` and `## Spec`, verbatim or lightly cleaned. Do **not** merge or rerank findings across axes. End with one line: findings per axis and the worst issue within each axis. Do not pick one winner across axes; that is the reranking the separation prevents. When no fresh-context reviewer ran and you wrote the change yourself, say so in that line ("same-context self-review"): an agent reviewing code it just wrote misses more.
 
 ## Why two axes
 

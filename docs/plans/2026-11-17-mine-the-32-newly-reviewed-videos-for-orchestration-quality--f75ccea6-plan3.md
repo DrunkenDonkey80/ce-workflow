@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-17
-updated: 2026-11-18T08:13:05.900Z
+updated: 2026-11-18T08:15:49.896Z
 size: plan
 reviewed: 2026-11-18
 tagsChecked: a310673c,811f1a0f
@@ -81,16 +81,11 @@ Commands (run directly with node, with PI_HUB cleared): `env -u PI_HUB node "scr
 ### Phase 1: Guards and prompt fixes [think]
 
 - [x] **G1** Shared extensions/command-guard.ts (gitCalls/runsGit/destructiveCommand); research uses it unchanged; execute runs block push until agent_end; night blocks push, reset --hard, clean -f, recursive deletes outside project/temp
-- [wip] **G2** Agent-facing text: ask_user cancel says don't ask again; ideas merge lists contradictions and discards; review prompts tightened; drop "load-bearing"
-  - ask_user: one constant, for example "User cancelled the question. Do not ask it again: continue without it or stop where you are."; assert it in `test-work-ask-user.mjs`.
-  - `plan3.ts:615`: add "list contradictions between sources and every discarded idea with the reason"; assert the phrase in `test-work-plan3.mjs`.
-  - `two-axis-review`: step 1 diff excludes `package-lock.json` and `*.lock`; step 4 adds a do-not-flag line (theoretical risks with unlikely preconditions, extra hardening when the main defense holds, unchanged code the diff doesn't affect, "consider library X"); step 5 confirms uncertain findings against the source or drops them.
-  - `diff-reviewer.md`: add a "Could not verify: <claim and why>" line so a gap is not read as `ok`; assert it if `test-advisor-model.mjs` already checks the reviewer text, otherwise prompt-only.
-  - `work-models.ts:482`: "load-bearing" becomes "key".
+- [x] **G2** ask_user cancel text shared (don't ask again); ideas merge lists contradictions/discards; two-axis-review excludes lockfiles, do-not-flag list, confirm-or-drop; diff-reviewer 'Could not verify' line; 'load-bearing' → 'key'
 
 ### Phase 2: Benchmark quality metric [think]
 
-- [ ] **B1** compare-benchmark-runs compares an optional `passed`/`score`; reasoning-strip gains a compaction-model matrix (Luna vs Terra, ultrafull)
+- [wip] **B1** compare-benchmark-runs compares an optional `passed`/`score`; reasoning-strip gains a compaction-model matrix (Luna vs Terra, ultrafull)
   - Metric: `passed` (boolean) or `score` (finite number) is compared only when both runs of a pair report the same field with a valid value. A pair where one side lacks it, has an invalid value or reports the other field is shown as "quality not comparable", never counted as zero or as a pass. A candidate whose pass rate or mean score drops is flagged even when it is cheaper. Old results without either field compare exactly as today. Add cases to `test-compare-benchmark-runs.mjs`: a drop, asymmetric fields and legacy results. Red before green on the drop flag.
   - Matrix `compaction-model` in `benchmark-reasoning-strip-live.mjs`. Two policies: L (`openai-codex/gpt-6-luna`) and T (`openai-codex/gpt-6.1-terra`), set through `workOrchestrator.context.compactionModel` and `mode: "ultrafull"` in each run's isolated agent dir. Today's harness hard-codes three-policy rotations (line 33), loads the extension only for the reasoning matrix or a policy that names it (213), and requests checkpoint compaction only for `matrix === "compaction"` (269). So:
     - add a two-arm rotation that alternates L and T order per repetition;

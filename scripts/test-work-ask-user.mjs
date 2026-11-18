@@ -166,6 +166,7 @@ for (const external of [false, true]) {
  assert.deepEqual(many.details.answers, [{ status: "skipped" }, { status: "answered", response: { kind: "selection", selections: ["Hold"] } }]);
  const cancelled = await tool.execute("hub-cancel", question, undefined, undefined, { hasUI: true, ui: hubUi(undefined) });
  assert.equal(cancelled.details.cancelled, true, "hub cancel cancels");
+ assert.match(cancelled.content[0].text, /Do not ask it again/, "a cancel tells the agent not to re-ask");
  const invalid = await tool.execute("hub-bad", question, undefined, undefined, { hasUI: true, ui: hubUi({ selections: ["Nope"] }) });
  assert.equal(invalid.details.cancelled, true, "an answer that fits no option counts as cancelled");
  // Intercom/web still race: an ask:answer wins and aborts the hub form.
