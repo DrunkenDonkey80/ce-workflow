@@ -505,7 +505,7 @@ export function createJevTools(pi, readProject, register = tool => pi.registerTo
 		for (const controller of active) controller.abort();
 		signature = next;
 		if (status.enabled && status.supported) {
-			for (const definition of tools()) register({ ...definition, exposure: "direct" });
+			for (const definition of tools()) register({ ...definition, exposure: definition.name === "jev_triage" ? "deferred" : "direct" }); // jev_triage is near-unused (E3 census): tools_enable declares it
 			registered = true;
 		} else if (registered) for (const definition of tools()) register({ ...definition, exposure: "hidden" });
 	}

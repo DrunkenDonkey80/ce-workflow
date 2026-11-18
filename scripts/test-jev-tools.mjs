@@ -90,7 +90,8 @@ try {
 	assert.equal(tools.size, 0, "default off registers nothing");
 	project = { workOrchestrator: { jev: { enabled: true } } }; extension.refresh();
 	const tool = tools.get("jev_triage");
-	assert.equal(tool.exposure, "direct");
+	assert.equal(tool.exposure, "deferred", "near-unused (E3 census): tools_enable declares it");
+	assert.equal(tools.get("jev_evidence").exposure, "direct");
 	const direct = await tool.execute("call", { jobs: [{ id: "json", questions: q, state: { status: "test passed" } }] }, undefined, undefined, ctx);
 	assert.equal(direct.usage.totalTokens, 11);
 	assert.equal(direct.structuredContent.results[0].status, "ok");

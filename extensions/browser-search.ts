@@ -223,6 +223,6 @@ export const imageSearchTool = () => ({
 });
 
 export default function browserSearchExtension(pi) {
-	if (installed()) { pi.registerTool?.(browserSearchTool()); pi.registerTool?.({ ...imageSearchTool(), exposure: "deferred" }); } // tools_enable declares image_search
+	if (installed()) { pi.registerTool?.({ ...browserSearchTool(), exposure: "deferred" }); pi.registerTool?.({ ...imageSearchTool(), exposure: "deferred" }); } // tools_enable declares image_search
 	for (const event of ["session_shutdown", "session_switch"]) pi.on?.(event, clearSets);
 }

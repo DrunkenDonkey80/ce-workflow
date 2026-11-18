@@ -585,5 +585,5 @@ export default function browserFetchExtension(pi) {
 	if (!installed()) return;
 	// Refresh the launcher on every load: a node upgrade can move node's path, and the browser would silently fail to start the old one.
 	if (existsSync(hostManifest())) try { writeLauncher(); } catch { /* the old launcher stays */ }
-	pi.registerTool?.(browserFetchTool());
+	pi.registerTool?.({ ...browserFetchTool(), exposure: "deferred" }); // near-unused (E3 census): tools_enable declares it
 }

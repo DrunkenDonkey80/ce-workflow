@@ -19,7 +19,7 @@ export function cameraTools(controller: ReturnType<typeof createCameraController
 	};
 	return [
 		{
-			name: "camera_capture", label: "Camera still capture", exposure: "model-only",
+			name: "camera_capture", label: "Camera still capture", exposure: "model-only", defaultActive: false,
 			description: "Capture a bounded still or spaced burst from the explicitly enabled project camera. Local TUI consent and active warning are mandatory; never video or audio. Default full field of view has a 1024-pixel maximum edge; fullSize requests native detail, without silent downgrade. Crop coordinates refer to native source pixels in the previous manifest. Hardware is released between shots; intervals exclude reopening/warm-up latency. Bounds are provisional pending calibration. On a Mac the camera is an iPhone or iPad (USB or Wi-Fi) on a stand: its Camera app is opened (and left open) and its viewfinder read as screenshots; lockAt {x, y} (source pixels of a previous frame) long-presses there first to lock focus and exposure (AE/AF LOCK), e.g. on a dim display.",
 			parameters: { type: "object", additionalProperties: false, properties: {
 				count: integer(1, 8), intervalMs: integer(0, 60000), deadlineMs: integer(2000, 600000), fullSize: { type: "boolean" }, width: integer(1, 16000), height: integer(1, 16000),
@@ -32,7 +32,7 @@ export function cameraTools(controller: ReturnType<typeof createCameraController
 			},
 		},
 		{
-			name: "camera_recover", label: "Recover retained camera still", exposure: "model-only",
+			name: "camera_recover", label: "Recover retained camera still", exposure: "model-only", defaultActive: false,
 			description: "Reattach an existing unexpired camera frame by capture UUID in the same project, after trimming or compaction. Never opens hardware or silently recaptures history. Missing or expired pixels are reported unavailable.",
 			parameters: { type: "object", additionalProperties: false, required: ["frame"], properties: { frame: { type: "string", pattern: "^[a-f0-9-]{36}$" } } },
 			async execute(_id: string, params: { frame: string }, _signal: AbortSignal, _update: unknown, ctx: ExtensionContext) {
@@ -41,7 +41,7 @@ export function cameraTools(controller: ReturnType<typeof createCameraController
 			},
 		},
 		...(watch ? [{
-			name: "camera_watch", label: "Watch camera changes", exposure: "model-only",
+			name: "camera_watch", label: "Watch camera changes", exposure: "model-only", defaultActive: false,
 			description: "Start bounded continuous local visual change/quiet monitoring. Waits for warm-up and baseline readiness before you operate the device; then return idle, never poll. Default adaptive mode emits at most an initial batch plus final native wake; settled mode emits only one fresh final image/wake. Quiet requires activity after readiness and is not proof of device success. An explicit deadline (maximum 48h) is capped by local consent expiry. Small LEDs require an appropriate crop/tile size. Numerical limits are provisional; sampling cannot guarantee every brief state. A phone camera samples as fast as its screenshots arrive (fps is ignored; width bounds the longest edge of the crop).",
 			parameters: { type: "object", additionalProperties: false, required: ["deadlineMs"], properties: {
 				mode: { type: "string", enum: ["adaptive", "settled"] }, deadlineMs: integer(2000, 172800000), quietMs: integer(500, 600000), width: integer(1, 640), height: integer(1, 480), fps: integer(1, 30), tileSize: integer(1, 64), noise: integer(0, 32), staleMs: integer(500, 30000), threshold: { type: "number", exclusiveMinimum: 0, maximum: 1 },
@@ -51,7 +51,7 @@ export function cameraTools(controller: ReturnType<typeof createCameraController
 				const details = await watch.start(ctx, params, signal); return { content: [{ type: "text" as const, text: JSON.stringify(details) }], details };
 			},
 		}, {
-			name: "camera_stop", label: "Stop camera watch", exposure: "model-only", description: "Stop owned camera watch and discard pending wakeups without revoking the existing time grant. Confirms process release; never acquires hardware.",
+			name: "camera_stop", label: "Stop camera watch", exposure: "model-only", defaultActive: false, description: "Stop owned camera watch and discard pending wakeups without revoking the existing time grant. Confirms process release; never acquires hardware.",
 			parameters: { type: "object", additionalProperties: false, properties: {} },
 			async execute() { await watch.stop(); const details = { outcome: "stopped" }; return { content: [{ type: "text" as const, text: "Camera watch stopped; pending wakeups discarded." }], details }; },
 		}] : []),

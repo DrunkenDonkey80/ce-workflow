@@ -28,3 +28,47 @@ const { readFileSync } = await import("node:fs");
 for (const [file, name] of [["screen-read", "screenReadTool"], ["mobile-act", "mobileActTool"], ["app-act", "appActTool"], ["browser-act", "browserActTool"], ["browser-search", "imageSearchTool"], ["vm-act", "vmActTool"]])
 	assert.match(readFileSync(new URL(`../extensions/${file}.ts`, import.meta.url), "utf8"), new RegExp(`\\{ \\.\\.\\.${name}\\([^)]*\\)\\)?, exposure: "deferred" \\}`), `${name} registers deferred`);
 console.log("ok - tools_enable lists registered situational tools and declares the named ones");
+
+// E7: near-unused tools (<1 call per 1,000 turns, census E3) start undeclared and are listed by tools_enable.
+{
+	const { activateNamedTools } = await import("../extensions/tool-loader.ts");
+	let on = ["read"], sets = 0;
+	const tools = [{ name: "camera_capture", exposure: "model-only" }, { name: "plan3_diagram", exposure: "deferred" }, { name: "session_dialog", exposure: "deferred" }, { name: "browser_fetch", exposure: "deferred" }, { name: "jev_triage", exposure: "hidden" }];
+	const host = { getAllTools: () => tools, getActiveTools: () => on, setActiveTools: (names) => { on = names; sets++; } };
+	assert.deepEqual(toolsEnableTool(host).parameters.properties.tools.items.enum, ["camera_capture", "plan3_diagram", "session_dialog", "browser_fetch"], "model-only camera tools are offered too, hidden ones are not");
+	assert.deepEqual(toolsEnableTool(host, ["camera_capture"]).parameters.properties.tools.items.enum, ["plan3_diagram", "session_dialog", "browser_fetch"], "a camera that is off is not offered");
+	activateNamedTools(host, "Update the diagram through plan3_diagram target product; browser_fetch the page.");
+	assert.deepEqual(on, ["read", "plan3_diagram"], "an instruction naming plan3_diagram declares it; tools the harness never instructs stay off");
+	activateNamedTools(host, "use plan3_diagram again");
+	assert.equal(sets, 1, "already active: no tool-set change (keeps the prompt cache)");
+	activateNamedTools(host, "session_dialog {action: \"wait\"}");
+	assert.deepEqual(on, ["read", "plan3_diagram", "session_dialog"]);
+	for (const [file, pattern] of [
+		["browser-search", /registerTool\?\.\(\{ \.\.\.browserSearchTool\(\), exposure: "deferred" \}\)/],
+		["browser-fetch", /registerTool\?\.\(\{ \.\.\.browserFetchTool\(\), exposure: "deferred" \}\)/],
+		["plan3", /name: "plan3_diagram", label: "Plan3 diagram", exposure: "deferred"/],
+		["hub-command", /name: "session_dialog",\s+label: "Session dialog",\s+exposure: "deferred"/],
+		["jev-tools", /exposure: definition\.name === "jev_triage" \? "deferred" : "direct"/],
+	]) assert.match(readFileSync(new URL(`../extensions/${file}.ts`, import.meta.url), "utf8"), pattern, `${file} registers its near-unused tool deferred`);
+	const camera = readFileSync(new URL("../extensions/work-camera-tools.ts", import.meta.url), "utf8");
+	assert.equal(camera.match(/exposure: "model-only", defaultActive: false/g)?.length, 4, "all four camera tools register inactive");
+	for (const name of ["camera_capture", "camera_recover", "camera_watch", "camera_stop", "plan3_diagram", "session_dialog", "browser_search", "browser_fetch", "jev_triage"]) assert(name in SITUATIONAL_TOOLS, `${name} has a tools_enable line`);
+	const hub = readFileSync(new URL("../extensions/hub-command.ts", import.meta.url), "utf8");
+	assert.match(hub, /activateTools\(pi, \["session_dialog"\]\)/, "a send stopped at a peer's open question declares session_dialog");
+	console.log("ok - near-unused tools start undeclared, tools_enable offers them, their instructions declare them");
+}
+
+// E7: pi-lens's near-unused always-active tools are withdrawn at session start; a branch that enabled one keeps it.
+{
+	const { deferForeignTools } = await import("../extensions/tool-loader.ts");
+	let on = ["read", "symbol_search", "read_enclosing", "effective_config", "lens_diagnostics"];
+	const host = { getAllTools: () => on.map((name) => ({ name, exposure: "direct" })), getActiveTools: () => on, setActiveTools: (names) => { on = names; } };
+	const offered = toolsEnableTool(host).parameters.properties.tools.items.enum;
+	assert.deepEqual(offered, ["symbol_search", "read_enclosing", "effective_config"], "direct pi-lens tools are offered; their other direct tools are not");
+	const branch = [{ message: { role: "toolResult", toolName: "tools_enable", details: { enabled: ["read_enclosing"] } } }, { message: { role: "toolResult", toolName: "read", details: { enabled: ["effective_config"] } } }];
+	deferForeignTools(host, branch);
+	assert.deepEqual(on, ["read", "read_enclosing", "lens_diagnostics"], "withdrawn unless tools_enable enabled it on this branch");
+	const wo = readFileSync(new URL("../extensions/work-models.ts", import.meta.url), "utf8");
+	assert.match(wo, /session_start[\s\S]{0,200}deferForeignTools\(pi, ctx\.sessionManager/, "session start withdraws them");
+	console.log("ok - pi-lens near-unused tools start undeclared unless this branch enabled them");
+}

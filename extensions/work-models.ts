@@ -14,7 +14,7 @@ import { handleEnvCommand } from "./work-env.ts";
 import { registerSelfUpdate } from "./work-self-update.ts";
 import { registerLensDefaults } from "./work-lens-format.ts";
 import { createImageTools, imageModelCanDraw } from "./work-images.ts";
-import { toolsEnableTool } from "./tool-loader.ts";
+import { activateNamedTools, deferForeignTools, toolsEnableTool } from "./tool-loader.ts";
 import { registerRemoteAskAnswers } from "./work-ask-remote.ts";
 import { createCameraController, cameraSettings } from "./work-camera.ts";
 import { cameraTools } from "./work-camera-tools.ts";
@@ -3801,9 +3801,9 @@ if(event.toolName === "ask_user" && event.input && event.input.allowComment == n
 	registerRemoteAskAnswers(pi);
 
 	pi.on("session_start", (_event, ctx) => {
-syncCameraTools(pi, ctx.cwd);
 // Every extension has registered its tools by now, so the loader lists only those on this machine.
-if (!loaderRegistered) { const loader = toolsEnableTool(pi); if (loader) { registerConstrainedTool(pi, loader); loaderRegistered = true; } }
+deferForeignTools(pi, ctx.sessionManager?.getBranch?.() ?? []);
+syncCameraTools(pi, ctx.cwd, true);
 visionBridge.clear();
 resetContextCompaction();
 restoreResearchContext(ctx);
@@ -3868,6 +3868,7 @@ showResearchContext(ctx, false); // no "off" for the hub: a parked session keeps
 
 	pi.on("before_agent_start", (event, ctx) => {
  syncCameraTools(pi, ctx.cwd); // picks up a camera switched on or off in settings since the last run
+ activateNamedTools(pi, contentText(event.prompt));
  blockedInternalBackgroundCompletionTurn = Boolean(pendingInternalBackgroundCompletionPrompt && contentText(event.prompt).trim() === pendingInternalBackgroundCompletionPrompt);
  pendingInternalBackgroundCompletionPrompt = null;
  // Pi 1.2+ also fires this for sendMessage(triggerTurn) runs (messageType "custom"); only prompts are user work.
@@ -4244,15 +4245,21 @@ function workSettingsStatus(ctx) {
 }
 
 const SETTINGS_RESET = "__reset__";
-let loaderRegistered = false;
+let loaderOffer = "", loaderCamera;
 let cameraController;
 const CAMERA_TOOLS = ["camera_capture", "camera_recover", "camera_watch", "camera_stop"];
-// The camera tools cost ~4k chars on every request: declare them only while this project's camera is ON with a device.
-export function syncCameraTools(pi, cwd) {
+// The camera tools (~4k chars per request) start inactive; tools_enable offers them only while this project's camera is ON
+// with a device, and a camera switched off withdraws them. Re-registers the loader only when its offer changes (prompt cache).
+// shortcut: after session start the offer is rebuilt only on a camera switch, so a tool registered later (Jev switched on
+// mid-session) is offered from the next session or /reload; rebuild on every run if that bites.
+export function syncCameraTools(pi, cwd, start = false) {
 	if (!pi?.getActiveTools || !pi.setActiveTools) return;
-	const camera = cameraSettings(readSettings(cwd)), active = pi.getActiveTools();
-	const next = camera.enabled && camera.device ? [...new Set([...active, ...CAMERA_TOOLS])] : active.filter(name => !CAMERA_TOOLS.includes(name));
-	if (next.length !== active.length) pi.setActiveTools(next);
+	const camera = cameraSettings(readSettings(cwd)), on = Boolean(camera.enabled && camera.device), active = pi.getActiveTools();
+	if (!on && active.some(name => CAMERA_TOOLS.includes(name))) pi.setActiveTools(active.filter(name => !CAMERA_TOOLS.includes(name)));
+	if (!start && (loaderCamera === undefined || loaderCamera === on)) return;
+	loaderCamera = on;
+	const loader = toolsEnableTool(pi, on ? [] : CAMERA_TOOLS), offer = loader?.parameters.properties.tools.items.enum.join() ?? "";
+	if (loader && offer !== loaderOffer) { registerConstrainedTool(pi, loader); loaderOffer = offer; }
 }
 
 function owns(object, key) {

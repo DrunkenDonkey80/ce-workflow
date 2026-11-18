@@ -4,6 +4,7 @@ import { execFile } from "node:child_process";
 import { basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { showListDialog } from "./ask-user/menu.ts";
+import { activateTools } from "./tool-loader.ts";
 
 const CLI = fileURLToPath(new URL("../hub/src/cli.ts", import.meta.url));
 
@@ -98,12 +99,14 @@ export function dialogReason(peer: { id: string; name?: string }, forms: Form[])
 	].join("\n");
 }
 
-async function dialogBlock(peer: Live | undefined) {
+async function dialogBlock(pi, peer: Live | undefined) {
 	if (!peer) return;
 	const result = await hubCli(["dialogs", peer.id], 30_000);
 	let state: { forms?: Form[] };
 	try { state = JSON.parse(result.text); } catch { return; } // no hub, or the peer is not one of its sessions
-	if (state.forms?.length) return { block: true, reason: dialogReason(peer, state.forms) };
+	if (!state.forms?.length) return;
+	activateTools(pi, ["session_dialog"]); // the reason tells the model to call it
+	return { block: true, reason: dialogReason(peer, state.forms) };
 }
 
 const text = (value: string) => ({ content: [{ type: "text", text: value }], details: {} });
@@ -112,6 +115,7 @@ export function sessionDialogTool(pi) {
 	return {
 		name: "session_dialog",
 		label: "Session dialog",
+		exposure: "deferred",
 		description: "Act on another hub session's open question after an intercom send was stopped because it is waiting for its user. wait: you get a message once it closes, saying what was picked and by whom. answer: answer it yourself, only when the user told you to control or fix that session; it is told the answer came from you.",
 		parameters: {
 			type: "object", additionalProperties: false, required: ["action", "session"],
@@ -162,12 +166,12 @@ export function intercomParkedSessions(pi) {
 		let target: Parked | undefined;
 		if (to) {
 			target = parkedTarget(await parkedSessions(), to, folder);
-			if (!target) return dialogBlock(liveTarget(await roster() ?? [], to, folder));
+			if (!target) return dialogBlock(pi, liveTarget(await roster() ?? [], to, folder));
 		} else {
 			// cwd alone: intercom picks the sole live peer there; only when none is live does a parked one stand in.
 			const live = await roster();
 			if (!live) return;
-			if (live.some(s => s.pid !== process.pid && sameFolder(s.cwd, folder!))) return dialogBlock(liveTarget(live, "", folder));
+			if (live.some(s => s.pid !== process.pid && sameFolder(s.cwd, folder!))) return dialogBlock(pi, liveTarget(live, "", folder));
 			const parked = (await parkedSessions()).filter(s => sameFolder(s.folder, folder!));
 			if (parked.length > 1) return { block: true, reason: `No live session in ${folder}; several are parked. Send again with to: <id>; it resumes first.${parkedList(parked)}` };
 			target = parked[0];

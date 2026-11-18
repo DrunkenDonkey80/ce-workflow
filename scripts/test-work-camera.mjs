@@ -346,25 +346,34 @@ const recovery = cameraTools(fakeController).find(tool => tool.name === "camera_
 const recovered = await recovery.execute("test", { frame: burst.frames[1].id }, undefined, undefined, ctx);
 assert.equal(recovered.content.filter(part => part.type === "image").length, 1);
 const { stripProcessedPayloads, syncCameraTools } = await import("../extensions/work-models.ts");
-// Camera tools are declared only while the project camera is ON with a device; other tools stay as they are.
+// E7: camera tools start inactive; tools_enable offers them only while the project camera is ON with a device, an
+// enabled one stays declared through later agent starts, and switching the camera off withdraws them.
 {
 	const dir = join(sandbox, "sync"), cam = ["camera_capture", "camera_recover", "camera_watch", "camera_stop"];
 	mkdirSync(join(dir, ".pi"), { recursive: true });
 	let active = ["read", ...cam], sets = 0;
-	const api = { getActiveTools: () => active, setActiveTools: next => { active = next; sets++; } };
-	syncCameraTools(api, dir);
+	const loaders = [];
+	const api = { getAllTools: () => [...cam, "screen_read"].map(name => ({ name, exposure: name === "screen_read" ? "deferred" : "model-only" })), getActiveTools: () => active, setActiveTools: next => { active = next; sets++; }, registerTool: tool => loaders.push(tool.parameters.properties.tools.items.enum), on() {} };
+	const offered = () => loaders.at(-1);
+	syncCameraTools(api, dir, true); // session start
 	assert.deepEqual(active, ["read"], "no settings: camera tools off by default");
+	assert.deepEqual(offered(), ["screen_read"], "camera off: tools_enable does not offer it");
 	const set = camera => writeFileSync(join(dir, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { camera } }));
 	set({ enabled: true });
 	syncCameraTools(api, dir);
-	assert.deepEqual(active, ["read"], "ON without a device stays off");
+	assert.deepEqual(offered(), ["screen_read"], "ON without a device is not offered");
 	set({ enabled: true, device: { id: "@device_pnp_cam", label: "Cam" } });
 	syncCameraTools(api, dir); syncCameraTools(api, dir);
-	assert.deepEqual(active, ["read", ...cam]);
-	assert.equal(sets, 2, "unchanged sets are skipped");
+	assert.deepEqual(active, ["read"], "a configured camera starts inactive");
+	assert.deepEqual(offered(), [...cam, "screen_read"]);
+	assert.equal(loaders.length, 2, "the loader re-registers only when its offer changes");
+	active = ["read", "camera_capture"]; // tools_enable declared it
+	syncCameraTools(api, dir);
+	assert.deepEqual(active, ["read", "camera_capture"], "an enabled camera tool stays active through the next agent start");
 	set({ enabled: false, device: { id: "@device_pnp_cam", label: "Cam" } });
 	syncCameraTools(api, dir);
 	assert.deepEqual(active, ["read"]);
+	assert.equal(sets, 2);
 }
 const conversation = [{ role: "toolResult", toolName: "camera_recover", toolCallId: "test", timestamp: 1, ...recovered }];
 const stripped = stripProcessedPayloads(conversation, { imageBeforeTimestamp: Infinity });

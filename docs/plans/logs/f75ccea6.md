@@ -77,3 +77,26 @@ Planning done; draft awaiting /plan3 finish. Phases: G1–G2 guards and prompt f
     - Limits: other machines contribute only their shared projects, and the available tool list per request is not logged.
   - Gap: the tool list offered per request is not logged, so "available" comes from the registration code for each window (assumption, labelled in the report). A self-check runs the parser over a small fixture JSONL.
   - check: env -u PI_HUB -u PI_HUB_SESSION node scripts/test-tool-usage-census.mjs -> ok; test_sensitivity (all-on window counted as recent) -> caught; tool-usage-census.mjs --dump-tool-defs -> 39 active / 68 registered; full census run -> report written
+
+## 2026-11-18T11:23:39.542Z E7 done: 12 near-unused tools start undeclared and are offered by tools_enable (camera ×4, browser_search/fetch, jev_triage, plan3_diagram, session_dialog, pi-lens symbol_search/read_enclosing/effective_config); the harness declares plan3_diagram/session_dialog when it instructs them; live start 39→27 tools, ~12 KB schema saved (estimate). Goal, context7, bg_wait, research_exit and other pi-lens tools stay: user decision (goal tools are required by /goal's command check).
+
+- [x] **E7** Make every always-on tool under 1 call per 1,000 turns in every phase on-demand through tools_enable; tests
+  - Threshold (D-09): fewer than 1 call per 1,000 assistant turns in every phase since 2026-10-31, from the E3 census. Already-situational tools are out of scope.
+  - Pilot candidates, which E3's final numbers confirm or change:
+    - ce-workflow tools: the four camera tools (0 calls), jev_triage (0.1), browser_search (0.5), plan3_diagram (0.2), session_dialog (0.9), research_exit (0.9).
+    - Tools from other packages: project_report, symbol_search, read_enclosing, module_report and effective_config (pi-lens); query-docs and resolve-library-id (context7); bg_wait (pi-subagents); goal_complete, goal_blocked and goal_wait; and pi_lens_activate_tools (0.3), a second loader that folds into tools_enable.
+  - ce-workflow tools: register as `exposure: "deferred"`, with a one-line entry in `SITUATIONAL_TOOLS` (`extensions/tool-loader.ts`). Pi then restores enabled tools on resume, as for today's situational tools.
+  - Camera: `syncCameraTools` (`work-models.ts` 4265, called at session start and before every run, 3818 and 3884) adds all camera tools whenever a camera is configured and removes them otherwise. It would undo both the deferral and an explicit enable. Change it to decide only whether the camera tools are offered by `tools_enable`, never which are active. Test two cases: a configured camera starts with the tools inactive, and an enabled camera tool stays active through the next agent start.
+  - Tools from other packages: ce-workflow cannot change how they register, so it removes them from the active set (`pi.setActiveTools`) at session start and lists them in `tools_enable`. Enabling one adds it back. Check whether Pi keeps that per-branch active set on resume; if it does not, record enabled names in a session entry and reapply them, with a test.
+  - Tools the harness tells the model to call at a known moment are activated by the code that gives that instruction:
+    - the goal tools when a goal starts;
+    - research_exit while research mode is on;
+    - session_dialog when intercom reports a stopped send;
+    - plan3_diagram when a plan has a diagram;
+    - bg_wait together with subagents_enable.
+    Otherwise the instruction would name a tool the model cannot see.
+  - Prompt rules that name a moved tool (browser_search, the context7 skill, pi-lens skills) say to enable it first, or the rule moves into the tool's tools_enable line.
+  - Proof:
+    - Extend the tool-loader tests (find the existing ones in `scripts/`; new cases in `test-work-plan3.mjs` if none). They assert that each moved tool is inactive at start, appears in the `tools_enable` enum, becomes active after enabling, and is activated by its instruction trigger.
+    - Red before the change. Then one live session start with the real package set confirms the declared tool list shrank, and reports the bytes saved per request.
+  - check: env -u PI_HUB -u PI_HUB_SESSION node scripts/test-work-tool-loader.mjs, test-work-camera.mjs, test-work-native-smoke.mjs: all ok/PASS; test_sensitivity dropping the branch-enabled keep in deferForeignTools: caught; live `pi -p` session: 27 declared tools, pi-lens trio absent and listed in tools_enable.
