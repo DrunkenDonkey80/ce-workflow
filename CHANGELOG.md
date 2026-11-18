@@ -6,6 +6,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ### Added
 
+- AGENTS.md audit: at most every 5 days, and only when an AGENTS.md or CLAUDE.md loaded in the project changed since the last audit, Astra reviews them in the background against the whole blank-session prompt (duplicates, rules other parts already ensure, shouting, stale references, wordiness). Its proposals come up in an ask_user dialog with the reason and the before/after text; only the ones you pick are written.
 - `/wo context-report` starts a throwaway Pi in the current project and shows what a blank session sends with every request, split by owner (ce-workflow, Pi core, each package, skill and instructions file). It includes each tool's schema and prompt text and how often it is called per 1,000 turns. Its ideas cover only ce-workflow's own parts; other owners are listed but not judged. It never calls the model.
 - `compare-benchmark-runs` compares an optional `passed` or `score` per run and warns when the candidate passes less or scores lower, even when it is cheaper; pairs where only one side reports it are shown as not comparable.
 - The reasoning-strip benchmark has a `compaction-model` matrix: Luna vs Terra as the ultrafull summarizer, one results file per arm, with each run's compaction model and cost.

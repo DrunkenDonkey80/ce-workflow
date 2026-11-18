@@ -2,7 +2,7 @@
 // What a blank session sends with every request: starts Pi once in <cwd> (no session, no provider call: the probe
 // exits on the first request), splits the system prompt and tool schemas by owner, adds tool call rates from this
 // PC's session logs, and suggests cuts for ce-workflow's own parts only; other owners are listed, not judged.
-// Usage: node scripts/context-report.mjs [--cwd <dir>] [--json]
+// Usage: node scripts/context-report.mjs [--cwd <dir>] [--json | --system]  (--system: the raw prompt and tool list, for the AGENTS.md audit)
 import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -213,5 +213,8 @@ export async function contextReport(cwd, { json = false } = {}) {
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
 	const args = process.argv.slice(2);
 	const cwd = args.includes("--cwd") ? path.resolve(args[args.indexOf("--cwd") + 1]) : process.cwd();
-	console.log(await contextReport(cwd, { json: args.includes("--json") }));
+	if (args.includes("--system")) {
+		const { system, all } = await captureBlankRequest(cwd);
+		console.log(JSON.stringify({ system, tools: all.map((t) => ({ name: bare(t.name), description: t.description })) }));
+	} else console.log(await contextReport(cwd, { json: args.includes("--json") }));
 }

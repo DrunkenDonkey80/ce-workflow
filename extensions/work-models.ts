@@ -11,6 +11,7 @@ import { askConfirm, askText, showListDialog } from "./ask-user/menu.ts";
 import { publish } from "./hub-channel.ts";
 import { handleDesignLibraryCommand, handleHubCommand, intercomParkedSessions, peerTools, projectCommandsTool, scheduleTool, sessionDialogTool, longSleepWait, LONG_WAIT_REASON, undeclaredBackground, BACKGROUND_REASON } from "./hub-command.ts";
 import { handleEnvCommand } from "./work-env.ts";
+import { registerAgentsAudit } from "./agents-audit.ts";
 import { registerSelfUpdate } from "./work-self-update.ts";
 import { registerLensDefaults } from "./work-lens-format.ts";
 import { createImageTools, imageModelCanDraw } from "./work-images.ts";
@@ -3812,6 +3813,7 @@ if(event.toolName === "ask_user" && event.input && event.input.allowComment == n
 });
 
 	registerRemoteAskAnswers(pi);
+	registerAgentsAudit(pi);
 
 	pi.on("session_start", (_event, ctx) => {
 // Every extension has registered its tools by now, so the loader lists only those on this machine.

@@ -112,6 +112,7 @@ const tests = [
 	"test-benchmark-compaction-model.mjs",
 	"test-tool-usage-census.mjs",
 	"test-context-report.mjs",
+	"test-agents-audit.mjs",
 	"test-audit-compaction.mjs",
 	...listed("scripts").filter((name) => /^test-work-.*\.mjs$/.test(name)),
 ];
