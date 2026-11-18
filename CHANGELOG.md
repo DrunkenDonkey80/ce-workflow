@@ -8,6 +8,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 - `compare-benchmark-runs` compares an optional `passed` or `score` per run and warns when the candidate passes less or scores lower, even when it is cheaper; pairs where only one side reports it are shown as not comparable.
 - The reasoning-strip benchmark has a `compaction-model` matrix: Luna vs Terra as the ultrafull summarizer, one results file per arm, with each run's compaction model and cost.
+- `scripts/tool-usage-census.mjs` counts tool use per Plan3 phase and tool-loading period from real session logs (this PC plus files fetched from paired hubs), reading only tool names, never message text or arguments; it also lists always-on tools that are almost never used and their schema size.
 
 ### Changed
 
