@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-17
-updated: 2026-11-18T09:48:00.260Z
+updated: 2026-11-18T09:52:41.338Z
 size: plan
 reviewed: 2026-11-18
 tagsChecked: a310673c,811f1a0f
@@ -95,27 +95,11 @@ Commands (run directly with node, with PI_HUB cleared): `env -u PI_HUB node "scr
 - [x] **E2** 6 paired reps (user's budget), Opus foreground: no difference (pass 6/6 both, runtime -4.2%, tokens +0.4%, cost +0.7% Terra vs Luna, per-pair signs flip); keep Luna as default, verdict in Decisions
 ### Phase 4: Tool-use census from real sessions [think]
 
-- [wip] **E3** Tool-use census from real session logs and Plan3 stats; report use per phase, before and after on-demand loading
-  - New `scripts/tool-usage-census.mjs` (rerun in E6, so it belongs in the repo). It reads only entry types, tool names, `plan3-run` modes, timestamps and cwd; never message text or tool arguments, because sessions hold user content.
-  - Inputs:
-    - Pi session JSONL from all three machines. This PC: `~/.pi/agent/sessions`. The Flex Windows hub and the MacBook: the session files of their shared projects, listed with `peer_ls` and fetched with `peer_fetch`. `peer_fetch` can only save into the session project's `.pi/inbox` (`hub/src/link.ts` 316), which is gitignored, so the script moves each file to the system temp folder straight after fetching and never stages it. The script reads these files and never commits them. Phases come from `plan3-run` entries (planning, think, coding, normal); chat outside Plan3 counts as "normal".
-    - The committed `docs/plans/logs/*.stats.json` in the 17 repos under `C:\SOFT\git` that have them. These are cross-machine, but only per-plan totals, with no phase split.
-  - Windows: before 2026-10-31 (all tools always on), from 318b4244 on 2026-10-31 (situational tools on demand), and from 17b68ef2 on 2026-11-13 (trigger-oriented `tools_enable`).
-  - Report per phase and window: calls per tool, the share of sessions using each tool, `tools_enable` and `pi_lens_activate_tools` loads, and always-on tools with near-zero use. Add the description and schema size of each always-on tool, from the registered tool definitions. Loads come from the `details.enabled` of `tools_enable` results (`tool-loader.ts` 43), not from tool arguments.
-  - Tool-token metric: requests do not log the tools they offered, and Plan3 stats keep only total model usage (`plan3-stats.ts` 76–89). So E3 and E6 report **estimated** schema bytes per request: the summed definition sizes of the tools active in that phase, labelled as an estimate. No new logging is added.
-  - Pilot census, run during planning (scratch script, temp folder; E3 rebuilds it in the repo):
-    - Coverage: 256 sessions since 2026-09-01. This PC 215, Flex Windows 33, MacBook 8.
-    - Assistant turns since on-demand loading: planning 2,116; think 6,660; coding 28,268; normal 16,270.
-    - bash, read, edit, write, codemode and plan3 make up about 90% of calls in every phase.
-    - Always-on tools near zero in every phase (at most 0.5 calls per 1,000 turns): camera tools (0), project_report, symbol_search, read_enclosing, module_report, effective_config, goal tools. plan3_diagram is used only in coding (0.2).
-    - Phase-specific: research_note only in planning (19.4 per 1,000 turns); ask_user and subagent are highest in planning; screen_read, vm_act, browser_act and process_image never appear in planning; video_digest only in normal chat.
-    - On-demand loads (tools_enable): video_digest 102, screen_read 48, app_act 24, browser_act 19.
-    - Limits: other machines contribute only their shared projects, and the available tool list per request is not logged.
-  - Gap: the tool list offered per request is not logged, so "available" comes from the registration code for each window (assumption, labelled in the report). A self-check runs the parser over a small fixture JSONL.
+- [x] **E3** scripts/tool-usage-census.mjs (+ self-check) run over 752 sessions (this PC 711, win-flex 33, mac 8; peer copies fetched 2026-11-18 in temp) + 102 Plan3 stats: near-zero always-on (<1/1k turns in every on-demand phase): camera_capture/watch/recover/stop, goal_blocked/complete/wait, plan3_diagram, effective_config, symbol_search, read_enclosing, browser_search, browser_fetch, jev_triage, session_dialog, web_enable; est. schema bytes/request all-on 110,366, on-demand base 52,503, near-zero share 16,840 (estimate). Loads: video_digest 102, design 10. Report: %TEMP%/pi-research-CTpN87/census-e3.{txt,json}
 
 ### Phase 5: Near-unused tools on demand [code]
 
-- [ ] **E7** Make every always-on tool under 1 call per 1,000 turns in every phase on-demand through tools_enable; tests
+- [wip] **E7** Make every always-on tool under 1 call per 1,000 turns in every phase on-demand through tools_enable; tests
   - Threshold (D-09): fewer than 1 call per 1,000 assistant turns in every phase since 2026-10-31, from the E3 census. Already-situational tools are out of scope.
   - Pilot candidates, which E3's final numbers confirm or change:
     - ce-workflow tools: the four camera tools (0 calls), jev_triage (0.1), browser_search (0.5), plan3_diagram (0.2), session_dialog (0.9), research_exit (0.9).
