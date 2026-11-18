@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-17
-updated: 2026-11-18T09:07:10.137Z
+updated: 2026-11-18T09:48:00.260Z
 size: plan
 reviewed: 2026-11-18
 tagsChecked: a310673c,811f1a0f
@@ -46,6 +46,8 @@ Non-goals: agent teams with a lead and specialist members (D-08); tailoring the 
 - **D-08 Specialize tools per phase, not agents.** The video's team evidence (Anthropic Fable 5.2 system card §8.12) tests peers with identical tools and prompts. It shows teams buying latency with tokens, not specialization winning, so teams stay out. Tool narrowing has independent support: Anthropic's Tool Search reports Opus 4 at 49%→74% selection accuracy, with selection degrading past 30–50 tools; RAG-MCP (arXiv 2505.03275) reports 43.13% vs 13.62%. Source: research this session; user asked to pursue it.
 
 - **D-09 Near-unused tools become on-demand.** Every always-on tool under the E7 usage threshold loads only through `tools_enable`, whichever package registers it. This applies to all sessions, not only Plan3 phases, and is not gated on E6's verdict. Source: user, 2026-11-18, after the cross-machine pilot census.
+- 2026-11-18 E2 verdict, Luna vs Terra as ultrafull summarizer (6 paired repetitions, alternating order, foreground anthropic/claude-opus-5-5, calculator-lite 3 phases, 2 checkpoint compactions per run): **no difference**. Pass 6/6 vs 6/6; runtime 582 s vs 558 s (-4.2%), total tokens 1.104M vs 1.108M (+0.4%), cost $1.84 vs $1.86 (+0.7%), turns 73 vs 74. Per-pair deltas flip sign (runtime -17 s to +14 s), so noise dominates. Compaction calls themselves: Luna ≈ $0.0009 vs Terra ≈ $0.009 per run, both under 1% of the run. Keeping Luna (cheaper, equal outcome) is the default; changing the setting is the user's call. Limit: one small task whose phases fit easily in context; a summary quality gap would show only on long, dense sessions. Results: `.pi/compaction-model-benchmark/e2/results-{L,T}.json` (untracked).
+
 
 ## Open questions
 
@@ -90,12 +92,10 @@ Commands (run directly with node, with PI_HUB cleared): `env -u PI_HUB node "scr
 ### Phase 3: Compaction model experiment [think]
 
 - [x] **E1** Pilot (foreground anthropic/claude-opus-5-5, user's pick) passed: both arms 2/2 checkpoint compactions with usage, details.compactionModel = arm model; L 76s/142k tok/$0.20, T 89s/179k/$0.30, both pass. Harness fixes: Pi CLI lookup in install/releases, Anthropic provider extension, fail fast on refused prompt, 500-token tail for this matrix (Opus phase 1 fit under 2k so Pi refused to compact)
-- [wip] **E2** Ask the repetition budget with pilot numbers, run the paired repetitions, compare and record the verdict
-  - Ask with ask_user, using the pilot's runtime and token totals per arm; recommend 3 repetitions unless the pilot is costly.
-  - Verdict in Decisions: keep Luna, switch to Terra, or no difference. It weighs pass rate first, then runtime, total tokens (foreground + compaction) and turns, per the Optimization Regression Rule. Changing the user's setting is the user's decision; this step only reports.
+- [x] **E2** 6 paired reps (user's budget), Opus foreground: no difference (pass 6/6 both, runtime -4.2%, tokens +0.4%, cost +0.7% Terra vs Luna, per-pair signs flip); keep Luna as default, verdict in Decisions
 ### Phase 4: Tool-use census from real sessions [think]
 
-- [ ] **E3** Tool-use census from real session logs and Plan3 stats; report use per phase, before and after on-demand loading
+- [wip] **E3** Tool-use census from real session logs and Plan3 stats; report use per phase, before and after on-demand loading
   - New `scripts/tool-usage-census.mjs` (rerun in E6, so it belongs in the repo). It reads only entry types, tool names, `plan3-run` modes, timestamps and cwd; never message text or tool arguments, because sessions hold user content.
   - Inputs:
     - Pi session JSONL from all three machines. This PC: `~/.pi/agent/sessions`. The Flex Windows hub and the MacBook: the session files of their shared projects, listed with `peer_ls` and fetched with `peer_fetch`. `peer_fetch` can only save into the session project's `.pi/inbox` (`hub/src/link.ts` 316), which is gitignored, so the script moves each file to the system temp folder straight after fetching and never stages it. The script reads these files and never commits them. Phases come from `plan3-run` entries (planning, think, coding, normal); chat outside Plan3 counts as "normal".

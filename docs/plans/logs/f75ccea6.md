@@ -49,3 +49,10 @@ Planning done; draft awaiting /plan3 finish. Phases: G1–G2 guards and prompt f
 - [x] **E1** Pilot one repetition per arm; check that compactions fire and results.json is complete
   - Both arms must show at least one checkpoint compaction with usage recorded, and `details.compactionModel` must name that arm's model. Otherwise fix the harness before spending more.
   - check: node scripts/benchmark-reasoning-strip-live.mjs --matrix compaction-model --repetitions 1 --model anthropic/claude-opus-5-5 -> exit 0; compare-benchmark-runs results-L.json results-T.json -> 1/1 pair complete, passed 1/1 -> 1/1; test-benchmark-compaction-model.mjs -> ok
+
+## 2026-11-18T09:48:00.255Z E2 done: 6 paired reps (user's budget), Opus foreground: no difference (pass 6/6 both, runtime -4.2%, tokens +0.4%, cost +0.7% Terra vs Luna, per-pair signs flip); keep Luna as default, verdict in Decisions
+
+- [x] **E2** Ask the repetition budget with pilot numbers, run the paired repetitions, compare and record the verdict
+  - Ask with ask_user, using the pilot's runtime and token totals per arm; recommend 3 repetitions unless the pilot is costly.
+  - Verdict in Decisions: keep Luna, switch to Terra, or no difference. It weighs pass rate first, then runtime, total tokens (foreground + compaction) and turns, per the Optimization Regression Rule. Changing the user's setting is the user's decision; this step only reports.
+  - check: node scripts/benchmark-reasoning-strip-live.mjs --matrix compaction-model --repetitions 6 --model anthropic/claude-opus-5-5 -> exit 0, 12/12 pass, 24/24 compactions with arm model; compare-benchmark-runs results-L.json results-T.json -> 6/6 pairs complete, passed 6/6 -> 6/6
