@@ -97,6 +97,24 @@ try {
 	assert(manifest.pi.extensions.includes("extensions/plan3.ts"));
 	assert.deepEqual([...commands.keys()], ["night", "plan3", "plans3", "resume3", "pi-hub"]);
 	assert(tools.has("plan3") && tools.get("plan3").promptSnippet);
+	// Without a session plan only the small plan3_create is declared; a plan pointer or a plan request brings the full tool, which then stays.
+	assert.deepEqual(tools.get("plan3_create").parameters.required, ["text"]);
+	const planTurn = (prompt) => hooks.get("before_agent_start")({ prompt, systemPrompt: "BASE" }, ctx);
+	activeTools = ["read", "plan3", "plan3_create"];
+	planTurn("hi");
+	assert.deepEqual(activeTools, ["read", "plan3_create"], "no plan: only plan3_create");
+	planTurn("mark the plan step done");
+	assert.deepEqual(activeTools, ["read", "plan3"], "a plan request swaps in the full tool");
+	planTurn("hi");
+	assert.deepEqual(activeTools, ["read", "plan3"], "the full tool stays for the session");
+	await hooks.get("session_start")({ reason: "new" }, ctx);
+	planTurn("hi");
+	assert.deepEqual(activeTools, ["read", "plan3_create"], "a new session starts small again");
+	entries = [{ type: "custom", customType: "plan3-current", data: { id: "x" } }];
+	planTurn("hi");
+	assert.deepEqual(activeTools, ["read", "plan3"], "a current plan brings the full tool");
+	await hooks.get("session_start")({ reason: "new" }, ctx);
+	entries = []; activeTools = undefined;
 	assert(tools.has("test_sensitivity") && tools.get("test_sensitivity").promptSnippet, "sensitivity tool is available without starting a plan");
 	for (const text of ["Now you can run it.", "I haven't opened the page in a browser to confirm."]) {
 		for (const end of endHandlers) await end({ messages: [{ role: "assistant", content: [{ type: "text", text }] }] }, ctx);

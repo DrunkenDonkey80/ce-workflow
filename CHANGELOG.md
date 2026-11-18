@@ -17,6 +17,8 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - Twelve almost-never-used tools now start switched off and are listed in `tools_enable` instead: the four camera tools, `browser_search`, `browser_fetch`, `jev_triage`, `plan3_diagram`, `session_dialog`, and pi-lens's `symbol_search`, `read_enclosing` and `effective_config`. A live session start declares 27 tools instead of 39, an estimated 12 KB less tool schema per request. The harness switches on `plan3_diagram` and `session_dialog` itself when it tells the model to use them.
 - Plan3 phases drop the always-on tools they almost never call: planning drops Context7 and pi-lens's `project_report`, `module_report` and `read_symbol`; [think] phases drop Context7, `project_report` and `module_report`; coding drops `project_report` and `module_report`. `tools_enable` brings any of them back, and chatting after the plan stops restores the full set.
 - `/plan3 ideas` lists contradictions between sources and every discarded idea with the reason.
+- Sessions without a plan declare only a small `plan3_create` tool; the full `plan3` tool (about 4 KB) arrives once the session has a plan or a request mentions one, and stays for that session.
+- The project AGENTS.md shrank from 6.1 to 3.0 KB: rules for niche work (dialog UX, video review, benchmark regressions, compaction mode in tests, changelog screenshots) moved to `docs/agent-rules.md`, with one-line pointers saying when to read it.
 - Code reviews skip lockfiles, carry a do-not-flag list, drop uncertain findings the source does not confirm, and the diff reviewer reports what it could not verify instead of a plain `ok`.
 
 ## 1.1.1 — 2026-11-18

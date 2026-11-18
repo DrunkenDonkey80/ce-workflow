@@ -1,52 +1,14 @@
-<!-- BEGIN COMPOUND PI TOOL MAP -->
-## Compound Engineering (Pi compatibility)
-
-This block is added by the pi-compound-engineering package.
-
-Pi extensions used by skills shipped by this package:
-
-- Required for full functionality: `pi-subagents` (by nicobailon) provides the `subagent` tool used by ce-compound, ce-code-review, ce-plan, ce-compound-refresh, and other parallel-agent skills.
-- Recommended: `pi-ask-user` (by edlsh) provides the `ask_user` tool; skills fall back to numbered options in chat when it is missing.
-
-Install with:
-  pi install npm:pi-subagents
-  pi install npm:pi-ask-user
-<!-- END COMPOUND PI TOOL MAP -->
-
 ## Code-First Workflow Rule
 
 If project workflow behavior can be handled in code without losing functionality, prefer coded automation over prompt-only or manual process guidance.
 
-## Video Review Tracking
+## Rules for specific work
 
-Video ingestion lives in yt-ingest; ce-workflow review state lives in `docs/upstream/processed-videos.json`, keyed by YouTube ID. Before reviewing a batch, run `node "scripts/work-video-status.mjs" "<digest directory>"` to list only unprocessed digests. After review or an intentional skip, add the ID, title, `reviewed`/`skipped` status, `processedOn` date and `evidence` path (including the reason for a skip). Downloaded/seen is not reviewed, and reviewed does not mean every idea was adopted. Do not mark unfinished reviews or infer status from titles.
-
-## Optimization Regression Rule
-
-Never retain or describe a workflow optimization as successful from focused tests or fewer turns alone. Re-run the same end-to-end benchmark, aggregate every continuation session, and compare runtime, total provider tokens, cost, turns, and tool calls against the last accepted baseline. Revert the optimization when it causes a material overall regression; do not rationalize the regression from one improved submetric. Compare `results.json` files with `node scripts/compare-benchmark-runs.mjs <baseline> <candidate>`: it pairs runs by scenario and repetition and keeps failed or missing runs out of the totals.
-
-## Dialog UX Rule
-
-Every ce-workflow prompt goes through ask_user (`extensions/ask-user/`), so
-the terminal, the web and the hub draw one form: menus and checklists use
-`showListDialog()`, Yes/No uses `askConfirm()`, free text uses `askText()`, and
-few-action prompts pass `compact: true` (all in `extensions/ask-user/menu.ts`);
-never call `ctx.ui.confirm/input/editor` directly. Every dialog shows one muted purpose
-line directly below its title. Escape goes to the parent and closes only at the
-root; Enter and Space toggle checklist rows without moving the cursor; parent
-cursors survive submenu round trips; every model list supports keyboard
-filtering. Every model picker uses `chooseModel()` in `extensions/work-models.ts`
-(Pi-scoped models first, Tab toggles all models, like Pi's own picker); never
-build one from plain `choose()` + `modelItems()`. Keep native UI fallbacks for
-non-TUI modes.
+Before building or changing a dialog or model picker, reviewing videos, judging an optimization or benchmark, or choosing a compaction mode for tests, read that section of `docs/agent-rules.md`.
 
 ## Fast Commit-and-Push Rule
 
 For direct commit-and-push requests, use this path: one parallel preflight (`status`, `diff --stat`, branch/remote); inspect only unexpected or sensitive untracked files and never stage credentials; run one batched LSP check plus the smallest relevant tests; stage tracked changes with `git add -u`, then commit and push `master`. Changes made by other sessions belong to the commit too: never leave them out as "not mine" (still never stage credentials). Run their targeted tests as well; finish with one status/ahead check. If status and diff disagree, use `git diff-index` once instead of repeated probes. Do not create temporary comparison files.
-
-## Compaction Mode in Tests Rule
-
-Live tests and benchmarks run the `ultrafull` compaction mode (the coming default). Use `ultracompact` only in tests of behavior that exists only in that mode (rolling stripping, the reasoning-strip benchmark) and in tests that cover every mode.
 
 ## Test Scope Rule
 
@@ -58,7 +20,7 @@ run only the targeted tests for the pushed changes unless the request asks for t
 
 Before every push, increment the package version in `package.json` and commit it. Version `x.y.z`: small changes (fixes, tweaks) bump `z`, which never goes past 99; a new module or tool (or `z` would pass 99) bumps `y` and resets `z` to 0; when `y` would pass 9, bump `x` and reset `y` and `z` to 0. Write `z` unpadded (`0.2.0`, not `0.2.00`): npm rejects leading zeros. Keep any tracked lockfile version in sync. Retrying the same failed push does not require another increment.
 
-In the same commit, move `CHANGELOG.md`'s Unreleased bullets (and anything else since the last version's commit) under a new `## <version> — <date>` heading with `### Added` / `### Changed` / `### Fixed`, in plain user words, hub and `/wo` together. For a visible hub change, add a tight crop: `node hub/scripts/changelog-shot.mjs "<selector>" docs/changelog/<version>-<name>.png "<setup JS>"` (throwaway hub with a fake Pi; `--pad=N` keeps some surroundings, `--ask=<ask_user JSON>` shows a dialog, `--size=WxH` for tall ones): shoot the control and the dialog it opens, then put `![what it shows](docs/changelog/<file>.png)` lines right after that bullet.
+In the same commit, move `CHANGELOG.md`'s Unreleased bullets (and anything else since the last version's commit) under a new `## <version> — <date>` heading with `### Added` / `### Changed` / `### Fixed`, in plain user words, hub and `/wo` together. A visible hub change also gets a screenshot: see Changelog screenshots in `docs/agent-rules.md`.
 
 ## Extension File Rule
 

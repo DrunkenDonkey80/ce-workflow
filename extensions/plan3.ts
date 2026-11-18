@@ -32,6 +32,7 @@ import { PHASE_DROPS } from "./tool-loader.ts";
 
 const POINTER = "plan3-current";
 const RUN = "plan3-run";
+const PLAN_CREATE = "plan3_create";
 const TOOLS = "plan3-tools"; // { dropped }: the always-on tools the current phase profile took away
 const OPTIMIZE = "plan3-optimize";
 const COMPACT_MIN_TOKENS = 20_000; // D09: below this there is nothing worth compacting.
@@ -1764,14 +1765,7 @@ export default function plan3(pi) {
 			},
 		},
 		async execute(_id, args, _signal, _update, ctx) {
-			if (args.action === "create") {
-				if (!args.text?.trim()) throw new Error("create needs text: the request this plan answers");
-				const plan = await newPlanFile(ctx.cwd, args.text.trim());
-				research(ctx, true);
-				setPointer(plan, true);
-				await refresh(ctx);
-				return { content: [{ type: "text", text: writePrompt(plan.file) }], details: plan };
-			}
+			if (args.action === "create") return createFromTool(ctx, args.text);
 			const plans = await listPlans(ctx.cwd);
 			const plan = args.plan ? await resolvePlan(ctx.cwd, args.plan, plans) : currentPlan(ctx, plans);
 			if (!plan) throw new Error("No open Plan3 plan; pass plan or start one with /plan3.");
@@ -1908,6 +1902,35 @@ export default function plan3(pi) {
 			return { content: [{ type: "text", text: view ? `${view}\n\n${JSON.stringify(meta)}` : JSON.stringify(visible) }], details: visible };
 		},
 	});
+
+	async function createFromTool(ctx, text) {
+		if (!text?.trim()) throw new Error("create needs text: the request this plan answers");
+		const plan = await newPlanFile(ctx.cwd, text.trim());
+		research(ctx, true);
+		setPointer(plan, true);
+		syncPlanTools(true);
+		await refresh(ctx);
+		return { content: [{ type: "text", text: writePrompt(plan.file) }], details: plan };
+	}
+	// Without a current plan only this small tool is declared; the full plan3 schema (~4 KB) comes with the plan.
+	pi.registerTool?.({
+		name: PLAN_CREATE,
+		label: "Plan3 create",
+		description: "Create a Plan3 plan: writes the standard template with a stable id for the request and makes it current; the full plan3 tool (read and update plans) is declared from then on.",
+		promptSnippet: "Start a new Plan3 plan from the template",
+		promptGuidelines: ["Create every new plan with plan3_create, then fill that file in place; never hand-write a new plan file."],
+		parameters: { type: "object", additionalProperties: false, required: ["text"], properties: { text: { type: "string", description: "The request the plan answers (from the discussion)" } } },
+		execute: (_id, args, _signal, _update, ctx) => createFromTool(ctx, args.text),
+	});
+	// Sticky per session: once the full tool is in, it stays (no tool churn mid-conversation); session_start resets.
+	let planToolsFull = false;
+	function syncPlanTools(full: boolean) {
+		planToolsFull ||= full;
+		const active = pi.getActiveTools?.();
+		if (!active || !pi.setActiveTools) return;
+		const next = [...active.filter((name) => name !== "plan3" && name !== PLAN_CREATE), planToolsFull ? "plan3" : PLAN_CREATE];
+		if (next.length !== active.length || next.some((name) => !active.includes(name))) pi.setActiveTools(next);
+	}
 
 	pi.registerTool?.({
 		name: "plan3_diagram", label: "Plan3 diagram", exposure: "deferred",
@@ -2081,6 +2104,7 @@ export default function plan3(pi) {
 		// D9: a terminal Pi owns its session file through the lock; under the hub, the hub already holds it.
 		if (sessionLock) releaseSessionLock(sessionLock.file, sessionLock.info);
 		sessionLock = undefined;
+		planToolsFull = false;
 		const sessionFile = !hubActive() && ctx.sessionManager?.getSessionFile?.();
 		if (sessionFile) {
 			const { info, holder } = takeSessionLock(sessionFile);
@@ -2105,7 +2129,9 @@ export default function plan3(pi) {
 	});
 	pi.on?.("session_tree", (_event, ctx) => refresh(ctx));
 	let executeRun = false; // D-06: a run started by an execute prompt never pushes; a later chat request may.
-	pi.on?.("before_agent_start", event => {
+	pi.on?.("before_agent_start", (event, ctx) => {
+		// Every /plan3 command sets the pointer before its prompt; a chat request about a plan also gets the full tool.
+		syncPlanTools(Boolean(ctx && pointer(ctx).id) || /\bplan/i.test(String(event?.prompt ?? "")));
 		executeRun = String(event?.prompt ?? "").startsWith("Plan3: execute/resume the plan at ");
 		const sections = event?.systemPromptOptions?.sections;
 		if (sections && typeof sections === "object") { sections["locked-writes"] = LOCKED_WRITES; sections["test-sensitivity"] = TEST_SENSITIVITY; sections["self-verify"] = SELF_VERIFY; sections["reporting"] = REPORTING; return; }
@@ -2131,7 +2157,7 @@ export default function plan3(pi) {
 		if (!/[\\/]docs[\\/]plans[\\/](?:done[\\/])?[^\\/]+\.md$/i.test(file)) return;
 		const isPlanWrite = event.toolName === "write" && /^---\r?\nplan3: true\r?\n/.test(String(event.input?.content ?? ""));
 		if (!existsSync(file)) {
-			if (isPlanWrite) return { block: true, reason: "New Plan3 plans come from the template: call plan3 with action create and text = the request, then fill the returned file in place (keep its headings)." };
+			if (isPlanWrite) return { block: true, reason: "New Plan3 plans come from the template: call plan3_create (or plan3 with action create) and text = the request, then fill the returned file in place (keep its headings)." };
 			return;
 		}
 		const release = tryPlanLock(file);
