@@ -28,9 +28,11 @@ import { lockedWritesNote } from "./locked-writes.ts";
 import { registerTestSensitivity, TEST_SENSITIVITY } from "./test-sensitivity.ts";
 import { SELF_VERIFY } from "./self-verify.ts";
 import { runsGit } from "./command-guard.ts";
+import { PHASE_DROPS } from "./tool-loader.ts";
 
 const POINTER = "plan3-current";
 const RUN = "plan3-run";
+const TOOLS = "plan3-tools"; // { dropped }: the always-on tools the current phase profile took away
 const OPTIMIZE = "plan3-optimize";
 const COMPACT_MIN_TOKENS = 20_000; // D09: below this there is nothing worth compacting.
 const DUPLICATE_SIMILARITY = 0.5; // D15: Jaccard overlap of request words.
@@ -325,6 +327,7 @@ const touched = (plan) => plan.updated ?? plan.created ?? "";
 const isOpen = (plan) => plan.status !== "complete";
 
 const lastRun = (ctx) => (ctx.sessionManager?.getBranch?.() ?? []).findLast((entry) => entry.type === "custom" && entry.customType === RUN)?.data;
+const droppedTools = (ctx): string[] => (ctx.sessionManager?.getBranch?.() ?? []).findLast((entry) => entry.type === "custom" && entry.customType === TOOLS)?.data?.dropped ?? [];
 
 function pointer(ctx) {
 	const branch = ctx.sessionManager?.getBranch?.() ?? [];
@@ -998,6 +1001,16 @@ export default function plan3(pi) {
 		if (set.thinking && set.thinking !== pi.getThinkingLevel?.()) pi.setThinkingLevel?.(set.thinking);
 		set.thinking = pi.getThinkingLevel?.() ?? set.thinking; // the model may clamp the level
 		pi.appendEntry?.(RUN, mode === "planning" ? { home, set } : { id: plan?.id, mode, home, set });
+		toolProfile(ctx, plan ? PHASE_DROPS[mode] ?? [] : []); // bias changes without a plan and "normal" restore
+	}
+	// D-10: drop the phase's near-unused tools, give back what the previous profile dropped; tools_enable reaches any of them.
+	function toolProfile(ctx, drop: string[]) {
+		const active = pi.getActiveTools?.();
+		if (!active || !pi.setActiveTools) return;
+		const before = droppedTools(ctx), dropped = drop.filter((name) => active.includes(name) || before.includes(name));
+		const next = [...new Set([...active, ...before.filter((name) => !drop.includes(name))])].filter((name) => !drop.includes(name));
+		if (next.length !== active.length || next.some((name) => !active.includes(name))) pi.setActiveTools(next);
+		if (dropped.join() !== before.join()) pi.appendEntry?.(TOOLS, { dropped });
 	}
 
 	async function startPlanning(ctx, plan, lead, fromChat = false, sourceFile?: string) {
@@ -1999,7 +2012,8 @@ export default function plan3(pi) {
 		if (["interactive", "rpc"].includes(event.source) && !event.text.trimStart().startsWith("/") && ctx.isIdle?.() && executingPlan(ctx)) {
 			await runPhase(ctx, null, "normal");
 			ctx.ui.notify("Plan3: plan paused, back to your own model; /resume3 continues it on the work model.", "info");
-		}
+		} else if (["interactive", "rpc"].includes(event.source) && !event.text.trimStart().startsWith("/") && ctx.isIdle?.() && !pointer(ctx).planning && droppedTools(ctx).length)
+			toolProfile(ctx, []); // planning ended (finish, "Not yet"): ordinary chat gets its full tool set back
 		// Only exact operator words during live planning, never injected messages or ordinary sentences.
 		if (!["interactive", "rpc"].includes(event.source) || event.images?.length || !pointer(ctx).planning) return;
 		const command = event.text.trim();

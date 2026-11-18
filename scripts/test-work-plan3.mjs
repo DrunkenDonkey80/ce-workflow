@@ -58,8 +58,10 @@ const ctx = {
 		},
 	},
 };
-let askSource, thinking = "high";
+let askSource, thinking = "high", activeTools;
 const api = {
+	getActiveTools: () => activeTools,
+	setActiveTools: (names) => { activeTools = names; },
 	getThinkingLevel: () => thinking,
 	setThinkingLevel: (level) => { thinking = level; },
 	setModel: async (model) => { if (model.id === "no-auth") return false; ctx.model = model; return true; },
@@ -739,6 +741,40 @@ try {
 		thinking = "high";
 		ctx.model = savedModel; ctx.modelRegistry = savedRegistry;
 		await rm(execFile); await rm(draftFile); await rm(path.join(directory, "logs"), { recursive: true, force: true });
+		entries.splice(savedEntries);
+	}
+
+	// D-10 tool profiles: each Plan3 phase drops its near-unused tools; leaving the plan gives them back.
+	{
+		const savedEntries = entries.length, all = ["read", "bash", "project_report", "module_report", "read_symbol", "resolve-library-id", "query-docs", "tools_enable"];
+		const toolsNow = () => [...activeTools].sort();
+		const without = (...names) => all.filter((name) => !names.includes(name)).sort();
+		const profileFile = path.join(directory, "2026-10-02-profile-7f7f7f7f-plan3.md"), draftFile = path.join(directory, "2026-10-02-pdraft-7a7a7a7a-plan3.md");
+		await writeFile(profileFile, validPlan("7f7f7f7f", "Profile", "active", "### P1 — Decide [think]\n\n- [ ] **T-01** Choose\n\n### P2 — Build [code]\n\n- [ ] **T-02** Code it"));
+		await writeFile(draftFile, validPlan("7a7a7a7a", "PDraft", "draft", "- [ ] **P-01** Think"));
+		activeTools = [...all];
+		await run("resume3", "7f7f7f7f");
+		assert.deepEqual(toolsNow(), without("project_report", "module_report", "resolve-library-id", "query-docs"), "a [think] phase drops context7 and the pi-lens orientation tools");
+		await writeFile(profileFile, (await readFile(profileFile, "utf8")).replace("- [ ] **T-01**", "- [x] **T-01**"));
+		await hooks.get("turn_end")({}, ctx);
+		assert.deepEqual(toolsNow(), without("project_report", "module_report"), "coding gives context7 back and keeps its own drops");
+		await hooks.get("input")({ text: "how is it going?", source: "interactive" }, ctx);
+		assert.deepEqual(toolsNow(), [...all].sort(), "chatting after execution restores the full set");
+		await run("resume3", "7a7a7a7a");
+		assert.deepEqual(toolsNow(), without("project_report", "module_report", "read_symbol", "resolve-library-id", "query-docs"), "planning drops its five");
+		await hooks.get("input")({ text: "use TCP", source: "interactive" }, ctx);
+		assert.equal(activeTools.length, all.length - 5, "chat during live planning keeps the profile");
+		api.appendEntry("plan3-current", { id: "7a7a7a7a", planning: false }); // planning ended (finish, "Not yet")
+		await hooks.get("input")({ text: "thanks", source: "interactive" }, ctx);
+		assert.deepEqual(toolsNow(), [...all].sort(), "chatting after planning restores the full set");
+		api.appendEntry("plan3-current", {});
+		const profiles = entries.filter((entry) => entry.customType === "plan3-tools").length;
+		await shortcuts.get("alt+=").handler(ctx);
+		assert.deepEqual(toolsNow(), [...all].sort(), "a bias change without a plan applies no profile");
+		assert.equal(entries.filter((entry) => entry.customType === "plan3-tools").length, profiles, "and records nothing");
+		await shortcuts.get("alt+-").handler(ctx);
+		activeTools = undefined;
+		await rm(profileFile); await rm(draftFile); await rm(path.join(directory, "logs"), { recursive: true, force: true });
 		entries.splice(savedEntries);
 	}
 

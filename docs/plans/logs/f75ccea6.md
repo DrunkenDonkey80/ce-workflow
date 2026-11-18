@@ -100,3 +100,23 @@ Planning done; draft awaiting /plan3 finish. Phases: G1–G2 guards and prompt f
     - Extend the tool-loader tests (find the existing ones in `scripts/`; new cases in `test-work-plan3.mjs` if none). They assert that each moved tool is inactive at start, appears in the `tools_enable` enum, becomes active after enabling, and is activated by its instruction trigger.
     - Red before the change. Then one live session start with the real package set confirms the declared tool list shrank, and reports the bytes saved per request.
   - check: env -u PI_HUB -u PI_HUB_SESSION node scripts/test-work-tool-loader.mjs, test-work-camera.mjs, test-work-native-smoke.mjs: all ok/PASS; test_sensitivity dropping the branch-enabled keep in deferForeignTools: caught; live `pi -p` session: 27 declared tools, pi-lens trio absent and listed in tools_enable.
+
+## 2026-11-18T11:28:05.939Z E4 done: Per-phase profiles chosen and recorded as D-10: planning drops context7 pair + project_report/module_report/read_symbol, think drops context7 pair + project_report/module_report, coding drops project_report/module_report.
+
+- [x] **E4** Ask which always-on tools each Plan3 phase drops, using E3 numbers; record the profiles in Decisions
+  - Only Plan3 phases are profiled. Normal chat keeps today's set, because it has no phase to tailor to.
+  - Each candidate shows its calls per phase, its schema bytes and its on-demand route back. Recommend dropping only tools under a usage threshold the numbers justify.
+  - check: node one-off over %TEMP%/pi-research-CTpN87/census-e3.json + tool-defs-e7.json: per-phase calls/1k turns and schema bytes for the 27 post-E7 active tools; ask_user -> "Recommended profile".
+
+## 2026-11-18T11:33:12.056Z E5 done: runPhase applies the D-10 profile per phase (plan3-tools entry records what it dropped, the next phase gives back what it no longer drops); plan-less bias/normal runs and chat after execution or planning restore the full set; tools_enable offers every dropped tool.
+
+- [x] **E5** Apply the chosen tool profile in Plan3 planning and execution runs, with tools_enable as the way back; focused test
+  - Ownership: `runPhase` also serves the think and coding bias controls without a plan (`shiftBias`, `plan3.ts` 1192–1198). Profiles apply only when `runPhase` runs for a plan, never for bias changes without one.
+  - Fit: `runPhase` (`extensions/plan3.ts` around 980) already switches model and thinking per phase; the tool set goes in the same place through `pi.setActiveTools`. Pi patches only the changed sections, so the extra cache miss happens once per phase switch, where the model switch already causes one.
+  - Restoration: the user's set comes back when a plan run ends, from both execution and planning. The current restore hook on chat input requires `executingPlan`, which excludes planning (`plan3.ts` 1118–1121, 1998), so planning exits need their own restore. A dropped tool stays reachable through `tools_enable`, so its catalog must include each dropped tool.
+  - Proof: a `test-work-plan3.mjs` case asserts four things, red before the change: the active tools per phase, the restore after execution, the restore after planning, and no profile on a bias change without a plan.
+  - check: env -u PI_HUB -u PI_HUB_SESSION node scripts/test-work-plan3.mjs -> passed (new D-10 block: think/coding/planning sets, restore after execution and after planning, none on plan-less bias); test_sensitivity: removing the planning-exit restore -> caught, not giving back the previous drops -> caught; test-work-tool-loader, test-work-camera, test-work-plan3-night, test-work-native-smoke -> ok/PASS.
+
+## 2026-11-18T11:33:26.976Z Superseded resume context
+
+G1, G2 done and committed (68849f30, cc7c6fb5). B1 wip: add optional passed/score comparison to scripts/compare-benchmark-runs.mjs (+ test-compare-benchmark-runs.mjs) and a compaction-model matrix (Luna vs Terra, ultrafull, both arms load ce-workflow and compact; per-arm results files with same scenario name) in scripts/benchmark-reasoning-strip-live.mjs, with offline self-check. Known pre-existing failure: test-work-compaction-notifications.mjs:1484 (compaction fallback expects ["summary","current"]) fails on HEAD too; add to Backlog, it will hit global validation. Tests need env -u PI_HUB -u PI_HUB_SESSION.

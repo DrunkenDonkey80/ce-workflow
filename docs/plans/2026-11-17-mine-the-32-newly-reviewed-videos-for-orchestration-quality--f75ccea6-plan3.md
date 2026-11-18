@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-17
-updated: 2026-11-18T11:23:39.542Z
+updated: 2026-11-18T11:33:26.981Z
 size: plan
 reviewed: 2026-11-18
 tagsChecked: a310673c,811f1a0f
@@ -47,6 +47,7 @@ Non-goals: agent teams with a lead and specialist members (D-08); tailoring the 
 
 - **D-09 Near-unused tools become on-demand.** Every always-on tool under the E7 usage threshold loads only through `tools_enable`, whichever package registers it. This applies to all sessions, not only Plan3 phases, and is not gated on E6's verdict. Source: user, 2026-11-18, after the cross-machine pilot census.
 - 2026-11-18 E2 verdict, Luna vs Terra as ultrafull summarizer (6 paired repetitions, alternating order, foreground anthropic/claude-opus-5-5, calculator-lite 3 phases, 2 checkpoint compactions per run): **no difference**. Pass 6/6 vs 6/6; runtime 582 s vs 558 s (-4.2%), total tokens 1.104M vs 1.108M (+0.4%), cost $1.84 vs $1.86 (+0.7%), turns 73 vs 74. Per-pair deltas flip sign (runtime -17 s to +14 s), so noise dominates. Compaction calls themselves: Luna ≈ $0.0009 vs Terra ≈ $0.009 per run, both under 1% of the run. Keeping Luna (cheaper, equal outcome) is the default; changing the setting is the user's call. Limit: one small task whose phases fit easily in context; a summary quality gap would show only on long, dense sessions. Results: `.pi/compaction-model-benchmark/e2/results-{L,T}.json` (untracked).
+- **D-10 Per-phase tool profiles (E4).** Plan3 runs drop these always-on tools; `tools_enable` brings any back. Planning: `resolve-library-id`, `query-docs`, `project_report`, `module_report`, `read_symbol` (≈8.6 KB/request, estimated). Think: `resolve-library-id`, `query-docs`, `project_report`, `module_report` (≈7.7 KB). Coding: `project_report`, `module_report` (≈3.3 KB; context7 stays, `query-docs` is at 1.0). Basis: E3 census since 2026-10-31, calls per 1,000 assistant turns (planning 4.0k turns, think 13.5k, coding 43.5k), each dropped tool under 1.0 in its phase. Excluded on purpose: goal tools (/goal needs them), loaders, tools the standing rules name (test_sensitivity, jev_evidence, compaction_note, knowledge) and the research tools. Planning's sample is small (1 per 1,000 ≈ 4 calls). Source: user, ask_user 2026-11-18, recommended profile.
 
 
 ## Open questions
@@ -103,23 +104,18 @@ Commands (run directly with node, with PI_HUB cleared): `env -u PI_HUB node "scr
 
 ### Phase 6: Per-phase tool profiles [think]
 
-- [wip] **E4** Ask which always-on tools each Plan3 phase drops, using E3 numbers; record the profiles in Decisions
-  - Only Plan3 phases are profiled. Normal chat keeps today's set, because it has no phase to tailor to.
-  - Each candidate shows its calls per phase, its schema bytes and its on-demand route back. Recommend dropping only tools under a usage threshold the numbers justify.
+- [x] **E4** Per-phase profiles chosen and recorded as D-10: planning drops context7 pair + project_report/module_report/read_symbol, think drops context7 pair + project_report/module_report, coding drops project_report/module_report.
 ### Phase 7: Apply tool profiles [code]
 
-- [ ] **E5** Apply the chosen tool profile in Plan3 planning and execution runs, with tools_enable as the way back; focused test
-  - Ownership: `runPhase` also serves the think and coding bias controls without a plan (`shiftBias`, `plan3.ts` 1192–1198). Profiles apply only when `runPhase` runs for a plan, never for bias changes without one.
-  - Fit: `runPhase` (`extensions/plan3.ts` around 980) already switches model and thinking per phase; the tool set goes in the same place through `pi.setActiveTools`. Pi patches only the changed sections, so the extra cache miss happens once per phase switch, where the model switch already causes one.
-  - Restoration: the user's set comes back when a plan run ends, from both execution and planning. The current restore hook on chat input requires `executingPlan`, which excludes planning (`plan3.ts` 1118–1121, 1998), so planning exits need their own restore. A dropped tool stays reachable through `tools_enable`, so its catalog must include each dropped tool.
-  - Proof: a `test-work-plan3.mjs` case asserts four things, red before the change: the active tools per phase, the restore after execution, the restore after planning, and no profile on a bias change without a plan.
+- [x] **E5** runPhase applies the D-10 profile per phase (plan3-tools entry records what it dropped, the next phase gives back what it no longer drops); plan-less bias/normal runs and chat after execution or planning restore the full set; tools_enable offers every dropped tool.
 ### Phase 8: Real-use verdict [think]
 
-- [ ] **E6** After about two weeks of real use, rerun the census and compare misses, tool tokens and turns against the E3 baseline
+- [blocked] **E6** After about two weeks of real use, rerun the census and compare misses, tool tokens and turns against the E3 baseline
   - Covers E7 too: count `tools_enable` loads of each tool moved in E7.
   - The tool-token comparison uses E3's estimated schema bytes per request, labelled as an estimate.
   - A miss is a `tools_enable` call for a tool the profile dropped. A high miss rate means that tool goes back into the profile.
   - Verdict in Decisions: keep, adjust or revert the profiles. Real use varies by task, so this is a before/after comparison, not a paired benchmark; the report states that limit.
+  - note: Waits for about two weeks of real use after 2026-11-18 (E7 and E5 shipped then); rerun scripts/tool-usage-census.mjs around 2026-12-02 against the E3 baseline (%TEMP%/pi-research-CTpN87/census-e3.json is temporary: rerun E3's window from the script if it is gone).
 
 ## Backlog
 
@@ -134,7 +130,7 @@ Run every targeted test named in Relevant files on the final state, then `npm ru
 
 ## Resume context
 
-G1, G2 done and committed (68849f30, cc7c6fb5). B1 wip: add optional passed/score comparison to scripts/compare-benchmark-runs.mjs (+ test-compare-benchmark-runs.mjs) and a compaction-model matrix (Luna vs Terra, ultrafull, both arms load ce-workflow and compact; per-arm results files with same scenario name) in scripts/benchmark-reasoning-strip-live.mjs, with offline self-check. Known pre-existing failure: test-work-compaction-notifications.mjs:1484 (compaction fallback expects ["summary","current"]) fails on HEAD too; add to Backlog, it will hit global validation. Tests need env -u PI_HUB -u PI_HUB_SESSION.
+9/10 done. E6 (real-use verdict) waits for about two weeks of real use after 2026-11-18: rerun scripts/tool-usage-census.mjs around 2026-12-02 and compare tools_enable misses for the E7 and D-10 tools, estimated schema bytes and turns against E3. Nothing else is runnable.
 
 ## Amendments
 

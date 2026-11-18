@@ -70,5 +70,9 @@ console.log("ok - tools_enable lists registered situational tools and declares t
 	assert.deepEqual(on, ["read", "read_enclosing", "lens_diagnostics"], "withdrawn unless tools_enable enabled it on this branch");
 	const wo = readFileSync(new URL("../extensions/work-models.ts", import.meta.url), "utf8");
 	assert.match(wo, /session_start[\s\S]{0,200}deferForeignTools\(pi, ctx\.sessionManager/, "session start withdraws them");
+	const { PHASE_DROPS } = await import("../extensions/tool-loader.ts");
+	const dropped = [...new Set(Object.values(PHASE_DROPS).flat())];
+	const withDrops = { getAllTools: () => [...dropped, "read"].map((name) => ({ name, exposure: "direct" })) };
+	assert.deepEqual(toolsEnableTool(withDrops).parameters.properties.tools.items.enum, dropped, "every tool a Plan3 phase drops stays reachable through tools_enable");
 	console.log("ok - pi-lens near-unused tools start undeclared unless this branch enabled them");
 }

@@ -30,11 +30,25 @@ export const SITUATIONAL_TOOLS = {
 	symbol_search: "pi-lens: find files by ranked identifier search",
 	read_enclosing: "pi-lens: read the symbol or callback enclosing a line",
 	effective_config: "pi-lens: explain resolved pi-lens configuration and its provenance",
+	project_report: "pi-lens: orient in a project from its review graph (hubs, entry points)",
+	module_report: "pi-lens: outline a source file's symbols and references before reading bodies",
+	read_symbol: "pi-lens: read one symbol's source instead of the whole file",
+	"resolve-library-id": "Context7: find a library's id before querying its current documentation",
+	"query-docs": "Context7: query a library's current documentation and code examples by id",
+};
+
+// Plan f75ccea6 D-10: always-on tools a Plan3 phase almost never calls (E3 census); plan3.ts drops them for that phase.
+export const PHASE_DROPS = {
+	planning: ["resolve-library-id", "query-docs", "project_report", "module_report", "read_symbol"],
+	think: ["resolve-library-id", "query-docs", "project_report", "module_report"],
+	coding: ["project_report", "module_report"],
 };
 
 // Near-unused tools other packages (pi-lens) register always-active. Their owners never re-add a tool removed from the active
 // set (pi-lens only re-plans its own situational ones), so the session start withdraws them and tools_enable offers them.
 const FOREIGN_TOOLS = ["symbol_search", "read_enclosing", "effective_config"];
+// Direct tools tools_enable also offers: the withdrawn ones and the per-phase drops (listed even while active).
+const OFFERED_DIRECT = new Set([...FOREIGN_TOOLS, ...Object.values(PHASE_DROPS).flat()]);
 
 /** Withdraw the foreign near-unused tools, except those a tools_enable call on this branch enabled (a resume keeps them). */
 export function deferForeignTools(pi, branch = []) {
@@ -63,7 +77,7 @@ export const TOOLS_ENABLE = "tools_enable";
 /** The loader for the situational tools registered on this machine, minus excluded ones; undefined when none are left.
  * Camera tools register model-only (never callable from scripts) and inactive, so they count too. */
 export function toolsEnableTool(pi, exclude = []) {
-	const available = pi.getAllTools?.().filter((tool) => (tool.exposure === "deferred" || tool.exposure === "model-only" || (FOREIGN_TOOLS.includes(tool.name) && tool.exposure !== "hidden")) && tool.name in SITUATIONAL_TOOLS && !exclude.includes(tool.name)).map((tool) => tool.name) ?? [];
+	const available = pi.getAllTools?.().filter((tool) => (tool.exposure === "deferred" || tool.exposure === "model-only" || (OFFERED_DIRECT.has(tool.name) && tool.exposure !== "hidden")) && tool.name in SITUATIONAL_TOOLS && !exclude.includes(tool.name)).map((tool) => tool.name) ?? [];
 	if (!available.length) return;
 	return {
 		name: TOOLS_ENABLE,
