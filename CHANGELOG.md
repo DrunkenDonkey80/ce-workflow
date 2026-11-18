@@ -2,6 +2,13 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Changed
+
+- Paired hubs have their own section in the hub settings, listing each paired hub and the projects it can see; "Pair and share" opens the dialog (before, a small Hubs button under Remote access).
+- Which projects a hub shares can be set from its page opened on another paired device, e.g. the Mac's hub page opened on the PC. Pairing and unpairing still happen on the hub's own PC.
+
 ## 1.1.0 — 2026-11-17
 
 ### Added

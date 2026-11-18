@@ -1911,7 +1911,7 @@ async function hub(route: string, data?: unknown) {
 const pairDialog = () => $("pair-approve") as HTMLDialogElement;
 async function checkPairing() {
  if (!token) return;
- $("devices-button").hidden = false; $("hubs-button").hidden = false;
+ $("devices-button").hidden = false; $("hubs-group").hidden = false;
  let pending; try { ({ pending } = await hub("pairing")); } catch { return; }
  if (!pending) { if (pairDialog().open) pairDialog().close(); return; }
  $("pair-device").textContent = `${pending.label} · ${pending.login} · ${pending.address}`; $("pair-approve-code").textContent = pending.code;
@@ -1941,25 +1941,28 @@ $("devices-button").addEventListener("click", () => void (closeMenus(), showDevi
 $("devices-close").addEventListener("click", () => ($("devices") as HTMLDialogElement).close());
 // Plan 4d2fa07b D-02, D-05: per paired hub, which of this hub's projects it sees (unticked by default); pairing and unpairing.
 async function showHubs() {
- const state = await hub("hubs"), name = (folder: string) => folder.split(/[\\/]/).filter(Boolean).pop() ?? folder, key = (folder: string) => folder.replace(/[\\/]+$/, "").toLowerCase();
+ // The session page's api/hubs: a paired device's page (no hub key) ticks shares too; pairing and unpairing stay on this PC's page.
+ const state = await get("hubs"), name = (folder: string) => folder.split(/[\\/]/).filter(Boolean).pop() ?? folder, key = (folder: string) => folder.replace(/[\\/]+$/, "").toLowerCase();
  const act = (route: string, data: unknown) => void hub(route, data).then(showHubs, error => showNotice(error.message));
  // D-04: the session links the upgrade dropped, named once; seen as soon as shown.
  const dropped = $("hubs-dropped");
  if (!($("hubs") as HTMLDialogElement).open) dropped.hidden = true; // stays while the dialog that showed it is open
- if (state.dropped.length) { dropped.textContent = "Session links are gone; share projects instead. Dropped: " + state.dropped.join("; ") + "."; dropped.hidden = false; void hub("hubs/seen", {}).catch(() => {}); }
+ if (state.dropped.length && state.local) { dropped.textContent = "Session links are gone; share projects instead. Dropped: " + state.dropped.join("; ") + "."; dropped.hidden = false; void hub("hubs/seen", {}).catch(() => {}); }
  $("hub-list").replaceChildren(...state.hubs.length ? state.hubs.map(peer => {
   const box = html("fieldset"), legend = html("legend"), unpair = html("button", { type: "button", className: "danger", textContent: "Unpair" });
   unpair.addEventListener("click", async () => { if (await confirmBox(`Unpair ${peer.name}? Both hubs stop sharing projects with each other.`)) act("hubs/unpair", { url: peer.url }); });
+  unpair.hidden = !state.local;
   legend.append(html("strong", { textContent: peer.name }), html("small", { textContent: peer.online ? "online" : "offline" }), unpair);
   box.append(legend, ...state.projects.map(folder => {
    const row = html("label", { title: folder }), check = html("input", { type: "checkbox", checked: peer.shared.some(shared => key(shared) === key(folder)) });
-   check.addEventListener("change", () => act("hubs/share", { url: peer.url, folder, shared: check.checked }));
+   check.addEventListener("change", () => void post("hubs", { url: peer.url, folder, shared: check.checked }).then(showHubs, error => showNotice(error.message)));
    row.append(check, `${name(folder)} `, html("small", { textContent: folder }));
    return row;
   }), html("small", { textContent: peer.projects.length ? `${peer.name} shares: ${peer.projects.map(project => name(project.folder)).join(", ")}` : `${peer.name} shares no projects with this hub.` }));
   return box;
  }) : [html("p", { className: "dialog-purpose", textContent: "No paired hubs. Pair one by its Remote access link below." })]);
  const pairing = $("hub-pairing");
+ $("hub-pair").hidden = !state.local;
  pairing.hidden = !state.pairing;
  if (state.pairing) pairing.textContent = state.pairing.state === "pending" ? `Approve on ${state.pairing.url} if it shows code ${state.pairing.code}.` : `Pairing with ${state.pairing.url}: ${state.pairing.state}${state.pairing.error ? ` (${state.pairing.error})` : ""}.`;
  const dialog = $("hubs") as HTMLDialogElement; if (!dialog.open) dialog.showModal();
@@ -1967,6 +1970,15 @@ async function showHubs() {
 }
 $("hubs-button").addEventListener("click", () => void (closeMenus(), showHubs()).catch(error => showNotice("Hubs: " + error.message)));
 $("hubs-close").addEventListener("click", () => ($("hubs") as HTMLDialogElement).close());
+// The Settings section: each paired hub and which of this hub's projects it sees; the dialog changes them.
+async function hubsSummary() {
+ const state = await get("hubs"), name = (folder: string) => folder.split(/[\\/]/).filter(Boolean).pop() ?? folder;
+ $("hubs-group").hidden = false;
+ $("hubs-summary").replaceChildren(...state.hubs.length ? state.hubs.map((peer: { name: string; online: boolean; shared: string[] }) =>
+  html("div", { textContent: `${peer.name} (${peer.online ? "online" : "offline"}) sees ${peer.shared.length ? peer.shared.map(name).join(", ") : "no projects"}` }))
+  : [html("div", { textContent: "None yet: pair the hub on your other PC by its Remote access link." })]);
+}
+($("hubs") as HTMLDialogElement).addEventListener("close", () => void hubsSummary().catch(() => {}));
 $("hub-pair").addEventListener("submit", event => {
  event.preventDefault();
  const input = $("hub-pair-url") as HTMLInputElement, url = input.value.trim();
@@ -2866,7 +2878,7 @@ async function trashAction(empty = false) {
  } catch (error) { showNotice("Trash: " + error.message); }
 }
 $("trash-empty").addEventListener("click", () => void trashAction(true));
-$("settings-button").addEventListener("click", () => { if (token && !$("settings-menu").hidden) { void appAction({ action: "status" }); void remoteAction(); } if (!$("settings-menu").hidden) void trashAction(); });
+$("settings-button").addEventListener("click", () => { if (token && !$("settings-menu").hidden) { void appAction({ action: "status" }); void remoteAction(); } if (!$("settings-menu").hidden) void hubsSummary().catch(() => {}); if (!$("settings-menu").hidden) void trashAction(); });
 // Remote access (tailscale serve) is switched and its address copied on this PC's own page only, like pairing.
 type RemoteStatus = { on: boolean; url?: string; missing?: string[]; error?: string };
 let remoteUrl = "";

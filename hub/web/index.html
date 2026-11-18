@@ -66,7 +66,10 @@
      <div class="settings-actions"><button type="button" id="hub-update" title="Stops every session, runs pi update --all (Pi and extensions), then starts them again; refused while one is busy">Update all</button><button type="button" id="hub-restart" title="Stops every session and starts them again; refused while one is busy">Restart hub</button><button type="button" id="hub-catchup" title="Runs /wo catch-up in this session: reviews Pi and plugin updates in a Plan3 plan (ce-workflow checkout only)" hidden>Catch up</button></div>
     </section>
     <section class="settings-group" id="remote-group" aria-labelledby="set-remote" hidden><h3 id="set-remote" class="group-head" title="Tailnet-only HTTPS through Tailscale; each new device is approved on this PC">Remote access<label><input type="checkbox" id="remote-on"> On</label></h3>
-     <div class="remote-line"><div id="remote-status" class="update-list"></div><button type="button" id="remote-copy" title="Copies the address to open on your other devices" disabled>Copy</button><button type="button" id="devices-button" title="Paired phones and other devices; revoke one here" hidden>Devices</button><button type="button" id="hubs-button" title="Other hubs paired with this one, and which of this hub's projects each may see" hidden>Hubs</button></div>
+     <div class="remote-line"><div id="remote-status" class="update-list"></div><button type="button" id="remote-copy" title="Copies the address to open on your other devices" disabled>Copy</button><button type="button" id="devices-button" title="Paired phones and other devices; revoke one here" hidden>Devices</button></div>
+    </section>
+    <section class="settings-group" id="hubs-group" aria-labelledby="set-hubs" hidden><h3 id="set-hubs" class="group-head" title="Hubs on your other PCs: pair one, and pick which of this hub's projects it may see">Paired hubs<button type="button" id="hubs-button">Pair and share</button></h3>
+     <div id="hubs-summary" class="update-list"></div>
     </section>
     <section class="settings-group" id="app-group" aria-labelledby="set-app" hidden><h3 id="set-app">Desktop app (Pi Hub)</h3>
      <div id="app-status" class="update-list"></div>

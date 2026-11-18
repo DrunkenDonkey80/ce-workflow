@@ -348,6 +348,8 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 				if (request.headers["content-type"]?.split(";")[0].trim() !== "application/json") return send(415, { error: "JSON content type required." });
 				const data = await body(request, PAGE_BODY);
 				if (!data || typeof data !== "object" || Array.isArray(data)) return send(400, { error: "Expected a JSON object." });
+				// D-02 still holds: this hub ticks its own shares; a paired device may (it can already run anything here). Pairing stays local.
+				if (endpoint === "hubs") return send(200, await links.share(String(data.url ?? ""), String(data.folder ?? ""), data.shared === true));
 				if (endpoint === "hub" && data.action === "settings") {
 					// Per-hub (per-PC) settings from the gear menu: auto-park minutes and the tab icon.
 					const minutes = data.idleParkMinutes, collapse = data.collapseHours, key = data.attentionKey, icon = data.icon, seen = data.seenVersion, hidden = data.usageHidden, notify = data.notify as Record<string, unknown> | undefined;
@@ -429,6 +431,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 					return response.end(JSON.stringify({ id: "/", name: `pi-hub · ${name}`, short_name: name, start_url: "/" + key, scope: "/", display: "standalone", background_color: "#ffffff", theme_color: "#ffffff", icons: [{ src: "/app-icon.svg" + key, sizes: "any", type: "image/svg+xml", purpose: "any" }] }));
 				}
 				// The page on this PC links files copied in Explorer instead of uploading copies; remote devices never see this PC's clipboard.
+				if (endpoint === "hubs") return send(200, { ...links.state(), local: !remote });
 				if (endpoint === "clipfiles") return remote ? send(403, { error: "Local page only." }) : send(200, { files: await clipboardFiles() });
 				// The changelog (gear → version, What's new): ?since=x.y.z keeps newer versions only; ?image= serves its screenshots.
 				if (endpoint === "changelog") {

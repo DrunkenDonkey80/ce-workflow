@@ -208,7 +208,11 @@ try {
 	assert.deepEqual((await local("/api/devices")).body.devices.filter(d => d.kind === "hub").length, 3, "approved hubs and the offered credential are hub devices");
 	// Plan 4d2fa07b S3 end to end: a session's `pi-hub peer read` reaches "mac" (this hub again) over /link/read and gets a capped file.
 	fs.writeFileSync(path.join(folder, "big.txt"), Array.from({ length: 3000 }, (_, i) => `line ${i + 1}`).join("\n"));
-	assert.equal((await local("/api/hubs/share", { url: "https://mac.tail.ts.net:7781", folder, shared: true })).status, 200);
+	// A paired device's page ticks this hub's shares (no hub key); pairing stays on the local page.
+	assert.equal((await remote(`/s/${id}/api/hubs`, { cookie })).json().local, false);
+	assert.equal((await remote(`/s/${id}/api/hubs`, { method: "POST", cookie, body: { url: "https://mac.tail.ts.net:7781", folder, shared: true } })).status, 200);
+	assert.deepEqual((await local("/api/hubs")).body.hubs.find(h => h.name === "mac").shared, [folder], "a remote tick shares the project");
+	assert.equal((await remote("/api/hubs/pair", { method: "POST", cookie, body: { url: "x.tail.ts.net:1" } })).status, 403, "no pairing from a remote page");
 	const peerCli = (...args) => promisify(execFile)(process.execPath, [fileURLToPath(new URL("../src/cli.ts", import.meta.url)), "peer", ...args], { env: process.env, windowsHide: true }).then(r => r.stdout);
 	assert.match(await peerCli("ls"), /"name": "mac"[^]*"folder": ".*proj"/, "mac shares proj");
 	const cut = (await peerCli("read", "--json", JSON.stringify({ hub: "mac", project: "proj", path: "big.txt" }))).trim().split("\n");
