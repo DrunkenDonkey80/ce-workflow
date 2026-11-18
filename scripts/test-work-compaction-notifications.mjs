@@ -222,8 +222,8 @@ try {
 		// Image tools stay hidden until a session shows their model is set.
 		const hidden = ["process_image", "generate_image"].includes(tool.name) && "hidden";
 		// Hub buttons wait for tools_enable; schedule stays declared.
-		const deferred = tool.name === "project_commands" && "deferred";
-		assert.equal(tool.exposure, tool.name.startsWith("work_") || tool.name.startsWith("camera_") ? "model-only" : hidden || deferred || undefined);
+		const deferred = (["project_commands", "knowledge", "session_dialog"].includes(tool.name) || tool.name.startsWith("peer_")) && "deferred";
+		assert.equal(tool.exposure, tool.name.startsWith("work_") || tool.name.startsWith("camera_") ? "model-only" : hidden || deferred || undefined, tool.name);
 	}
 	assert.equal(tools.research_mode, undefined, "agent cannot toggle research mode");
 	await launchKnowledgeDiscoverer(pi, ctx, [

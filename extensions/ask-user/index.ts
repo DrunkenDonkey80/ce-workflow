@@ -2881,10 +2881,8 @@ export function registerAskUser(pi: ExtensionAPI) {
    // and produce empty options. Plain strings are still accepted at
    // runtime for older transcripts. See issue #22.
    const optionSchema = Type.Object({
-      title: Type.String({ description: "Short title for this option" }),
-      description: Type.Optional(
-         Type.String({ description: "Longer description explaining this option" }),
-      ),
+      title: Type.String(),
+      description: Type.Optional(Type.String()),
    });
 
    // Spread for older host types; codemode scripts must not hold workers waiting on dialogs.
@@ -2909,87 +2907,29 @@ export function registerAskUser(pi: ExtensionAPI) {
       // so the model can't batch ask_user with bash/edit/write and let those run
       // (potentially with side effects) before the user sees the prompt.
       executionMode: "sequential",
+      // UI knobs (displayMode, singleSelectLayout, contextExpanded, toggle keys) stay off the model schema: user settings own them; internal callers still pass them.
       parameters: Type.Object({
-         question: Type.Optional(
-            Type.String({ description: "The question to ask the user. With questions, it is only an optional heading for the batch; put every actual question inside questions." }),
-         ),
+         question: Type.Optional(Type.String({ description: "The question. With questions, only an optional batch heading." })),
          questions: Type.Optional(
             Type.Array(
                Type.Object({
-                  question: Type.String({ description: "One question in the batch" }),
-                  context: Type.Optional(
-                     Type.String({ description: "Relevant context to show with this question (summary of findings)" }),
-                  ),
-                  options: Type.Optional(
-                     Type.Array(optionSchema, { description: "List of options for this question" }),
-                  ),
-                  allowMultiple: Type.Optional(
-                     Type.Boolean({ description: "Allow selecting multiple options. Default: false" }),
-                  ),
-                  allowFreeform: Type.Optional(
-                     Type.Boolean({ description: "Add a freeform text option. Default: true" }),
-                  ),
-                  initialText: Type.Optional(
-                     Type.String({ description: "Pre-filled answer text the user edits; only for an entry without options" }),
-                  ),
+                  question: Type.String(),
+                  context: Type.Optional(Type.String({ description: "Summary of findings shown with this question" })),
+                  options: Type.Optional(Type.Array(optionSchema)),
+                  allowMultiple: Type.Optional(Type.Boolean({ description: "Default false" })),
+                  allowFreeform: Type.Optional(Type.Boolean({ description: "Add a free-text answer. Default true" })),
+                  initialText: Type.Optional(Type.String({ description: "Pre-filled editable answer; only without options" })),
                }),
-               {
-                  minItems: BATCH_MIN_QUESTIONS,
-                  maxItems: BATCH_MAX_QUESTIONS,
-                  description: "2-4 independent questions shown together, used instead of question. Set context, options, allowMultiple, and allowFreeform on each entry; the remaining parameters apply to the whole batch.",
-               },
+               { minItems: BATCH_MIN_QUESTIONS, maxItems: BATCH_MAX_QUESTIONS, description: "2-4 independent questions shown together, instead of question" },
             ),
          ),
-         context: Type.Optional(
-            Type.String({
-               description: "Relevant context to show before the question (summary of findings)",
-            }),
-         ),
-         options: Type.Optional(
-            Type.Array(optionSchema, { description: "List of options for the user to choose from" }),
-         ),
-         allowMultiple: Type.Optional(
-            Type.Boolean({ description: "Allow selecting multiple options. Default: false" }),
-         ),
-         allowFreeform: Type.Optional(
-            Type.Boolean({ description: "Add a freeform text option. Default: true" }),
-         ),
-         initialText: Type.Optional(
-            Type.String({ description: "Pre-filled answer text the user edits and submits (for example saved directions); only for a question without options" }),
-         ),
-         allowComment: Type.Optional(
-            Type.Boolean({ description: "Collect an optional comment after selecting one or more options. Default: PI_ASK_USER_ALLOW_COMMENT env var if set, otherwise false." }),
-         ),
-         displayMode: Type.Optional(
-            StringEnum(["overlay", "inline"] as const, {
-               description: "UI rendering mode. 'overlay' shows a centered modal, 'inline' renders in-place. Default: PI_ASK_USER_DISPLAY_MODE env var if set, otherwise 'overlay'. Omit to respect the user's configured preference.",
-            }),
-         ),
-         singleSelectLayout: Type.Optional(
-            StringEnum(["auto", "list"] as const, {
-               description: "Single-select layout. 'auto' uses a details pane on wide terminals; 'list' always keeps descriptions below options. Default: PI_ASK_USER_SINGLE_SELECT_LAYOUT if set, otherwise 'auto'.",
-            }),
-         ),
-         contextExpanded: Type.Optional(
-            Type.Boolean({
-               description: "Start with oversized context expanded instead of collapsed behind a one-line summary. Default: PI_ASK_USER_CONTEXT_EXPANDED env var if set, otherwise false.",
-            }),
-         ),
-         overlayToggleKey: Type.Optional(
-            Type.String({
-               description:
-                  "Shortcut for hiding/showing the overlay popup (overlay mode only), e.g. 'alt+o' or 'ctrl+shift+h'. Pass 'off' to disable. Default: PI_ASK_USER_OVERLAY_TOGGLE_KEY env var if set, otherwise 'alt+o'.",
-            }),
-         ),
-         commentToggleKey: Type.Optional(
-            Type.String({
-               description:
-                  "Shortcut for toggling the optional comment/extra-context row when allowComment is true, e.g. 'ctrl+g'. Pass 'off' to disable. Default: PI_ASK_USER_COMMENT_TOGGLE_KEY env var if set, otherwise 'ctrl+g'.",
-            }),
-         ),
-         timeout: Type.Optional(
-            Type.Number({ description: "Auto-dismiss after N milliseconds. Returns null (cancelled) when expired." }),
-         ),
+         context: Type.Optional(Type.String({ description: "Summary of findings shown before the question" })),
+         options: Type.Optional(Type.Array(optionSchema)),
+         allowMultiple: Type.Optional(Type.Boolean({ description: "Default false" })),
+         allowFreeform: Type.Optional(Type.Boolean({ description: "Add a free-text answer. Default true" })),
+         initialText: Type.Optional(Type.String({ description: "Pre-filled editable answer (e.g. saved directions); only without options" })),
+         allowComment: Type.Optional(Type.Boolean({ description: "Ask for an optional comment after the selection" })),
+         timeout: Type.Optional(Type.Number({ description: "Auto-dismiss after N ms (returns cancelled)" })),
       }),
 
       async execute(_toolCallId, params, signal, onUpdate, ctx) {

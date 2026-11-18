@@ -14,7 +14,7 @@ import { handleEnvCommand } from "./work-env.ts";
 import { registerSelfUpdate } from "./work-self-update.ts";
 import { registerLensDefaults } from "./work-lens-format.ts";
 import { createImageTools, imageModelCanDraw } from "./work-images.ts";
-import { activateNamedTools, deferForeignTools, toolsEnableTool } from "./tool-loader.ts";
+import { activateNamedTools, deferForeignTools, setToolsActive, toolsEnableTool } from "./tool-loader.ts";
 import { registerRemoteAskAnswers } from "./work-ask-remote.ts";
 import { createCameraController, cameraSettings } from "./work-camera.ts";
 import { cameraTools } from "./work-camera-tools.ts";
@@ -1456,6 +1456,7 @@ function showResearchContext(ctx, publish = true) {
 		? "RESEARCH STOPPING… · waiting for work to finish · Alt+R to keep on"
 		: "RESEARCH MODE · explore, don't implement · Alt+R to exit";
 	ctx.ui?.setStatus?.("work-research-context", researchContext ? label : undefined);
+	if (workExtensionPi) setToolsActive(workExtensionPi, ["research_note", "research_exit"], Boolean(researchContext)); // useless outside research mode
 	if (publish) workExtensionPi?.events?.emit?.("wo:modes-changed", {}); // pi-control-hub's page shows the mode too
 	ctx.ui?.setWidget?.("work-research-context", researchContext && ctx.mode === "tui"
 		? [ctx.ui.theme?.fg?.(researchContext.stopping ? "warning" : "accent", `━━ ${label} ━━`) ?? label,
@@ -3688,6 +3689,7 @@ export default function workModelsExtension(pi) {
 		registerConstrainedTool(pi, {
 			name: "knowledge",
 			label: "Durable knowledge",
+			exposure: "deferred", // ~0.5 calls per 1,000 turns (tool census): tools_enable declares it
 			description:
 				"Record or retrieve short reusable facts. Never store transcripts, secrets, guesses as facts, or human/verified authority.",
 			parameters: {

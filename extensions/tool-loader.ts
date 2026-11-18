@@ -4,37 +4,39 @@
 // the tools the E3 log census found under 1 call per 1,000 assistant turns in every phase (camera, browser search/fetch,
 // jev_triage, plan3_diagram, session_dialog).
 export const SITUATIONAL_TOOLS = {
-	screen_read: "see an app window, headless browser page, phone or VM screen as an image (visual UI checks)",
-	mobile_act: "operate an iOS Simulator, iPhone or Android device: launch, read the screen, tap, type, swipe",
-	app_act: "operate a running Windows/macOS app via Accessibility/UI Automation: menus, press, type, keys",
-	vm_act: "drive a VirtualBox VM for installer tests: accounts, sign-in, UAC, runs, keys, click, snapshots, USB",
-	browser_act: "operate a site in the user's logged-in browser: click, type, select, upload",
-	image_search: "Google Images in the user's browser: contact sheet of results, then save originals",
-	generate_image: "generate or edit a PNG image from a prompt",
-	project_commands: "add/remove/list the user's project command buttons on the hub page",
-	peer_ls: "list paired hubs (other PCs), the projects they share with this one, and their folders",
-	peer_grep: "ripgrep a project another paired hub shares (code and its Pi session files)",
-	peer_read: "read a file from a project another paired hub shares",
-	peer_fetch: "copy a file (binary too, up to 200 MB) from a project another paired hub shares into .pi/inbox",
-	design: "Design sessions: start variants built live in the hub, pick one and export it",
-	video_digest: "digest a YouTube coding video: transcript plus code, diagrams and tables rebuilt as Markdown",
-	browser_search: "Google web search in the user's own browser profile (titles, real URLs, snippets)",
-	browser_fetch: "load a page in the user's own browser when a plain fetch is blocked (Cloudflare, bot checks)",
-	jev_triage: "ask a cheap classifier many typed questions about JSON or explicit file ranges in one call",
-	plan3_diagram: "read/edit a plan's or the product's architecture diagram",
-	session_dialog: "wait for or answer another hub session's open question after an intercom send was stopped",
-	camera_capture: "capture a still or short burst from the project camera (enabled in /wo Settings)",
-	camera_watch: "watch the project camera for visual change or quiet (device LEDs, screens)",
-	camera_recover: "reattach an earlier camera frame by its capture id",
-	camera_stop: "stop a running camera watch",
-	symbol_search: "pi-lens: find files by ranked identifier search",
-	read_enclosing: "pi-lens: read the symbol or callback enclosing a line",
-	effective_config: "pi-lens: explain resolved pi-lens configuration and its provenance",
-	project_report: "pi-lens: orient in a project from its review graph (hubs, entry points)",
-	module_report: "pi-lens: outline a source file's symbols and references before reading bodies",
-	read_symbol: "pi-lens: read one symbol's source instead of the whole file",
-	"resolve-library-id": "Context7: find a library's id before querying its current documentation",
-	"query-docs": "Context7: query a library's current documentation and code examples by id",
+	screen_read: "screenshot an app window, headless browser page, phone or VM",
+	mobile_act: "drive an iOS Simulator, iPhone or Android device",
+	app_act: "drive a running Windows/macOS desktop app",
+	vm_act: "drive a VirtualBox VM (installer tests, UAC, snapshots)",
+	browser_act: "operate a site in the user's logged-in browser",
+	image_search: "Google Images in the user's browser",
+	generate_image: "generate or edit a PNG image",
+	project_commands: "the user's project command buttons on the hub page",
+	peer_ls: "list paired hubs (other PCs) and their shared projects",
+	peer_grep: "ripgrep a project a paired hub shares",
+	peer_read: "read a file from a project a paired hub shares",
+	peer_fetch: "copy a file from a paired hub's project into .pi/inbox",
+	design: "hub design sessions: live variants, pick, export",
+	video_digest: "digest a YouTube coding video into Markdown",
+	browser_search: "Google search in the user's browser",
+	browser_fetch: "load a page in the user's browser (bot-check blocked pages)",
+	jev_triage: "cheap classifier questions about JSON or file ranges",
+	plan3_diagram: "read/edit a plan or product architecture diagram",
+	session_dialog: "answer or wait for another hub session's open question",
+	camera_capture: "still or burst from the project camera",
+	camera_watch: "watch the project camera for change or quiet",
+	camera_recover: "reattach an earlier camera frame",
+	camera_stop: "stop a camera watch",
+	knowledge: "record or look up durable project facts",
+	symbol_search: "pi-lens: ranked identifier search for files",
+	read_enclosing: "pi-lens: read the symbol enclosing a line",
+	effective_config: "pi-lens: explain its resolved configuration",
+	project_report: "pi-lens: project hubs and entry points",
+	module_report: "pi-lens: outline a file's symbols before reading bodies",
+	read_symbol: "pi-lens: read one symbol's source",
+	pi_lens_activate_tools: "pi-lens: activate ast_grep and lsp_navigation tools",
+	"resolve-library-id": "Context7: find a library id (current library docs)",
+	"query-docs": "Context7: query a library's current docs by id",
 };
 
 // Plan f75ccea6 D-10: always-on tools a Plan3 phase almost never calls (E3 census); plan3.ts drops them for that phase.
@@ -44,9 +46,9 @@ export const PHASE_DROPS = {
 	coding: ["project_report", "module_report"],
 };
 
-// Near-unused tools other packages (pi-lens) register always-active. Their owners never re-add a tool removed from the active
+// Near-unused tools other packages (pi-lens, Context7) register always-active. Their owners never re-add a tool removed from the active
 // set (pi-lens only re-plans its own situational ones), so the session start withdraws them and tools_enable offers them.
-const FOREIGN_TOOLS = ["symbol_search", "read_enclosing", "effective_config"];
+const FOREIGN_TOOLS = ["symbol_search", "read_enclosing", "effective_config", "project_report", "module_report", "pi_lens_activate_tools", "resolve-library-id", "query-docs"];
 // Direct tools tools_enable also offers: the withdrawn ones and the per-phase drops (listed even while active).
 const OFFERED_DIRECT = new Set([...FOREIGN_TOOLS, ...Object.values(PHASE_DROPS).flat()]);
 
@@ -69,6 +71,14 @@ export function activateTools(pi, names) {
 	if (added.length) pi.setActiveTools([...active, ...added]);
 }
 
+/** Declare or withdraw mode-bound tools (research_note while research is on); no change when already in that state. */
+export function setToolsActive(pi, names, on) {
+	const active = pi.getActiveTools?.();
+	if (!active || !pi.setActiveTools) return;
+	if (on) return activateTools(pi, names);
+	if (names.some((name) => active.includes(name))) pi.setActiveTools(active.filter((name) => !names.includes(name)));
+}
+
 /** A prompt that tells the model to use an instructed tool declares it. */
 export const activateNamedTools = (pi, text) => activateTools(pi, INSTRUCTED_TOOLS.filter((name) => new RegExp(`\\b${name}\\b`).test(text ?? "")));
 
@@ -82,7 +92,7 @@ export function toolsEnableTool(pi, exclude = []) {
 	return {
 		name: TOOLS_ENABLE,
 		label: "Enable tools",
-		description: `Before telling the user to open, click, look at or test something, check whether one of these tools can do it, enable it and do it yourself: local web UI → headless agent-browser via bash + screen_read; a desktop app → app_act + screen_read; a phone app or simulator → mobile_act + screen_read; an installer or guest OS → vm_act + screen_read; an external site needing the user's login → browser_act. Enabling brings the full parameters and rules for your next request, stays on for this session and grants no consent by itself; enable only what the task needs.\n${available.map((name) => `- ${name}: ${SITUATIONAL_TOOLS[name]}`).join("\n")}`,
+		description: `Before telling the user to open, click, look at or test something, check whether one of these tools can do it, enable it and do it yourself: local web UI → headless agent-browser via bash + screen_read; a desktop app → app_act + screen_read; a phone app or simulator → mobile_act + screen_read; an installer or guest OS → vm_act + screen_read; an external site needing the user's login → browser_act. Enabled tools work from your next step, stay on for this session and grant no consent; enable only what the task needs.\n${available.map((name) => `- ${name}: ${SITUATIONAL_TOOLS[name]}`).join("\n")}`,
 		promptSnippet: "Enable situational tools before handing a UI check to the user: app windows, phones, VMs, screenshots, logged-in sites, images, hub buttons; also browser search/fetch, camera, diagrams and rarely used helpers",
 		parameters: {
 			type: "object",

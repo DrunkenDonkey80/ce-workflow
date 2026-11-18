@@ -19,6 +19,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - `/plan3 ideas` lists contradictions between sources and every discarded idea with the reason.
 - Sessions without a plan declare only a small `plan3_create` tool; the full `plan3` tool (about 4 KB) arrives once the session has a plan or a request mentions one, and stays for that session.
 - The project AGENTS.md shrank from 6.1 to 3.0 KB: rules for niche work (dialog UX, video review, benchmark regressions, compaction mode in tests, changelog screenshots) moved to `docs/agent-rules.md`, with one-line pointers saying when to read it.
+- A blank session declares 20 tools (26 KB of schema) instead of 28 (40 KB): `research_note` and `research_exit` exist only while research mode is on; `knowledge`, Context7, `project_report`, `module_report` and `pi_lens_activate_tools` moved to `tools_enable`; the ask_user and `tools_enable` schemas are shorter. The `/goal` tools stay declared because pi-goal needs them when `/goal` starts.
 - Code reviews skip lockfiles, carry a do-not-flag list, drop uncertain findings the source does not confirm, and the diff reviewer reports what it could not verify instead of a plain `ok`.
 
 ## 1.1.1 — 2026-11-18
