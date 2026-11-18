@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: active
+status: complete
 created: 2026-11-17
-updated: 2026-11-17T22:37:13.174Z
+updated: 2026-11-18T06:09:50.116Z
 reviewed: 2026-11-17
 started: 2026-11-17T21:32:10.397Z
 ---
@@ -95,11 +95,7 @@ None recorded.
 
 ### Phase 3: Cross-machine qualification [code]
 
-- [human] **S5** [blocked] This PC and the Mac hub on the new release: share Belot, message, grep and read a session file, fetch a large file
-  - Blocked on: the Mac hub updated to the release with COMM 3 (needs a push the user authorizes).
-  - Also checks on the Mac: ripgrep found by the login-started hub, and a 200 MB transfer through `tailscale serve` without its own timeout.
-  - note: Waits for the user to authorize a version bump and push, then update the Mac hub.
-  - note: Release 1.1.0 pushed; needs the Mac hub updated and a live check with the user.
+- [x] **S5** Live PC<->Mac check on 1.1.0 passed: shared Belot listed, grep/read of code and session files, secrets and ../ refused, 32 MB APK and 73 MB DMG fetched intact, 199 MiB upload to belot-1~mac in 26 s and fetched back with the same sha256.
 
 ## Global validation
 
