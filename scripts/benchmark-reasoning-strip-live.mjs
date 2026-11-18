@@ -30,11 +30,13 @@ const reasoningPolicies = [
 	{ id: "R1", label: "interaction", value: "interaction" },
 	{ id: "R2", label: "aggressive", value: "aggressive" },
 ];
-const rotations = [
+let rotations = [
 	[0, 1, 2],
 	[1, 2, 0],
 	[2, 0, 1],
 ];
+// Ultrafull checkpoints between phases, through ce-workflow, in both matrices that compare compaction.
+const compacts = matrix === "compaction" || matrix === "compaction-model";
 
 function npmRoot() {
 	try {
@@ -44,7 +46,8 @@ function npmRoot() {
 	}
 }
 
-const piCli = path.join(
+// BENCH_PI_CLI: the offline self-check swaps in a fake RPC Pi (scripts/test-benchmark-compaction-model.mjs).
+const piCli = process.env.BENCH_PI_CLI ?? path.join(
 	npmRoot(),
 	"@earendil-works",
 	"pi-coding-agent",
@@ -83,6 +86,16 @@ if (matrix === "compaction") {
 			extension: path.join(oldRoot, "extensions", "work-models.ts"),
 		},
 		{ id: "C2", label: "native-pi-compaction", value: "0" },
+	];
+} else if (matrix === "compaction-model") {
+	// Luna vs Terra as the ultrafull summarizer; same scenario, one results file per arm, order alternates.
+	policies = [
+		{ id: "L", label: "luna-ultrafull", value: "0", extension, compactionModel: "openai-codex/gpt-6-luna" },
+		{ id: "T", label: "terra-ultrafull", value: "0", extension, compactionModel: "openai-codex/gpt-6.1-terra" },
+	];
+	rotations = [
+		[0, 1],
+		[1, 0],
 	];
 } else if (matrix !== "reasoning") {
 	throw new Error(`unknown matrix: ${matrix}`);
@@ -168,14 +181,14 @@ const prompts = [
 	"Implement Phase 3 from SPEC.md while preserving all prior behavior. Run `node test.mjs 3` and fix any failures.",
 ];
 
-function scaffold(cwd) {
+function scaffold(cwd, policy) {
 	mkdirSync(cwd, { recursive: true });
-	if (matrix === "compaction") {
+	if (compacts) {
+		const settings = { compaction: { enabled: false, keepRecentTokens: 2_000 } };
+		if (policy.compactionModel)
+			settings.workOrchestrator = { context: { mode: "ultrafull", compactionModel: policy.compactionModel } };
 		mkdirSync(path.join(cwd, ".pi"), { recursive: true });
-		writeFileSync(
-			path.join(cwd, ".pi", "settings.json"),
-			`${JSON.stringify({ compaction: { enabled: false, keepRecentTokens: 2_000 } }, null, 2)}\n`,
-		);
+		writeFileSync(path.join(cwd, ".pi", "settings.json"), `${JSON.stringify(settings, null, 2)}\n`);
 	}
 	writeFileSync(path.join(cwd, "SPEC.md"), spec);
 	writeFileSync(path.join(cwd, "test.mjs"), test);
@@ -193,7 +206,7 @@ async function run(policy, repetition, sequence) {
 		outputRoot,
 		`rep-${repetition + 1}-${sequence + 1}-${policy.id}-${policy.label}`,
 	);
-	scaffold(cwd);
+	scaffold(cwd, policy);
 	const sessionDir = path.join(cwd, "sessions");
 	const wireProbeOutput = path.join(cwd, "wire-probe.jsonl");
 	const piArgs = [
@@ -266,7 +279,7 @@ async function run(policy, repetition, sequence) {
 				if (Date.now() > deadline) throw new Error("phase timed out");
 				await sleep(250);
 			}
-			if (matrix === "compaction" && promptIndex < prompts.length - 1) {
+			if (compacts && promptIndex < prompts.length - 1) {
 				const responsesBefore = events.filter(
 					(event) => event.type === "response" && event.command === "compact",
 				).length;
@@ -374,14 +387,21 @@ async function run(policy, repetition, sequence) {
 	const wireReasoning = wireRequests.map(
 		(request) => request.fields.reasoning_content?.count ?? 0,
 	);
+	const compactionEntries = entries.filter((entry) => entry.type === "compaction");
 	return {
+		scenario: "calculator-lite",
 		policy: policy.id,
 		label: policy.label,
+		passed: verification === "pass",
 		repetition: repetition + 1,
 		sequence: sequence + 1,
 		verification,
 		verificationOutput: verificationOutput.trim().slice(-1000),
-		compactions: entries.filter((entry) => entry.type === "compaction").length,
+		compactions: compactionEntries.length,
+		// Ultrafull puts usage on the compaction entry and the model in details; already counted in usage above.
+		compactionModels: compactionEntries.map((entry) => entry.details?.compactionModel ?? null),
+		compactionCostUsd: compactionEntries.reduce((sum, entry) => sum + (entry.usage?.cost?.total ?? 0), 0),
+		compactionTokens: compactionEntries.reduce((sum, entry) => sum + (entry.usage?.totalTokens ?? 0), 0),
 		checkpointCompactionsSucceeded: checkpointResults.filter(
 			(result) => result?.success,
 		).length,
@@ -430,6 +450,12 @@ for (let repetition = 0; repetition < repetitions; repetition++) {
 			path.join(outputRoot, "results.json"),
 			`${JSON.stringify({ model, matrix, repetitions, results }, null, 2)}\n`,
 		);
+		// One file per arm with a shared scenario, so compare-benchmark-runs pairs L and T by repetition.
+		if (matrix === "compaction-model")
+			writeFileSync(
+				path.join(outputRoot, `results-${policy.id}.json`),
+				`${JSON.stringify({ model, matrix, repetitions, results: results.filter((r) => r.policy === policy.id) }, null, 2)}\n`,
+			);
 	}
 }
 process.stdout.write(

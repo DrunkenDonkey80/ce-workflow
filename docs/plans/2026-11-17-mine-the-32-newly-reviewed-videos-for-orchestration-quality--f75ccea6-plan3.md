@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-17
-updated: 2026-11-18T08:15:49.896Z
+updated: 2026-11-18T08:21:41.188Z
 size: plan
 reviewed: 2026-11-18
 tagsChecked: a310673c,811f1a0f
@@ -85,21 +85,11 @@ Commands (run directly with node, with PI_HUB cleared): `env -u PI_HUB node "scr
 
 ### Phase 2: Benchmark quality metric [think]
 
-- [wip] **B1** compare-benchmark-runs compares an optional `passed`/`score`; reasoning-strip gains a compaction-model matrix (Luna vs Terra, ultrafull)
-  - Metric: `passed` (boolean) or `score` (finite number) is compared only when both runs of a pair report the same field with a valid value. A pair where one side lacks it, has an invalid value or reports the other field is shown as "quality not comparable", never counted as zero or as a pass. A candidate whose pass rate or mean score drops is flagged even when it is cheaper. Old results without either field compare exactly as today. Add cases to `test-compare-benchmark-runs.mjs`: a drop, asymmetric fields and legacy results. Red before green on the drop flag.
-  - Matrix `compaction-model` in `benchmark-reasoning-strip-live.mjs`. Two policies: L (`openai-codex/gpt-6-luna`) and T (`openai-codex/gpt-6.1-terra`), set through `workOrchestrator.context.compactionModel` and `mode: "ultrafull"` in each run's isolated agent dir. Today's harness hard-codes three-policy rotations (line 33), loads the extension only for the reasoning matrix or a policy that names it (213), and requests checkpoint compaction only for `matrix === "compaction"` (269). So:
-    - add a two-arm rotation that alternates L and T order per repetition;
-    - make both arms load `extensions/work-models.ts`;
-    - run checkpoint compaction for this matrix too.
-  - Pairing: write one results file per arm, `results-L.json` and `results-T.json`. Every run carries the same `scenario` (for example `calculator-lite`) and keeps its arm in `policy`, so `compare-benchmark-runs.mjs` pairs L and T by scenario and repetition.
-  - Each result carries `passed` from `verification`. Ultrafull checkpoint compactions put their usage on the compaction entry and the model in `details.compactionModel` (`work-models.ts` 4005–4018); `work-compaction-usage` is only for ultracompact. So:
-    - report compaction usage and the actual compaction model from those entries;
-    - keep compaction usage counted once in the totals, where the harness already includes it.
-  - Proof: an offline self-check of the new matrix, the default `node --check` cannot verify it. It asserts the two-arm order for N repetitions, the extension loaded in both arms, compaction requested between phases, and N complete pairs from the comparator. Red before green.
+- [x] **B1** Comparator compares optional passed/score and flags drops; reasoning-strip benchmark gains compaction-model matrix (Luna vs Terra ultrafull, alternating two-arm order, ce-workflow in both arms, checkpoint compaction, results-L/T.json with shared scenario, compaction model/usage from compaction entries) with offline fake-Pi self-check
 
 ### Phase 3: Compaction model experiment [think]
 
-- [ ] **E1** Pilot one repetition per arm; check that compactions fire and results.json is complete
+- [wip] **E1** Pilot one repetition per arm; check that compactions fire and results.json is complete
   - Both arms must show at least one checkpoint compaction with usage recorded, and `details.compactionModel` must name that arm's model. Otherwise fix the harness before spending more.
 - [ ] **E2** Ask the repetition budget with pilot numbers, run the paired repetitions, compare and record the verdict
   - Ask with ask_user, using the pilot's runtime and token totals per arm; recommend 3 repetitions unless the pilot is costly.
@@ -179,7 +169,7 @@ Run every targeted test named in Relevant files on the final state, then `npm ru
 
 ## Resume context
 
-Planning done; draft awaiting /plan3 finish. Phases: G1–G2 guards and prompt fixes, B1 benchmark metric, E1–E2 Luna vs Terra compaction, E3 census, E7 near-unused tools on demand (D-09), E4–E6 per-phase profiles and real-use verdict. Pilot census (256 sessions across 3 machines) is in E3. Scratch files: %TEMP%/pi-research-CTpN87 (takeaways.md, census.mjs, table.txt, peer/). Next: /plan3 finish, then G1.
+G1, G2 done and committed (68849f30, cc7c6fb5). B1 wip: add optional passed/score comparison to scripts/compare-benchmark-runs.mjs (+ test-compare-benchmark-runs.mjs) and a compaction-model matrix (Luna vs Terra, ultrafull, both arms load ce-workflow and compact; per-arm results files with same scenario name) in scripts/benchmark-reasoning-strip-live.mjs, with offline self-check. Known pre-existing failure: test-work-compaction-notifications.mjs:1484 (compaction fallback expects ["summary","current"]) fails on HEAD too; add to Backlog, it will hit global validation. Tests need env -u PI_HUB -u PI_HUB_SESSION.
 
 ## Amendments
 

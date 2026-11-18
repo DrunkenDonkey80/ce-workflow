@@ -41,4 +41,31 @@ assert.equal(scen.complete, 1);
 assert.match(scen.pairs.find((p) => p.key === "a#1").incomplete, /candidate missing/);
 assert.equal(scen.total, 2);
 
+// Quality: a cheaper candidate that passes less is flagged; a lower mean score too.
+const drop = compareRuns({ results: [run(1, 2, { passed: true }), run(2, 2, { passed: true })] }, { results: [run(1, 1, { passed: true }), run(2, 1, { passed: false })] });
+assert.deepEqual(drop.quality.passed, { pairs: 2, baseline: 2, candidate: 1 });
+assert.equal(drop.quality.dropped, true);
+assert.match(formatComparison(drop), /passed: 2\/2 -> 1\/2[\s\S]*QUALITY DROP/);
+const scored = compareRuns({ results: [run(1, 1, { score: 0.9 }), run(2, 1, { score: 0.7 })] }, { results: [run(1, 1, { score: 0.8 }), run(2, 1, { score: 0.6 })] });
+assert.equal(scored.quality.dropped, true);
+assert(Math.abs(scored.quality.score.baseline - 0.8) < 1e-9);
+const better = compareRuns({ results: [run(1, 1, { passed: false })] }, { results: [run(1, 1, { passed: true })] });
+assert.equal(better.quality.dropped, false);
+assert.doesNotMatch(formatComparison(better), /QUALITY DROP/);
+
+// Asymmetric or invalid fields are not comparable, never a pass or a zero.
+const asym = compareRuns(
+	{ results: [run(1, 1, { passed: true }), run(2, 1, { score: 1 }), run(3, 1, { passed: "yes" }), run(4, 1, { passed: true })] },
+	{ results: [run(1, 1), run(2, 1, { passed: true }), run(3, 1, { passed: true }), run(4, 1, { passed: true })] },
+);
+assert.equal(asym.quality.notComparable, 3);
+assert.deepEqual(asym.quality.passed, { pairs: 1, baseline: 1, candidate: 1 });
+assert.equal(asym.quality.dropped, false);
+assert.equal(asym.pairs.find((p) => p.key === "#1").quality.notComparable, true);
+assert.match(formatComparison(asym), /quality not comparable in 3 pair/);
+
+// Legacy results without either field compare exactly as before.
+assert.equal(same.quality, undefined);
+assert.doesNotMatch(formatComparison(same), /quality|QUALITY/);
+
 console.log("compare-benchmark-runs: ok");

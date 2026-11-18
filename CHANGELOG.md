@@ -4,6 +4,11 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+### Added
+
+- `compare-benchmark-runs` compares an optional `passed` or `score` per run and warns when the candidate passes less or scores lower, even when it is cheaper; pairs where only one side reports it are shown as not comparable.
+- The reasoning-strip benchmark has a `compaction-model` matrix: Luna vs Terra as the ultrafull summarizer, one results file per arm, with each run's compaction model and cost.
+
 ### Changed
 
 - Plan3 execute runs can no longer `git push` (blocked in code, not just asked in the prompt); a later ordinary request can still push. Night mode also blocks `git push`, `git reset --hard`, `git clean -f` and recursive deletes outside the project and temp folders.

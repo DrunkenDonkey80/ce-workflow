@@ -13,6 +13,14 @@ export const METRICS = {
 	turns: (r) => r.turns,
 	toolCalls: (r) => r.toolCalls,
 };
+// Optional quality per run: `passed` (boolean) or `score` (finite number). A pair compares it only when both
+// sides report the same field with a valid value; otherwise it is "not comparable", never a pass or a zero.
+const QUALITY = { passed: (v) => typeof v === "boolean", score: (v) => Number.isFinite(v) };
+function quality(b, c) {
+	const field = Object.keys(QUALITY).find((name) => QUALITY[name](b[name]) && QUALITY[name](c[name]));
+	if (field) return { field, baseline: b[field], candidate: c[field] };
+	return Object.keys(QUALITY).some((name) => name in b || name in c) ? { notComparable: true } : undefined;
+}
 const keyOf = (r) => `${r.scenario ?? r.policy ?? ""}#${r.repetition}`;
 
 function index(results) {
@@ -40,7 +48,8 @@ export function compareRuns(baseline, candidate) {
 		const b = base.get(key), c = cand.get(key);
 		const incomplete = [problem(b, "baseline"), problem(c, "candidate")].filter(Boolean).join(", ");
 		if (incomplete) return { key, incomplete };
-		return { key, metrics: Object.fromEntries(Object.entries(METRICS).map(([name, pick]) => [name, { baseline: pick(b), candidate: pick(c), delta: pick(c) - pick(b) }])) };
+		const q = quality(b, c);
+		return { key, metrics: Object.fromEntries(Object.entries(METRICS).map(([name, pick]) => [name, { baseline: pick(b), candidate: pick(c), delta: pick(c) - pick(b) }])), ...(q ? { quality: q } : {}) };
 	});
 	const complete = pairs.filter((p) => p.metrics);
 	const totals = Object.fromEntries(Object.keys(METRICS).map((name) => {
@@ -48,7 +57,22 @@ export function compareRuns(baseline, candidate) {
 		const candidate = complete.reduce((s, p) => s + p.metrics[name].candidate, 0);
 		return [name, { baseline, candidate, delta: candidate - baseline, change: baseline ? (candidate - baseline) / baseline : null }];
 	}));
-	return { pairs, complete: complete.length, total: pairs.length, totals };
+	return { pairs, complete: complete.length, total: pairs.length, totals, ...summarizeQuality(complete) };
+}
+
+// Pass counts and mean scores over the pairs that compare them; any drop flags the candidate even when it is cheaper.
+function summarizeQuality(complete) {
+	const rated = complete.filter((p) => p.quality);
+	if (!rated.length) return {};
+	const out = { notComparable: rated.filter((p) => p.quality.notComparable).length, dropped: false };
+	for (const field of Object.keys(QUALITY)) {
+		const pairs = rated.filter((p) => p.quality.field === field);
+		if (!pairs.length) continue;
+		const sum = (side) => pairs.reduce((s, p) => s + Number(p.quality[side]), 0) / (field === "score" ? pairs.length : 1);
+		out[field] = { pairs: pairs.length, baseline: sum("baseline"), candidate: sum("candidate") };
+		if (out[field].candidate < out[field].baseline) out.dropped = true;
+	}
+	return { quality: out };
 }
 
 const fmt = (n) => (Math.abs(n) >= 100 ? Math.round(n).toLocaleString("en-US") : Number(n.toFixed(4)).toString());
@@ -57,11 +81,19 @@ export function formatComparison(result) {
 	const lines = [];
 	for (const p of result.pairs) {
 		if (p.incomplete) { lines.push(`${p.key}: incomplete (${p.incomplete})`); continue; }
-		lines.push(`${p.key}: ${Object.entries(p.metrics).map(([n, m]) => `${n} ${fmt(m.baseline)} -> ${fmt(m.candidate)}`).join(", ")}`);
+		const q = !p.quality ? "" : p.quality.notComparable ? ", quality not comparable" : `, ${p.quality.field} ${p.quality.baseline} -> ${p.quality.candidate}`;
+		lines.push(`${p.key}: ${Object.entries(p.metrics).map(([n, m]) => `${n} ${fmt(m.baseline)} -> ${fmt(m.candidate)}`).join(", ")}${q}`);
 	}
 	lines.push(`Totals over ${result.complete} of ${result.total} pairs complete:`);
 	for (const [n, t] of Object.entries(result.totals))
 		lines.push(`  ${n}: ${fmt(t.baseline)} -> ${fmt(t.candidate)} (${t.change === null ? "n/a" : `${t.change >= 0 ? "+" : ""}${(t.change * 100).toFixed(1)}%`})`);
+	const q = result.quality;
+	if (q) {
+		if (q.passed) lines.push(`  passed: ${q.passed.baseline}/${q.passed.pairs} -> ${q.passed.candidate}/${q.passed.pairs}`);
+		if (q.score) lines.push(`  mean score: ${fmt(q.score.baseline)} -> ${fmt(q.score.candidate)} over ${q.score.pairs} pairs`);
+		if (q.notComparable) lines.push(`  quality not comparable in ${q.notComparable} pair(s): one side lacks the field, reports another or an invalid value`);
+		if (q.dropped) lines.push("QUALITY DROP: the candidate passes less or scores lower; do not accept it on cost alone.");
+	}
 	if (result.complete < result.total) lines.push("Incomplete pairs are excluded: rerun them before calling the candidate cheaper or better.");
 	return lines.join("\n");
 }
