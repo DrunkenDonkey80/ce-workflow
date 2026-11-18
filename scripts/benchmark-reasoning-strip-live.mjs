@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync, spawn } from "node:child_process";
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 process.env.PI_WORK_PROJECT_MAP ??= "off"; // live runs never map unless a fixture opts in (PI_WORK_PROJECT_MAP=on)
@@ -47,14 +47,16 @@ function npmRoot() {
 }
 
 // BENCH_PI_CLI: the offline self-check swaps in a fake RPC Pi (scripts/test-benchmark-compaction-model.mjs).
-const piCli = process.env.BENCH_PI_CLI ?? path.join(
-	npmRoot(),
-	"@earendil-works",
-	"pi-coding-agent",
-	"dist",
-	"bundle",
-	"cli.js",
-);
+// Pi installs into ~/.pi/agent/install/releases/<version>; older installs live in the npm global root.
+const releases = path.join(process.env.USERPROFILE ?? process.env.HOME ?? "", ".pi", "agent", "install", "releases");
+const piCli = process.env.BENCH_PI_CLI ?? [
+	...(existsSync(releases) ? readdirSync(releases) : [])
+		.sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
+		.map((version) => path.join(releases, version, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "bundle", "cli.js")),
+	path.join(npmRoot(), "@earendil-works", "pi-coding-agent", "dist", "bundle", "cli.js"),
+].find(existsSync);
+if (!piCli) throw new Error("Pi CLI not found");
+const providerExtension = value("--provider-extension", path.join(process.env.USERPROFILE ?? process.env.HOME ?? "", ".pi", "agent", "git", "github.com", "DrunkenDonkey80", "pi-provider-claude-ex", "index.ts"));
 const extension = path.join(repo, "extensions", "work-models.ts");
 const wireProbe = path.join(repo, "scripts", "reasoning-wire-probe.mjs");
 let policies = reasoningPolicies;
@@ -185,8 +187,11 @@ function scaffold(cwd, policy) {
 	mkdirSync(cwd, { recursive: true });
 	if (compacts) {
 		const settings = { compaction: { enabled: false, keepRecentTokens: 2_000 } };
-		if (policy.compactionModel)
+		if (policy.compactionModel) {
+			// A terse foreground (Opus) finishes phase 1 under a 2k tail, and Pi then refuses: "Nothing to compact".
+			settings.compaction.keepRecentTokens = 500;
 			settings.workOrchestrator = { context: { mode: "ultrafull", compactionModel: policy.compactionModel } };
+		}
 		mkdirSync(path.join(cwd, ".pi"), { recursive: true });
 		writeFileSync(path.join(cwd, ".pi", "settings.json"), `${JSON.stringify(settings, null, 2)}\n`);
 	}
@@ -226,6 +231,8 @@ async function run(policy, repetition, sequence) {
 	const selectedExtension =
 		policy.extension ?? (matrix === "reasoning" ? extension : null);
 	if (selectedExtension) piArgs.push("--extension", selectedExtension);
+	// Anthropic runs need the user's OAuth pool provider: --no-extensions would leave a revoked auth.json token.
+	if (model.startsWith("anthropic/") && existsSync(providerExtension)) piArgs.push("--extension", providerExtension);
 	piArgs.push("--extension", wireProbe, "-a");
 	const child = spawn(process.execPath, piArgs, {
 		cwd,
@@ -277,6 +284,8 @@ async function run(policy, repetition, sequence) {
 				if (child.exitCode !== null)
 					throw new Error(`pi exited ${child.exitCode}: ${stderr.slice(-2000)}`);
 				if (Date.now() > deadline) throw new Error("phase timed out");
+				const refused = events.find((event) => event.type === "response" && event.command === "prompt" && event.success === false);
+				if (refused) throw new Error(`pi refused ${refused.command}: ${refused.error}`);
 				await sleep(250);
 			}
 			if (compacts && promptIndex < prompts.length - 1) {

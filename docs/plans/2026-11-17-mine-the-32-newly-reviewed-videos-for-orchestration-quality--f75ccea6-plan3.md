@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-17
-updated: 2026-11-18T08:21:41.188Z
+updated: 2026-11-18T09:07:10.137Z
 size: plan
 reviewed: 2026-11-18
 tagsChecked: a310673c,811f1a0f
@@ -89,9 +89,8 @@ Commands (run directly with node, with PI_HUB cleared): `env -u PI_HUB node "scr
 
 ### Phase 3: Compaction model experiment [think]
 
-- [wip] **E1** Pilot one repetition per arm; check that compactions fire and results.json is complete
-  - Both arms must show at least one checkpoint compaction with usage recorded, and `details.compactionModel` must name that arm's model. Otherwise fix the harness before spending more.
-- [ ] **E2** Ask the repetition budget with pilot numbers, run the paired repetitions, compare and record the verdict
+- [x] **E1** Pilot (foreground anthropic/claude-opus-5-5, user's pick) passed: both arms 2/2 checkpoint compactions with usage, details.compactionModel = arm model; L 76s/142k tok/$0.20, T 89s/179k/$0.30, both pass. Harness fixes: Pi CLI lookup in install/releases, Anthropic provider extension, fail fast on refused prompt, 500-token tail for this matrix (Opus phase 1 fit under 2k so Pi refused to compact)
+- [wip] **E2** Ask the repetition budget with pilot numbers, run the paired repetitions, compare and record the verdict
   - Ask with ask_user, using the pilot's runtime and token totals per arm; recommend 3 repetitions unless the pilot is costly.
   - Verdict in Decisions: keep Luna, switch to Terra, or no difference. It weighs pass rate first, then runtime, total tokens (foreground + compaction) and turns, per the Optimization Regression Rule. Changing the user's setting is the user's decision; this step only reports.
 ### Phase 4: Tool-use census from real sessions [think]

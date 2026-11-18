@@ -43,3 +43,9 @@ Planning done; draft awaiting /plan3 finish. Phases: G1–G2 guards and prompt f
     - keep compaction usage counted once in the totals, where the harness already includes it.
   - Proof: an offline self-check of the new matrix, the default `node --check` cannot verify it. It asserts the two-arm order for N repetitions, the extension loaded in both arms, compaction requested between phases, and N complete pairs from the comparator. Red before green.
   - check: env -u PI_HUB -u PI_HUB_SESSION node scripts/test-benchmark-compaction-model.mjs -> ok; node scripts/test-compare-benchmark-runs.mjs -> ok; test_sensitivity: compacts without compaction-model -> caught (prompt,compact sequence assertion); earlier drop-flag mutation caught
+
+## 2026-11-18T09:07:10.137Z E1 done: Pilot (foreground anthropic/claude-opus-5-5, user's pick) passed: both arms 2/2 checkpoint compactions with usage, details.compactionModel = arm model; L 76s/142k tok/$0.20, T 89s/179k/$0.30, both pass. Harness fixes: Pi CLI lookup in install/releases, Anthropic provider extension, fail fast on refused prompt, 500-token tail for this matrix (Opus phase 1 fit under 2k so Pi refused to compact)
+
+- [x] **E1** Pilot one repetition per arm; check that compactions fire and results.json is complete
+  - Both arms must show at least one checkpoint compaction with usage recorded, and `details.compactionModel` must name that arm's model. Otherwise fix the harness before spending more.
+  - check: node scripts/benchmark-reasoning-strip-live.mjs --matrix compaction-model --repetitions 1 --model anthropic/claude-opus-5-5 -> exit 0; compare-benchmark-runs results-L.json results-T.json -> 1/1 pair complete, passed 1/1 -> 1/1; test-benchmark-compaction-model.mjs -> ok
