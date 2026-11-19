@@ -110,6 +110,7 @@ const tests = [
 	"test-latest-model.mjs",
 	"test-run-budget.mjs",
 	"test-compare-benchmark-runs.mjs",
+	"test-compaction-recall.mjs",
 	"test-benchmark-compaction-model.mjs",
 	"test-tool-usage-census.mjs",
 	"test-context-report.mjs",
