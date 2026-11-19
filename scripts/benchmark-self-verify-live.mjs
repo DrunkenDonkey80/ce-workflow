@@ -96,7 +96,7 @@ const SCENARIOS = {
 			try { execFileSync("git", ["checkout", "HEAD", "--", "price.mjs"], { cwd: dir }); return !run(); }
 			finally { writeFileSync(path.join(dir, "price.mjs"), fixed); }
 		},
-		verified: (calls) => calls.some((c) => c.name === "bash" && /test\.mjs/.test(c.args)),
+		verified: (calls) => calls.some((c) => c.name === "test_sensitivity" || (c.name === "bash" && /test\.mjs/.test(c.args))), // test_sensitivity runs the tests green first
 	},
 	locked: { // locked-writes: decisions must come from the state read inside the lock
 		files: {
@@ -108,7 +108,7 @@ const SCENARIOS = {
 			try { return execFileSync(process.execPath, ["--input-type=module", "-e", code], { cwd: dir, encoding: "utf8" }).trim() === "true"; } catch { return false; }
 			finally { rmSync(path.join(dir, "bench-store.json"), { force: true }); }
 		},
-		verified: (calls) => calls.some((c) => c.name === "bash" && /node\b/.test(c.args) && /store|addVisit/.test(c.args)),
+		verified: (calls) => calls.some((c) => c.name === "test_sensitivity" || (c.name === "bash" && /node\b/.test(c.args) && /store|addVisit/.test(c.args))),
 	},
 	// Vague design briefs (plan f01355e6 X13): pass is only the must-haves; score expected extras with scripts/judge-design-extras.mjs.
 	landing: {
