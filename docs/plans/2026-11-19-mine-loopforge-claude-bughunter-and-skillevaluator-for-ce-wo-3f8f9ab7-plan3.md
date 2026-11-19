@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: ready
+status: active
 created: 2026-11-19
-updated: 2026-11-19T20:41:25.788Z
+updated: 2026-11-19T21:01:03.981Z
 size: plan
 reviewed: 2026-11-19
 started: 2026-11-19T20:39:08.879Z
@@ -185,10 +185,8 @@ Commands (referenced by steps; run them as written, report failures):
 ### Phase 1: Review [think]
 
 - [x] **RR-01** Pinned clones in C:\SOFT\git\repo-review (3/3 at D-07 SHAs); blind Astra brief at docs/proposals/repo-review-3f8f9ab7/astra-brief.md.
-- [ ] **RR-03** Desk review of LoopForge L1-L14 with path:line evidence, counterparts and R3 measurements; try the chat UI alone (C4).
-  - UI rows (L9, L10) say whether the standalone run worked, with screenshots read via `screen_read`.
-- [ ] **RR-04** Desk review of BugHunter B1-B8 and SkillEvaluator S1-S10; keyless checks C2 and C3 on our skills, summary in keyless-checks.md.
-  - Each row ends with a verdict and, for candidates, a one-line idea. Commit the review doc with all 32 of our verdicts before RR-02.
+- [x] **RR-03** LoopForge L1–L14 rows written (1 Test first: post-plan retro L3; rest covered/skip) with path:line evidence and log measurements.
+- [x] **RR-04** B1–B8 and S1–S10 verdicts written (2 Adopt idea: S5 uncertainty line, S6 labelled judge suites; rest covered/skip with measurements); keyless checks in repo-review-3f8f9ab7/keyless-checks.md.
 - [ ] **RR-02** After RR-03 and RR-04 are committed, launch Astra (D-11, model set explicitly) blind and async on the RR-01 brief; verdicts land in astra-verdicts.md.
   - Task tells Astra to write the file and end with a neutral one-line reply; our verdicts are already frozen, so the wake preview cannot anchor them.
 - [ ] **RR-05** Merge Astra's column: agreement count, each disagreement settled in code, final verdicts, shortlist and both dropped groups.
