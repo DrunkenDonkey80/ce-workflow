@@ -5,6 +5,9 @@
 // Usage: node scripts/benchmark-self-verify-live.mjs [--model ID] [--thinking L] [--reps N] [--arms on,off]
 //          [--scenarios web,cli,explain] [--parallel N] [--output DIR] [--append FILE]
 // --append FILE adds FILE to the system prompt of every arm (prompt A/B: run once without, once with, then compare).
+// Block ablation: an arm "no-<tag>[+<tag>...]" is "on" without those system-prompt sections (locked-writes, test-sensitivity,
+// self-verify, reporting, ponytail, project-map), removed by scripts/bench-sections-off.ts. --ponytail also loads the
+// user's ponytail extension in every arm. --dry-run sends no request: it prints which sections each arm's prompt has.
 // Compare: node scripts/compare-benchmark-runs.mjs <out>/off/results.json <out>/on/results.json
 import { execFileSync, spawn } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -24,6 +27,9 @@ const arms = value("--arms", "off,on").split(",");
 const scenarioNames = value("--scenarios", "web,cli,explain").split(",");
 const parallel = Number(value("--parallel", "4"));
 const append = value("--append", undefined);
+const ponytail = args.includes("--ponytail") ? [path.join(os.homedir(), ".pi", "agent", "git", "github.com", "DietrichGebert", "ponytail", "pi-extension", "index.js")] : [];
+const dryRun = args.includes("--dry-run");
+const BLOCKS = ["locked-writes", "test-sensitivity", "self-verify", "reporting", "ponytail", "project-map"];
 const out = path.resolve(value("--output", path.join(repo, ".pi", "self-verify-bench", new Date().toISOString().replace(/[:.]/g, "-"))));
 const launcher = path.join(os.homedir(), ".pi", "agent", "bin", "pi-launcher.js");
 const piEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("PI_HUB"))); // dialogs never reach the user's hub
@@ -116,12 +122,13 @@ async function one(arm, extDir, name, repetition) {
 	const art = path.join(out, arm, `${name}-${repetition}`);
 	mkdirSync(art, { recursive: true });
 	const dir = fixture(scenario), sessions = path.join(art, "sessions");
-	const extArgs = extensionList.flatMap((rel) => ["--extension", path.join(extDir, path.relative("extensions", rel))]);
+	const extArgs = [...extensionList.map((rel) => path.join(extDir, path.relative("extensions", rel))), ...ponytail, path.join(repo, "scripts", "bench-sections-off.ts")].flatMap((file) => ["--extension", file]);
+	const payload = path.join(art, "dry-run-payload.json");
 	const started = Date.now();
 	const { code, timedOut } = await new Promise((resolve) => {
 		const child = spawn(process.execPath, [launcher, "-p", "--mode", "json", "--model", model, "--thinking", thinking, "--no-extensions", ...extArgs,
 			"--session-dir", sessions, ...(append ? ["--append-system-prompt", path.resolve(append)] : []), scenario.prompt],
-		{ cwd: dir, env: { ...piEnv, AGENT_BROWSER_SESSION: `sv-${process.pid}-${id}` }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+		{ cwd: dir, env: { ...piEnv, AGENT_BROWSER_SESSION: `sv-${process.pid}-${id}`, BENCH_SECTIONS_OFF: arm.startsWith("no-") ? arm.slice(3).replaceAll("+", ",") : "", ...(dryRun ? { BENCH_DRY_RUN: payload } : {}) }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
 		let timedOut = false;
 		const timer = setTimeout(() => { timedOut = true; child.kill(); }, 15 * 60_000);
 		const log = [];
@@ -130,6 +137,12 @@ async function one(arm, extDir, name, repetition) {
 		child.on("exit", (code) => { clearTimeout(timer); writeFileSync(path.join(art, "pi.log"), Buffer.concat(log)); resolve({ code, timedOut }); });
 	});
 	const elapsedMs = Date.now() - started;
+	if (dryRun) {
+		const sent = existsSync(payload) ? readFileSync(payload, "utf8") : "";
+		const present = BLOCKS.filter((tag) => sent.includes(`<${tag}>`));
+		console.log(id, sent ? `sections: ${present.join(", ") || "none"}; missing: ${BLOCKS.filter((t) => !present.includes(t)).join(", ") || "none"}` : `no payload (exit ${code})`);
+		return { scenario: name, repetition, arm, dryRun: true, present };
+	}
 	try { execFileSync("agent-browser", ["--session", `sv-${process.pid}-${id}`, "close"], { stdio: "ignore", timeout: 20_000 }); } catch {}
 	const messages = sessionEntries(sessions).filter((e) => e.type === "message").map((e) => e.message);
 	const calls = messages.filter((m) => m.role === "assistant").flatMap((m) => (m.content ?? []).filter((b) => b.type === "toolCall"))
@@ -156,7 +169,7 @@ async function one(arm, extDir, name, repetition) {
 const benchStart = new Date();
 const extDirs = { on: path.join(repo, "extensions"), off: arms.includes("off") ? offExtensions() : undefined };
 const jobs = [];
-for (let repetition = 1; repetition <= reps; repetition++) for (const name of scenarioNames) for (const arm of arms) jobs.push([arm, extDirs[arm], name, repetition]);
+for (let repetition = 1; repetition <= reps; repetition++) for (const name of scenarioNames) for (const arm of arms) jobs.push([arm, extDirs[arm] ?? extDirs.on, name, repetition]);
 const results = [];
 try {
 	let next = 0;
@@ -175,6 +188,7 @@ try {
 		execFileSync("powershell", ["-NoProfile", "-Command", `Get-CimInstance Win32_Process | Where-Object { $_.CreationDate -gt [datetime]'${benchStart.toISOString()}' -and $_.CommandLine -match 'counter\\.py|server\\.mjs' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`], { stdio: "ignore", timeout: 60_000 });
 	} catch (error) { console.error("stray-process cleanup failed:", error.message); }
 }
+if (dryRun) process.exit(0);
 for (const arm of arms) writeFileSync(path.join(out, arm, "results.json"), JSON.stringify({ model, thinking, results: results.filter((r) => r.arm === arm) }, null, 2));
 for (const arm of arms) {
 	const rs = results.filter((r) => r.arm === arm && !r.error);
