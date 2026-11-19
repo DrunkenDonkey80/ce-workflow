@@ -912,7 +912,7 @@ try {
 	assert.match(await readFile(path.join(directory, jevName), "utf8"), /- \[ \] \*\*JEV-16\*\* Follow-up[\s\S]*Added JEV-16 after JEV-15: test/);
 
 	// Completing archives to docs/plans/done; resolution covers the done folder.
-	await writeFile(path.join(directory, "2026-10-03-small-33333333-plan3.md"), validPlan("33333333", "Small", "active", "- [x] **S-01** Done"));
+	await writeFile(path.join(directory, "2026-10-03-small-33333333-plan3.md"), `${validPlan("33333333", "Small", "active", "- [x] **S-01** Done")}\n## Ideas\n\n### IDEA-0a0a0a0a Keep facts\n\nStatus: accepted\n\n#### Proposed requirement\n\n> Facts survive compaction.\n\n### IDEA-0b0b0b0b Dropped idea\n\nStatus: rejected\n`);
 	const beforeArchiveDiagram = await diagram({ action: "apply", plan: "33333333", expectedRevision: 0, operations: [{ op: "add", entity: "node", value: { id: "small", label: "Small", kind: "service", x: 25, y: 50 } }, { op: "add", entity: "note", value: { id: "note_small", target: "small", text: "Keep me", author: "agent", created: "2026-10-13" } }] });
 	assert.match((await tool({ action: "get", plan: "33333333" })).hint, /set status complete/);
 	entries.push({ type: "custom", customType: "plan3-current", data: { id: "33333333" } });
@@ -921,6 +921,8 @@ try {
 	entries.pop();
 	state = await tool({ action: "status", plan: "33333333", value: "complete" });
 	assert.equal(state.path, path.join(directory, "done", "2026-10-03-small-33333333-plan3.md"));
+	assert.deepEqual(state.acceptedIdeas, [{ id: "IDEA-0a0a0a0a", title: "Keep facts", requirement: "Facts survive compaction." }], "completion lists accepted ideas only");
+	assert.match(state.report, /every accepted idea[\s\S]*condition the user approved/);
 	assert.equal((await tool({ action: "get", plan: "33333333" })).status, "complete");
 	assert.deepEqual((await diagram({ action: "get", plan: "33333333" })).diagram, beforeArchiveDiagram.diagram);
 	assert.equal(planEvents.findLast(event => event.name === "plan3:plans-changed").plans.find(plan => plan.id === "33333333").file, state.path, "workspace rebind metadata uses stable id, including archived plans");

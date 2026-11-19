@@ -1817,7 +1817,13 @@ export default function plan3(pi) {
 					if (value === "complete" && loadDiagram(ctx.cwd, { kind: "product" }) && !architectureDone(lines)) throw new Error(`Finish ${ARCHITECTURE_STEP} first.`);
 					setMeta(lines, "status", value);
 				});
-				if (value === "complete") { result = { file: await archive(ctx.cwd, plan) }; pi.events?.emit?.("plan3:completed", { ctx, plan }); }
+				if (value === "complete") {
+					const accepted = ideaItems(split(await readFile(plan.file, "utf8")).lines).filter((idea) => idea.status === "accepted");
+					result = { file: await archive(ctx.cwd, plan) };
+					// A final report once dropped ideas reported mid-run and silently swapped a user-approved condition.
+					if (accepted.length) Object.assign(result, { acceptedIdeas: accepted.map(({ id, title, requirement }) => ({ id, title, requirement })), report: "The final report covers every accepted idea, one line each, even if reported earlier: what was done and the result. Say plainly where the outcome differs from the idea's title, its requirement or the user's comment, or where a condition the user approved (for example 'switch only if X') was not followed." });
+					pi.events?.emit?.("plan3:completed", { ctx, plan });
+				}
 			} else if (args.action === "step") {
 				const mark = need("mark");
 				if (!MARKS[mark]) throw new Error(`Unknown mark. Use ${Object.keys(MARKS).join(", ")}.`);
