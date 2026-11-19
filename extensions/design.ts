@@ -634,7 +634,9 @@ export default function designExtension(pi) {
 		if (!self) return;
 		const sections = event?.systemPromptOptions?.sections;
 		const text = `${DESIGN_ROLE(self)}\n\n${designGuide()}`;
-		if (sections && typeof sections === "object") { sections.design = text; return; }
+		// Ponytail's "smallest version" cuts the sections a brief implies; ce-workflow loads after it in settings.packages,
+		// so this runs later and wins. shortcut: order-dependent, upgrade if ponytail gains a per-session off API.
+		if (sections && typeof sections === "object") { delete sections.ponytail; sections.design = text; return; }
 		return { systemPrompt: `${event.systemPrompt ?? ""}\n\n${text}` };
 	});
 	pi.events?.on?.("wo:web-info", info => { if (self) info.design = self.handle; });

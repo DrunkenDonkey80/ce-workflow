@@ -37,7 +37,7 @@ import {
 	runExtensionScout,
 	updateExtensionScoutProgress,
 } from "./work-extension-scout.ts";
-import { COMPACTION_PROFILES, compactionThreshold, compactionInputBytes, contextFilterCutIndex, replayCost, retainedHistoryBudget, tightenPreparation, contentText, addCost, filesFromOps, formatCompactionSummary, COMPACTION_NOTE_TOOL, COMPACTION_NOTE_MAX, latestCompactionNote } from "./work-compaction.ts";
+import { COMPACTION_PROFILES, compactionThreshold, compactionInputBytes, contextFilterCutIndex, replayCost, retainedHistoryBudget, tightenPreparation, contentText, addCost, filesFromOps, formatCompactionSummary, COMPACTION_NOTE_TOOL, COMPACTION_NOTE_MAX, latestCompactionNote, lunaCompactionWarning } from "./work-compaction.ts";
 import { compactMemory } from "./work-compaction-memory.ts";
 import { createVisionBridge, splitLevel } from "./work-vision.ts";
 import { createProjectMapSession, createProjectMapper, projectRoot, registryComplete } from "./work-project-map.ts";
@@ -3844,6 +3844,8 @@ if (extensionScoutEnabled()) {
 			ctx.ui?.setWidget?.("work-extension-scout", undefined);
 		}
 ctx.ui.notify(`ce-workflow loaded · ${UTILITY_SHORTCUT_STATUS}`, "info");
+const lunaWarning = lunaCompactionWarning(compactionModelSettings(ctx.cwd).model);
+if (lunaWarning) ctx.ui.notify(lunaWarning, "warning");
 sessionCwd = ctx.cwd;
 projectMapRegistry = ctx.modelRegistry;
 projectMapShutdown = new AbortController();
@@ -4520,7 +4522,7 @@ async function workSettingsLoop(ctx, pi = undefined) {
 				value: "compactionModel",
 				label: `Compaction LLM model: [${modelEffortSummary(compactor.model, compactor.thinking, names)}] ${SUBMENU_ARROW}`,
 				description:
-					"None: cleaned code only. Model: hybrid summary + knowledge in one call.",
+					"None: cleaned code only. Model: hybrid summary + knowledge in one call. Facts kept (planted-fact test, 2026-11): Luna 24% (avoid), Terra 60%, Astra 6.2 93%, Opus 5.5 93%; pick Terra or Astra 6.2.",
 			},
 {
 				kind: "jev", value: "jev",

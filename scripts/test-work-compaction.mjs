@@ -11,7 +11,12 @@ import {
 	retainedHistoryBudget,
 	tightenPreparation,
 	addCost,
+	lunaCompactionWarning,
 } from "../extensions/work-compaction.ts";
+
+assert.match(lunaCompactionWarning("openai-codex/gpt-6-luna"), /24%[\s\S]*Terra 60%[\s\S]*Astra 6\.2 93%/);
+assert.equal(lunaCompactionWarning("openai-codex/gpt-6.2-astra"), undefined);
+assert.equal(lunaCompactionWarning("none"), undefined);
 
 {
 	// Kept tail is measured by real reply cost: hidden reasoning (usage.output) counts, visible text alone does not.

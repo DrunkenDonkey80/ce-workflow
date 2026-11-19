@@ -262,6 +262,16 @@ try {
 	assert.match(own, /^BASE\n\nYou are design session design-2 [\s\S]*# Frontend Design[\s\S]*# Design session guide[\s\S]*data-id="kebab-case"[\s\S]*design:tweaks/);
 	assert.doesNotMatch(own, /^name: frontend-design/m, "no skill frontmatter");
 	assert.equal(await prompt(), undefined);
+	const sectioned = async hubId => {
+		const hooks = {}, sections = { ponytail: "PONYTAIL" };
+		designExtension({ on: (name, fn) => { hooks[name] = fn; } });
+		if (hubId) process.env.PI_HUB_SESSION = hubId;
+		try { hooks.session_start({}, { cwd }); } finally { delete process.env.PI_HUB_SESSION; }
+		hooks.before_agent_start({ systemPromptOptions: { sections } });
+		return sections;
+	};
+	assert.equal((await sectioned("00000000-0000-0000-0000-000000000001")).ponytail, undefined, "design sessions drop ponytail");
+	assert.equal((await sectioned()).ponytail, "PONYTAIL", "other sessions keep ponytail");
 	assert.equal(await prompt("some-other-session"), undefined);
 
 	// Select (R7): exports the folder to docs/designs/<name>/, stars it, asks where to implement.

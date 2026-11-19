@@ -273,6 +273,13 @@ export const COMPACTION_NOTE_TOOL = "compaction_note";
 // Enforced in code, not the schema: providers with strict schemas silently cut the note at maxLength.
 export const COMPACTION_NOTE_MAX = 2500;
 
+/** Standing warning: Luna drops most facts (docs/agent-rules.md "Compaction Model Fact Recall"). */
+export function lunaCompactionWarning(model: string) {
+	return /-luna\b/i.test(model)
+		? "Compaction model is Luna: it kept only 24% of key facts in the planted-fact test (Terra 60%, Astra 6.2 93%). Switch in /wo → Compaction LLM model."
+		: undefined;
+}
+
 // ponytail: newest note wins even if a later cycle never rewrote it; add per-compaction consumption if stale notes mislead.
 export function latestCompactionNote(messages = []) {
 	for (const message of messages.toReversed())
