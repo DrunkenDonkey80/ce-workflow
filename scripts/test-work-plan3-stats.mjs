@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { classify, commandShape, createStats, recordCommand, recordReply, sanitize, serialHint, statsItems, emptyStats } from "../extensions/plan3-stats.ts";
+import { classify, commandShape, createStats, planDigest, recordCommand, recordReply, sanitize, serialHint, statsItems, emptyStats } from "../extensions/plan3-stats.ts";
 
 assert.equal(classify("cd \"C:/x\" && node scripts/test-work-plan3.mjs"), "test");
 assert.equal(classify("cargo nextest run"), "test");
@@ -107,5 +107,23 @@ const labels = statsItems(saved).map((item) => item.label).join("\n");
 assert.match(labels, /Tests: \d+s/);
 assert.match(labels, /p\/m:medium: 5s · 1 replies/);
 assert.match(labels, /Waiting for you/);
+// L3 digest: counted repeats and failures; a retry only from a cited check/note line, never inferred from a repeat.
+const digestStats = { ...emptyStats(), activeMs: 600_000, runs: 2, waitingMs: 150_000, toolWallMs: 300_000,
+	commands: { [["bash", "npm test"].join("\0")]: { count: 3, ms: 90_000, maxMs: 40_000, failures: 2 }, [["bash", "git status"].join("\0")]: { count: 1, ms: 100, maxMs: 100, failures: 0 } },
+	tools: { bash: { count: 4, ms: 90_100, maxMs: 40_000, failures: 2 }, edit: { count: 5, ms: 50, maxMs: 20, failures: 1 } },
+	steps: { "A-01": { ms: 60_000, testMs: 0 }, "A-02": { ms: 400_000, testMs: 90_000, replies: 12, failures: 2 } } };
+const digest = planDigest(digestStats, "# Plan3 log\n\n- [x] **A-02** retry logic for uploads\n  - check: npm test failed twice, reran after the fix -> ok\n");
+assert.match(digest, /waiting for the user 2m 30s \(25%\)/);
+assert.match(digest, /Slowest steps:\n- A-02: 6m 40s, tests 1m 30s, 12 replies, 2 failed tools\n- A-01: 1m 0s/);
+assert.match(digest, /Repeated commands[^\n]*:\n- ×3, 1m 30s: bash: npm test\n\n/);
+assert.doesNotMatch(digest, /git status/, "a command run once is neither repeated nor failed");
+assert.match(digest, /- 2\/3 failed: bash: npm test\n- tool bash: 2\/4 failed\n- tool edit: 1\/5 failed/);
+assert.match(digest, /Retries[^\n]*:\n- log line 4: - check: npm test failed twice, reran after the fix -> ok$/, "only the cited check line, not the step text about retry logic");
+const noRetry = planDigest(digestStats, "");
+assert.match(noRetry, /Retries[^\n]*:\n- retries not recorded$/, "a repeated, failing command is not reported as a retry");
+assert.match(planDigest(emptyStats()), /Slowest steps:\n- none recorded/);
+const pooled = planDigest({ ...digestStats, commands: { ...digestStats.commands, "\0(other)": { count: 50, ms: 1000, maxMs: 100, failures: 4 } } });
+assert.match(pooled, /approximate, over 200 distinct commands/);
+assert.doesNotMatch(pooled, /other/i, "the evicted-commands pool is not listed as a repeated or failed command");
 await rm(directory, { recursive: true, force: true });
-console.log("ok - plan3 stats collection, classification and viewer");
+console.log("ok - plan3 stats collection, classification, viewer and digest");
