@@ -2,7 +2,7 @@
 
 Upstream: [NVIDIA/SkillEvaluator](https://github.com/NVIDIA/SkillEvaluator) (Apache-2.0). Reviewed at commit `d8ddd4f76de78dfc3425d0a829d2c7dc9ccb9037` (2026-11-19). Plan `docs/plans/done/2026-11-19-mine-loopforge-claude-bughunter-and-skillevaluator-for-ce-wo-3f8f9ab7-plan3.md`; review `docs/proposals/2026-11-19-loopforge-bughunter-skillevaluator-review.md` (areas S1-S10); keyless `quality-check`, `harness-check`, `pii-scan` and `security-scan` runs on our skills: `docs/proposals/repo-review-3f8f9ab7/keyless-checks.md`.
 
-No catch-up watch yet: nothing is built. The umbrella plan adds a scoped entry only if it ports code (D-09).
+No catch-up watch yet: nothing is built. The umbrella plan adds a scoped entry when it builds an idea from this repo (D-09, user: "Only when built").
 
 ## Pending (accepted, not built)
 

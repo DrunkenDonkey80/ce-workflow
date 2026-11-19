@@ -2,7 +2,7 @@
 
 Upstream: [Tencent/LoopForge](https://github.com/Tencent/LoopForge) (MIT, with listed third-party exceptions). Reviewed at commit `6f606cf2a7354f05d1dbf2085f4eb832b7e89ccb` (2026-11-19), everything including the chat workbench and SOP designer UIs. Plan `docs/plans/done/2026-11-19-mine-loopforge-claude-bughunter-and-skillevaluator-for-ce-wo-3f8f9ab7-plan3.md`; review with measurements and the blind Astra merge `docs/proposals/2026-11-19-loopforge-bughunter-skillevaluator-review.md` (areas L1-L14).
 
-No catch-up watch yet: nothing is built. The umbrella plan adds a scoped entry only if it ports code (D-09).
+No catch-up watch yet: nothing is built. The umbrella plan adds a scoped entry when it builds an idea from this repo (D-09, user: "Only when built").
 
 ## Pending (accepted, not built)
 
