@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-19
-updated: 2026-11-19T21:01:03.981Z
+updated: 2026-11-19T21:08:16.618Z
 size: plan
 reviewed: 2026-11-19
 started: 2026-11-19T20:39:08.879Z
@@ -187,10 +187,8 @@ Commands (referenced by steps; run them as written, report failures):
 - [x] **RR-01** Pinned clones in C:\SOFT\git\repo-review (3/3 at D-07 SHAs); blind Astra brief at docs/proposals/repo-review-3f8f9ab7/astra-brief.md.
 - [x] **RR-03** LoopForge L1–L14 rows written (1 Test first: post-plan retro L3; rest covered/skip) with path:line evidence and log measurements.
 - [x] **RR-04** B1–B8 and S1–S10 verdicts written (2 Adopt idea: S5 uncertainty line, S6 labelled judge suites; rest covered/skip with measurements); keyless checks in repo-review-3f8f9ab7/keyless-checks.md.
-- [ ] **RR-02** After RR-03 and RR-04 are committed, launch Astra (D-11, model set explicitly) blind and async on the RR-01 brief; verdicts land in astra-verdicts.md.
-  - Task tells Astra to write the file and end with a neutral one-line reply; our verdicts are already frozen, so the wake preview cannot anchor them.
-- [ ] **RR-05** Merge Astra's column: agreement count, each disagreement settled in code, final verdicts, shortlist and both dropped groups.
-  - Drop weak or duplicate candidates with reasons; split them into Already covered and Not covered, but not recommended (R5).
+- [x] **RR-02** Blind Astra (gpt-6.2-astra high, fresh context) wrote astra-verdicts.md: 32 rows + top 7; session log shows no reads of our review doc, keyless-checks or plan.
+- [x] **RR-05** Merged: 17/32 same verdict, 21/32 same outcome; 11 disagreements settled by code/log evidence; shortlist S6, S5, L3; 25 covered drops, 8 uncovered-not-recommended.
 
 ### Phase 2: Idea review [think]
 
@@ -213,7 +211,7 @@ Commands (referenced by steps; run them as written, report failures):
 
 ## Resume context
 
-Planning and review done; status draft, no open questions. The review accepted all 9 advisor findings (see Amendments): Astra now runs after our 32 verdicts are committed (order RR-01, RR-03, RR-04, RR-02, RR-05). C3 uses absolute paths, C4 binds to loopback, and S2 uses Pi's own loader check. RR-06 gets a None option, RR-07 moves accepted requirements and steps to the umbrella draft, and the validation uses git show plus git status. Next: RR-01 after the user runs /plan3 finish.
+RR-01/03/04 done; own 32 verdicts committed 56741d40 (2 Adopt idea: S5 uncertainty line, S6 labelled judge suites; LoopForge L3 Test first). RR-02 running: async delegate c88e591a, model openai-codex/gpt-6.2-astra:high, fresh context, writes docs/proposals/repo-review-3f8f9ab7/astra-verdicts.md, final reply "Verdicts written.". On wake: check file has 32 rows + top 7, commit it, mark RR-02 done, then RR-05 merge (fill Astra/Final columns, agreement count). Never stage docs/plans/logs/{4d2fa07b,f75ccea6,f01355e6}.stats.json or nul.
 
 ## Amendments
 
