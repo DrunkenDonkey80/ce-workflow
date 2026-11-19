@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: active
+status: complete
 created: 2026-11-19
-updated: 2026-11-19T21:08:16.618Z
+updated: 2026-11-19T21:29:08.688Z
 size: plan
 reviewed: 2026-11-19
 started: 2026-11-19T20:39:08.879Z
@@ -99,6 +99,9 @@ Acceptance examples:
 - The reply before the popups has the two dropped groups and one checkbox question; picked items appear as popups.
 - With zero accepted ideas: the three ledgers exist, no umbrella draft exists, `extensions/work-catch-up-baseline.json` is unchanged.
 
+
+
+
 ## Decisions
 
 - **D-01 Astra reviews blind, then we merge.** One read-only Astra review across the three repos, given the pinned clones, the area table and a short capability brief, not our verdicts (Haystack D-03 precedent). Source: user via ask_user 2026-11-19, round 1.
@@ -129,6 +132,14 @@ Acceptance examples:
   - Independent: yes
   - Answer: {"kind":"selection","selections":["gpt-6.2-astra high"]}
   - Source: user via ask_user /plan3 resolve; not independently verified.
+- IDEA-2aa23198: rejected — S6 Judge calibration: labelled cases and a --check mode for our model judges. Source: user via Plan3 idea review; not independently verified. Response: {"kind":"selection","selections":["Reject"]}
+- IDEA-b08832b1: accepted — S5 Honest small-sample results: judge error counts, both-direction changes and a 'not established' line. Source: user via Plan3 idea review; not independently verified. Response: {"kind":"selection","selections":["Accept"]}
+- IDEA-2f20a933: accepted — L13 Quiet-process notice: show when a running command has printed nothing for a while. Source: user via Plan3 idea review; not independently verified. Response: {"kind":"selection","selections":["Accept"]}
+- IDEA-cec728e2: accepted — L3 Post-plan retro digest (Test first). Source: user via Plan3 idea review; not independently verified. Response: {"interpretation":"Accepted with changes: trial offline on already finished plans (37 stats.json in docs/plans/logs, 50 done plans) instead of waiting for new finishes; compare several retro models incl. thinking ones; score recommendations on two sides: the project's own flow and ce-workflow itself.","userResponse":"{\"kind\":\"selection\",\"selections\":[\"Accept\"],\"comment\":\"can we also do trials from the already finished plans, stuff is recorded right? test the different models, I guess the thinker ones will perform better here. the outcome can be 2 sided tho - improvement in the project flow and improvement in ce-wf\"}"}
+
+
+
+
 
 
 
@@ -192,17 +203,11 @@ Commands (referenced by steps; run them as written, report failures):
 
 ### Phase 2: Idea review [think]
 
-- [ ] **RR-06** Reply with both dropped groups and one checkbox ask_user (R5), then `plan3 ideas` for the shortlist plus picked items; record decisions.
-  - Each popup: what it is here, benefit with example, drawbacks, approach, cost, recommendation, sources with upstream `path:line` and measured gap.
-  - The checkbox question has a "None, continue with the shortlist" option (Enter submits the highlighted row, `extensions/ask-user/index.ts:728`); skip the question when group 2 is empty.
-  - Accepting an idea auto-adds its requirement and build steps to this plan (`extensions/plan3-ideas.ts:76`); RR-07 moves both, with any user edits, to the umbrella draft and keeps the idea blocks and decisions here.
+- [x] **RR-06** Dropped groups shown; checkbox pick L13; 4 popups: S5 and L13 accepted, L3 accepted with changes (offline multi-model trial on finished plans, two-sided recommendations), S6 rejected.
 
 ### Phase 3: Records [code]
 
-- [ ] **RR-07** Write the three ledgers (R7); when ideas were accepted, create the umbrella Plan3 draft (R8) and link it from each ledger.
-  - The draft request names each idea, its upstream paths and pin, the evidence, the catch-up entry to add when built, and D-04 with the per-file license note.
-  - Remove the auto-added requirements and steps from this plan after copying them into the draft (RR-06 sub-bullet).
-  - Check: `git show --name-status` for this plan's commits and `git status --short --untracked-files=all` list only `docs/` paths from this work.
+- [x] **RR-07** Ledgers docs/upstream/{loopforge,claude-bughunter,skillevaluator}.md written; umbrella draft 5e4d224a (UB-01..08, Q-01/Q-02 deferred) holds the moved requirements and steps; no catch-up entry.
 
 ## Global validation
 
@@ -228,3 +233,184 @@ Append material changes and their reasons; preserve the original request and set
   - Accepted as a precision note, not a change to D-04: per-source-file licenses (BugHunter `README.md:335`, LoopForge `LICENSE` third-party exclusion) added under Commands and RR-07.
   - Accepted: `git diff --stat` misses committed and untracked files; RR-07 and Global validation use `git show --name-status` and `git status --untracked-files=all`.
   - Also fixed: D-11's note that the oracle default was still gpt-6-astra is stale; it now says the builtin reviewer has no configured model.
+- 2026-11-19: Added RR-08, RR-09 after RR-07: Accepted IDEA-b08832b1: S5 Honest small-sample results: judge error counts, both-direction changes and a 'not established' line
+- 2026-11-19: Added RR-10, RR-11 after RR-09: Accepted IDEA-2f20a933: L13 Quiet-process notice: show when a running command has printed nothing for a while
+- 2026-11-19: Added RR-12, RR-13, RR-14, RR-15 after RR-11: Accepted IDEA-cec728e2: L3 Post-plan retro digest (Test first)
+- 2026-11-19 RR-07: the three accepted ideas' requirements and the auto-added steps RR-08 to RR-15 moved to the umbrella draft `docs/plans/2026-11-19-build-the-three-accepted-loopforge-and-skillevaluator-ideas-5e4d224a-plan3.md` (UB-01 to UB-08; L3 steps as revised by the user's comment). Idea records and decisions stay here.
+- 2026-11-19 RR-02 note: the blind review ran as the builtin `delegate` agent (fresh context, write access limited by its task to `astra-verdicts.md`) rather than `reviewer`, because the brief requires writing that file; the model was still passed explicitly as `openai-codex/gpt-6.2-astra:high` (D-11).
+
+
+
+
+
+## Ideas
+
+### IDEA-2aa23198 S6 Judge calibration: labelled cases and a --check mode for our model judges
+
+Status: rejected
+Response: {"kind":"selection","selections":["Reject"]}
+
+#### What this is
+
+> Our model judges (scripts/judge-handoff.mjs labels final replies handoff/blocker/none; scripts/judge-design-extras.mjs ticks checklist items on blinded pages) decided D-08..D-10 and the soft self-verify wording. Nothing in the repo shows they label correctly: the hand checks were never saved. SkillEvaluator runs its shipped verifier against independently hand-labelled cases, keeps tuning and assessment cases apart, and reports agreement before anyone trusts a score.
+
+#### What you gain
+
+> We would know a judge's error rate before reading a difference between arms into it. Example: soft vs strict self-verify differed by 1 vs 0 judged handoffs. If the handoff judge mislabels 1 in 10 'please run node --test' replies, that difference is noise. Switching the judge model (Luna today) becomes a measured step, not a guess.
+
+#### Drawbacks and risks
+
+> Labelling takes about an hour of human time per judge, and the labels can be wrong too. Each --check run costs a few cents of judge calls. A small set (20-30 cases) shows gross errors only, not fine accuracy.
+
+#### Implementation and affected files
+
+> Per judge, a JSON file of cases under scripts/fixtures/judges/<judge>/ with a hand label and a split (tune/assess), built from real final replies and pages we already have plus a few paired edge cases (asks to run a test it could run vs asks for a physical device). Add --check to each judge script: run it on the assess split, print agreement, a confusion table and the disagreeing case ids; exit non-zero below a stated floor. Reuse the judges' existing prompt and parsing unchanged.
+
+#### Cost
+
+> Small build (~1 script change per judge plus fixtures); about 1 hour of labelling by you or a labelled draft you correct; cents per --check run.
+
+#### Recommendation
+
+> Adopt. Both reviewers chose it independently; it is the cheapest way to make the paid benchmark decisions trustworthy.
+
+#### Sources and agreement
+
+> SkillEvaluator docs/grader-validation.mdx:6-27,108 (14 assessment + 2 tuning cases, --check-suite); docs/metrics-reference.mdx:588. Ours: scripts/judge-handoff.mjs:18,49, scripts/judge-design-extras.mjs:40-51. Measured: 0 labelled judge cases in repo. Astra rank 1.
+
+#### Proposed requirement
+
+> Every model judge we use for decisions has a committed labelled assessment set and a --check mode that reports its agreement.
+
+#### Proposed steps
+
+> - Collect 20-30 cases per judge (handoff, design extras) from existing benchmark results, add paired edge cases, draft labels and have the user confirm them; split tune/assess
+> - Add --check to judge-handoff.mjs and judge-design-extras.mjs: run on the assess split, print agreement, confusion table and disagreeing ids, non-zero exit below the floor; a fixture-only self-check for the scoring code
+> - Run --check once per judge on the current judge model and record the numbers in docs/agent-rules.md next to the benchmark rule
+
+### IDEA-b08832b1 S5 Honest small-sample results: judge error counts, both-direction changes and a 'not established' line
+
+Status: accepted
+Response: {"kind":"selection","selections":["Accept"]}
+
+#### What this is
+
+> Our decisions rest on 3-5 repetitions per arm (X3 6 arms x 3, X6 5 vs 5) and print bare rates such as 'locked tests 0/3 vs 3/3'. compare-benchmark-runs.mjs already pairs runs and drops incomplete pairs; judge-design-extras.mjs already asks for booleans and does the arithmetic. What is missing is the uncertainty and the separation of judge failures from real failures. SkillEvaluator's rules: booleans only, code does the math, one retry on an invalid reply, judge errors unscored, N/A drops out, intervals, and a 'what has not been established' statement.
+
+#### What you gain
+
+> Readers see when a result cannot separate the arms. Example: 3/3 vs 0/3 has wide intervals; '9/9 both arms' would print 'not established: arms not separable at this n' instead of reading as a tie. A judge timeout no longer counts as a failed run.
+
+#### Drawbacks and risks
+
+> More output lines per comparison. Intervals at n=3 are so wide they may feel discouraging (that is the point). Some care to not treat repetitions of one task as independent cases.
+
+#### Implementation and affected files
+
+> In compare-benchmark-runs.mjs: count distinct scenarios, complete pairs, improved/regressed/unchanged pairs and unscored or errored runs; for binary outcomes print a Wilson 95% interval per arm and one 'not established' line when intervals overlap. In the judge scripts: validate the reply shape, retry once, count judge errors and N/A separately. Fixture self-check with duplicate reps, a judge timeout and an inapplicable metric.
+
+#### Cost
+
+> Small: ~60-100 lines across 2-3 scripts plus a fixture self-check; no paid runs.
+
+#### Recommendation
+
+> Adopt. Both reviewers chose it; it changes reporting only, not benchmarks.
+
+#### Sources and agreement
+
+> SkillEvaluator docs/metrics-reference.mdx:24-27,58,191-193,289-290,412,578,607,638. Ours: scripts/compare-benchmark-runs.mjs:1-5, scripts/judge-design-extras.mjs:42,51,78, scripts/judge-handoff.mjs:49. Astra rank 2.
+
+#### Proposed requirement
+
+> Benchmark comparisons and judge summaries show sample counts, judge errors apart from failures, and say when the sample cannot separate the arms.
+
+#### Proposed steps
+
+> - compare-benchmark-runs.mjs: distinct cases, both-direction pair counts, unscored/error counts, Wilson intervals for binary outcomes and a 'not established' line; fixture self-check (duplicate reps, judge timeout, N/A metric)
+> - judge-handoff.mjs and judge-design-extras.mjs: reply shape check, one retry, judge error and N/A counted apart from failures, intervals on printed rates
+
+### IDEA-cec728e2 L3 Post-plan retro digest (Test first)
+
+Status: accepted
+Response: {"interpretation":"Accepted with changes: trial offline on already finished plans (37 stats.json in docs/plans/logs, 50 done plans) instead of waiting for new finishes; compare several retro models incl. thinking ones; score recommendations on two sides: the project's own flow and ce-workflow itself.","userResponse":"{\"kind\":\"selection\",\"selections\":[\"Accept\"],\"comment\":\"can we also do trials from the already finished plans, stuff is recorded right? test the different models, I guess the thinker ones will perform better here. the outcome can be 2 sided tho - improvement in the project flow and improvement in ce-wf\"}"}
+
+#### What this is
+
+> plan3-stats.ts already records per plan: model thinking/acting time, cost, tool time, tests and builds, slowest commands, failed commands, user wait and per-step totals, and sends speed hints during the run. Nobody turns that into lessons when the plan finishes. LoopForge builds a bounded facts digest of a run (retries, errors, slow nodes) and turns it into applicable recommendations; skills-lab results.md and plan 79614d24 already asked for a post-plan retro.
+
+#### What you gain
+
+> A short list at plan finish such as 'npm run verify ran 9 times (14 min); RR-04 step had 3 failed edits on the same file; 40% of time was waiting for you' points at fixable patterns. Example: the repeated full test run would become a rule to run targeted tests.
+
+#### Drawbacks and risks
+
+> Easy to produce generic advice nobody acts on; costs one cheap model call per finished plan; adds one more message at finish. Value unknown until measured, hence Test first.
+
+#### Implementation and affected files
+
+> At plan finish (/plan3 finish or status complete), build a code-only digest from the plan's stats.json (top repeated commands, failed commands, slowest steps, wait share, retries) and ask a cheap model for at most 3 recommendations that cite digest lines. Write them to the sidecar log; show one notice. Trial on the next 5-10 finished plans, counting recommendations you accept and later find useful; keep only if that count is non-trivial.
+
+#### Cost
+
+> Small build (digest function + one model call); trial needs ~5-10 real plan finishes, cents each.
+
+#### Recommendation
+
+> Test first, as both reviewers said: build the digest cheaply, keep the recommendation step only if the trial shows accepted, useful items.
+
+#### Sources and agreement
+
+> LoopForge internal/runeval/facts.go:72, internal/domain/run_eval.go:40, internal/runeval/apply.go:10. Ours: extensions/plan3-stats.ts:43-58,222-262; skills-lab results.md:55-64; plan 79614d24 backlog line 233. Astra L3 Test first.
+
+#### Proposed requirement
+
+> When a plan finishes, the user gets a short evidence-cited retro from its stats, kept only if a trial shows useful recommendations.
+
+#### Proposed steps
+
+> - Code-only digest from a plan's stats.json at finish (repeated and failed commands, slowest steps, wait share), written to the sidecar log, with a fixture self-check
+> - One cheap model call turning the digest into at most 3 cited recommendations, shown as one notice at finish
+> - Trial on the next 5-10 finished plans: record accepted/useful counts in the log and decide keep or remove
+
+### IDEA-2f20a933 L13 Quiet-process notice: show when a running command has printed nothing for a while
+
+Status: accepted
+Response: {"kind":"selection","selections":["Accept"]}
+
+#### What this is
+
+> LoopForge's process watch kills a command that stops printing and keeps its last lines. We never kill, but neither the hub nor the terminal tells you a bash call has gone silent: you see 'running' until the timeout. plan3-web.ts already receives tool_execution_update with partial output, so silence is observable without new hooks.
+
+#### What you gain
+
+> You notice a hung command (a waiting prompt, a stuck dev server, a dead network call) minutes before its timeout, and the agent can be steered. Example: a git clone waiting for credentials would show 'quiet for 3 min, last line: Username for https://github.com:' in the hub.
+
+#### Drawbacks and risks
+
+> Healthy quiet builds and tests also look silent, so the notice must never stop anything and needs a sensible threshold. Measured gap is small: 75 of 17,930 bash calls (0.4%) hit their timeout; how many long quiet stretches ended fine is not in the logs.
+
+#### Implementation and affected files
+
+> In the hub's tool-row tracking (plan3-web.ts tool_execution_start/update/end), keep the time of the last partial output per running bash call; after a threshold (e.g. 120 s of no new output) mark the row 'quiet for N min' with the last output line. No kill, no agent message. Optionally one hub notice. Self-check with a fake clock.
+
+#### Cost
+
+> Small: ~30-50 lines in the hub/plan view plus a fake-clock self-check; no paid runs.
+
+#### Recommendation
+
+> Small and safe, but the measured gap is low (0.4% timeouts); worth it only as a display hint, never a kill policy.
+
+#### Sources and agreement
+
+> LoopForge internal/procwatch/procwatch.go:60, internal/procwatch/group_windows.go:7. Ours: extensions/plan3-web.ts:144-148 (tool_execution_update already observed), hub/src/sessions.ts. Measured: 17,930 bash calls, 94.5% with timeout, 75 timed out. Astra L13 Test first (warning, not kill).
+
+#### Proposed requirement
+
+> A running command that has printed nothing for a while is shown as quiet, with its last output line, without stopping it.
+
+#### Proposed steps
+
+> - Track last-output time per running bash call from tool_execution_update and show 'quiet for N min' plus the last line on its tool row after a threshold; fake-clock self-check
+> - Check it in the headless hub with a command that sleeps silently past the threshold
