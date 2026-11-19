@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { askConfirm, askText, showListDialog } from "./ask-user/menu.ts";
 import { publish } from "./hub-channel.ts";
+import { latestModel } from "./latest-model.ts";
 import { handleDesignLibraryCommand, handleHubCommand, intercomParkedSessions, peerTools, projectCommandsTool, scheduleTool, sessionDialogTool, longSleepWait, LONG_WAIT_REASON, undeclaredBackground, BACKGROUND_REASON } from "./hub-command.ts";
 import { handleEnvCommand } from "./work-env.ts";
 import { registerAgentsAudit } from "./agents-audit.ts";
@@ -2922,7 +2923,7 @@ export async function handleWorkContextCommand(args, ctx) {
 
 async function screenExtensionMetadataWithLuna(items, ctx, signal) {
 	if (!items.length) return [];
-	const model = ctx.modelRegistry?.find?.("openai-codex", "gpt-5.6-luna");
+	const model = await latestModel(ctx.modelRegistry, "openai-codex", "luna");
 	const complete = ctx.modelRegistry?.complete?.bind(ctx.modelRegistry);
 	if (!model || !complete) throw new Error("Luna model is unavailable");
 	const response = await complete(
@@ -2947,7 +2948,7 @@ async function screenExtensionMetadataWithLuna(items, ctx, signal) {
 }
 
 async function inspectExtensionSourceWithLuna(source, ctx, signal) {
-	const model = ctx.modelRegistry?.find?.("openai-codex", "gpt-5.6-luna");
+	const model = await latestModel(ctx.modelRegistry, "openai-codex", "luna");
 	const complete = ctx.modelRegistry?.complete?.bind(ctx.modelRegistry);
 	if (!model || !complete) throw new Error("Luna model is unavailable");
 	const response = await complete(

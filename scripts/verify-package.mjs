@@ -107,6 +107,7 @@ check(
 const tests = [
 	"test-jev-tools.mjs",
 	"test-advisor-model.mjs",
+	"test-latest-model.mjs",
 	"test-run-budget.mjs",
 	"test-compare-benchmark-runs.mjs",
 	"test-benchmark-compaction-model.mjs",

@@ -847,6 +847,7 @@ try {
 				ui: { notify() {}, setStatus() {}, setWidget() {} },
 				modelRegistry: {
 					find: (provider, id) => ({ provider, id }),
+					getAvailable: () => [{ provider: "openai-codex", id: "gpt-6-luna" }],
 					complete: async (model, request, callOptions) => {
 						const input = JSON.parse(request.messages[0].content[0].text);
 						completedModels.push({
@@ -907,6 +908,7 @@ try {
 			ui: { notify() {}, setStatus() {}, setWidget() {} },
 			modelRegistry: {
 				find: (provider, id) => ({ provider, id }),
+				getAvailable: () => [{ provider: "openai-codex", id: "gpt-6-luna" }],
 				complete: async (_model, request) => {
 					const input = JSON.parse(request.messages[0].content[0].text);
 					assert(

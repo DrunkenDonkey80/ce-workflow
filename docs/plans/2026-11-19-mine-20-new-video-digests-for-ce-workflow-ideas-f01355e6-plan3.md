@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-19
-updated: 2026-11-19T13:37:50.564Z
+updated: 2026-11-19T13:43:43.295Z
 size: plan
 started: 2026-11-19T12:55:51.528Z
 ---
@@ -68,6 +68,10 @@ Non-goals: implementing ideas the user did not accept; re-reviewing videos alrea
 - IDEA-6e87d551: accepted — Check that the compaction model keeps the facts. Source: user via Plan3 idea review; not independently verified. Response: {"interpretation":"Accepted; the user wants the planted-fact test kept as a reusable check to rerun on each new model release, so it becomes a committed script that takes any model, not a one-off.","userResponse":"{\"kind\":\"selection\",\"selections\":[\"Accept (Recommended)\"],\"comment\":\"this is good, this test needs to stay so we can on new model releases do a planted facts test indeed, pay special attention to this point\"}"}
 - IDEA-759e998f: accepted — Move the extension scout's two Luna calls to GPT-6 Luna. Source: user via Plan3 idea review; not independently verified. Response: {"interpretation":"Accepted, widened per comment: instead of hardcoding gpt-6-luna, add one resolver that picks the newest available model of a family (sol, astra, luna, terra) from the model registry, and use it where code hardcodes a family model (work-models.ts scout x2, agents-audit.ts astra). Risk kept visible: a new release is picked up without a benchmark, so callers stay limited to short bounded tasks.","userResponse":"{\"kind\":\"selection\",\"selections\":[\"Accept\"],\"comment\":\"can we define a model-latest or so func that finds the latest sol, latest astra, latest luna, tera, etc so we dont end up with outdated models hardcoded?\"}"}
 - IDEA-3d820eac: accepted — Ponytail stands down on design scope. Source: user via Plan3 idea review; not independently verified. Response: {"interpretation":"Accepted. The user's question (remove Ponytail, or replace it with a rule to prefer shared code over patches) is answered by measuring, not guessing: the \"prefer one-place change over patches\" rule already exists as Plan3's Project care fit check (extensions/plan3.ts PROJECT_CARE), but only inside Plan3 sessions. Ponytail is an always-on block, so it joins the ablation of IDEA-2123a372 as its own arm; keep, scope or drop it from that result.","userResponse":"{\"kind\":\"selection\",\"selections\":[\"Accept (Recommended)\"],\"comment\":\"woah this is huge too, maybe worth removing ponytail altogether or is it good for code bloat? or replace with standing instructions for code to prefer to combine and make universal code instead of patches, I think we even had something like that?\"}"}
+- **D-04 Experiment order and form (X1).** Free code steps first: X11-X12 resolver, X5 look tells, X8 recall script; then paid: X9-X10, X2-X4 with X15 as one ablation (arms: all-on, each of our blocks off, ponytail off), X6-X7, X13-X14. Source: agent.
+- **D-05 Budget $35 total for paid live runs; ablation runs on Opus 5.5.** Estimates: ablation ~$16 (+~40% for two added tasks, ~$22), X6 ~$4, X9 ~$3, design ~$8; trim design reps if the ablation overruns. Source: user, X1.
+- **D-06 Ablation adds two small tasks**: a behavior change needing a regression test (test-sensitivity) and a concurrent-write fix (locked-writes), so those blocks can show a quality loss, not only a token saving. Source: user, X1.
+
 
 
 
@@ -112,9 +116,7 @@ Commands:
 
 ### Phase 2: Experiments [think]
 
-- [ ] **X1** Order the accepted ideas' steps, set each one's form and check, and ask the budget of any paid live run with numbers.
-  - If no idea is accepted, mark this done and complete the plan.
-  - Accepted ideas' steps are appended after this step by code.
+- [x] **X1** Order, form and $35 budget set (D-04..D-06); ablation on Opus 5.5 with two added tasks, ponytail arm merged in.
 - [ ] **X2** Add a per-block off switch to the self-verify live benchmark; check: a dry run shows the block missing from the system prompt.
 - [ ] **X3** Run all-on vs each block off, 3 tasks x 3 reps; check: compare-benchmark-runs report per arm.
 - [ ] **X4** Trim or scope blocks with no gain; check: targeted prompt tests pass and the rerun shows no regression.
@@ -124,8 +126,8 @@ Commands:
 - [ ] **X8** Write a reusable planted-fact recall script (any --model) over 2-3 real transcripts; check: self-check scores a perfect summary 100% and an empty one 0%.
 - [ ] **X9** Score gpt-6-luna, gpt-5.6-terra and the main model; check: results.json per model and a recall table per length bucket.
 - [ ] **X10** Document the rerun-on-new-model command in docs/agent-rules.md; change the compaction default only on a clear win; check: compare-benchmark-runs on E2 shows no regression.
-- [ ] **X11** Add latestModel(registry, provider, family) picking the highest-versioned available id; check: a test with a fake registry list picks gpt-6-luna over gpt-5.6-luna and returns undefined for an unknown family.
-- [ ] **X12** Use it for the two scout calls in work-models.ts and the astra call in agents-audit.ts; check: their targeted tests pass and one live scout review parses both responses.
+- [x] **X11** extensions/latest-model.ts latestModel(registry, provider, family) picks the highest gpt-<version>-<family> available; test-latest-model.mjs added to verify-package.
+- [x] **X12** Scout's two Luna calls and agents-audit's Astra call use latestModel (now gpt-6-luna and gpt-6.2-astra); scout test fakes gained getAvailable.
 - [ ] **X13** Run 'landing page' and 'pricing page' design prompts with ponytail ultra as baseline; check: blind judge scores expected extras.
 - [ ] **X14** Add the scope line to frontend-design and the design prompt, rerun; check: extras score rises with no regression in must-haves.
 - [ ] **X15** Add a ponytail-off arm to the always-on block ablation on coding tasks; check: pass rate, lines added and duplicate-logic count per arm decide keep, scope or drop.

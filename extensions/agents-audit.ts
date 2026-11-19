@@ -9,6 +9,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { showAskDialog } from "./ask-user/menu.ts";
+import { latestModel } from "./latest-model.ts";
 import { loadPlan3Ask } from "./plan3-ask.ts";
 
 const EVERY_MS = 5 * 24 * 60 * 60 * 1000;
@@ -112,7 +113,7 @@ export function registerAgentsAudit(pi) {
 	};
 	const audit = async (ctx, files: File[]) => {
 		const { stdout } = await promisify(execFile)(process.execPath, [REPORT_SCRIPT, "--cwd", ctx.cwd, "--system"], { maxBuffer: 16 * 1024 * 1024 });
-		const model = ctx.modelRegistry?.find?.("openai-codex", "gpt-6-astra"); // Luna dropped rules' meaning in a side-by-side run; Astra kept it
+		const model = await latestModel(ctx.modelRegistry, "openai-codex", "astra"); // Luna dropped rules' meaning in a side-by-side run; Astra kept it
 		if (!model) throw new Error("the Astra model is unavailable");
 		const recs = await proposeRecommendations(files, JSON.parse(stdout), async (systemPrompt, user) => {
 			const response = await ctx.modelRegistry.complete(model, { systemPrompt, messages: [{ role: "user", content: [{ type: "text", text: user }] }] }, { cacheRetention: "none" });
