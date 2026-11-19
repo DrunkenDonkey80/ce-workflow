@@ -1,0 +1,1484 @@
+{
+ "version": 1,
+ "activeMs": 12544710,
+ "runs": 10,
+ "waitingMs": 4037394,
+ "toolWallMs": 7440105,
+ "compactions": {
+  "count": 1,
+  "ms": 45672
+ },
+ "models": {
+  "anthropic/claude-opus-5-5:high": {
+   "replies": 361,
+   "thinkingMs": 1352820,
+   "actingMs": 750014,
+   "input": 864,
+   "output": 198172,
+   "cacheRead": 33792907,
+   "cacheWrite": 1170329,
+   "cost": 16.5771224,
+   "errors": 0
+  }
+ },
+ "tools": {
+  "bash": {
+   "count": 262,
+   "ms": 4998828,
+   "maxMs": 766577,
+   "failures": 9
+  },
+  "subagents_enable": {
+   "count": 1,
+   "ms": 1,
+   "maxMs": 1,
+   "failures": 0
+  },
+  "plan3": {
+   "count": 41,
+   "ms": 1891093,
+   "maxMs": 1887850,
+   "failures": 0
+  },
+  "subagent": {
+   "count": 2,
+   "ms": 59697,
+   "maxMs": 59485,
+   "failures": 0
+  },
+  "subagent_launch": {
+   "count": 4,
+   "ms": 0,
+   "maxMs": 0,
+   "failures": 0
+  },
+  "compaction_note": {
+   "count": 5,
+   "ms": 1,
+   "maxMs": 1,
+   "failures": 1
+  },
+  "write": {
+   "count": 9,
+   "ms": 29,
+   "maxMs": 6,
+   "failures": 0
+  },
+  "edit": {
+   "count": 31,
+   "ms": 376,
+   "maxMs": 49,
+   "failures": 0
+  },
+  "test_sensitivity": {
+   "count": 3,
+   "ms": 130313,
+   "maxMs": 121709,
+   "failures": 1
+  },
+  "lens_diagnostics": {
+   "count": 25,
+   "ms": 143064,
+   "maxMs": 37137,
+   "failures": 0
+  },
+  "read": {
+   "count": 10,
+   "ms": 58,
+   "maxMs": 13,
+   "failures": 0
+  },
+  "lens_diagnostic_mark": {
+   "count": 4,
+   "ms": 127,
+   "maxMs": 51,
+   "failures": 0
+  },
+  "codemode": {
+   "count": 1,
+   "ms": 163,
+   "maxMs": 163,
+   "failures": 0
+  },
+  "project_commands": {
+   "count": 2,
+   "ms": 870,
+   "maxMs": 440,
+   "failures": 0
+  }
+ },
+ "categories": {
+  "shell": {
+   "count": 207,
+   "ms": 3353241,
+   "maxMs": 766577,
+   "failures": 3
+  },
+  "test": {
+   "count": 54,
+   "ms": 1642109,
+   "maxMs": 495005,
+   "failures": 6
+  },
+  "build": {
+   "count": 1,
+   "ms": 3478,
+   "maxMs": 3478,
+   "failures": 0
+  }
+ },
+ "commands": {
+  "bash\u0000cd \".\"; git status --short | head -20; git log --oneline -5; node scripts/work-video-status.mjs \"C:/Users/Flex/Downloads/video-digests\"": {
+   "count": 1,
+   "ms": 241,
+   "maxMs": 241,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git diff --stat docs/upstream/processed-videos.json CHANGELOG.md; git diff docs/upstream/processed-videos.json | head -30; cd \"C:/Users/Flex/Downloads/video-digests\"; for d in */; do [ -f \"$d/": {
+   "count": 1,
+   "ms": 5074,
+   "maxMs": 5074,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \"const l=JSON.parse(require('child_process').execSync('node scripts/work-video-status.mjs C:/Users/Flex/Downloads/video-digests'));for(const x of l){const s=require('fs').statSync(x.fi": {
+   "count": 1,
+   "ms": 203,
+   "maxMs": 203,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; echo \"--luna56\"; rg -n \"gpt-5\\.6-luna|gpt-6-luna\" extensions hub/src --glob \"*.ts\" | head; echo \"--thinkdisplay\"; rg -n \"thinking.?display|display.*updates\" extensions hub/src -g \"*.ts\" | head": {
+   "count": 1,
+   "ms": 438,
+   "maxMs": 438,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; echo \"--compaction quality metric\"; rg -n -i \"quality\" scripts/*compaction* scripts/*context-cache* 2>/dev/null | head -5; ls scripts | rg -i \"compaction|cache|bench\" | head -20; echo \"--hub r": {
+   "count": 1,
+   "ms": 247,
+   "maxMs": 247,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n \"subtitle\" hub/src/*.ts | head -8; echo \"--folder groups\"; rg -n -i \"folder.*(count|working)|groupBy|projectGroup\" hub/web/app.ts | head -8; echo \"--codemode rule src\"; rg -rn \"filter la": {
+   "count": 1,
+   "ms": 28352,
+   "maxMs": 28352,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; echo \"--ablation\"; rg -n -i \"test-sensitivity|locked-writes\" docs/plans/done -l | head; rg -n -i \"ablat|without the block|block off\" docs/plans/done docs/proposals -l | head -5; echo \"--opt ru": {
+   "count": 1,
+   "ms": 199,
+   "maxMs": 199,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n -i \"test-sensitivity|self-verify|block\" docs/plans/done/2026-11-08-benchmark-the-matt-video-experiments-c1-c6-427dd6a8-plan3.md | head -12; rg -n -i \"always-on|prompt block|prefix audit|": {
+   "count": 1,
+   "ms": 131,
+   "maxMs": 131,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n -i \"benchmark|cost|tokens\" docs/plans/done/2026-11-11-add-an-always-on-project-independent-test-sensitivity-safegu-d49034f9-plan3.md | head -8; rg -n -i \"^- \\*\\*D\" docs/plans/done/*self-": {
+   "count": 1,
+   "ms": 256,
+   "maxMs": 256,
+   "failures": 0
+  },
+  "bash\u0000env | rg \"^PI_\" | head; cd \".\"; rg -n -i \"fable\" extensions/*.ts | head -5; rg -n \"thinking\" C:/Users/Flex/.pi/agent/settings.json | head": {
+   "count": 1,
+   "ms": 230,
+   "maxMs": 230,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; ls scripts | rg -i \"benchmark-compaction|compaction-model\"; rg -n -i \"quality\" scripts/benchmark-compaction-model.mjs | head -12; sed -n 10,30p C:/Users/Flex/.pi/agent/settings.json; sed -n 22": {
+   "count": 1,
+   "ms": 144,
+   "maxMs": 144,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; head -20 scripts/test-benchmark-compaction-model.mjs | rg -n \"import|from\"; rg -n \"compaction\" C:/Users/Flex/.pi/agent/settings.json | head -5; rg -n -i \"quality\" -l scripts .pi 2>/dev/null | ": {
+   "count": 1,
+   "ms": 8368,
+   "maxMs": 8368,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n -i \"scope|extra|smallest|ponytail|section\" skills/frontend-design/SKILL.md | head -12; wc -c skills/frontend-design/SKILL.md; ls skills": {
+   "count": 1,
+   "ms": 110,
+   "maxMs": 110,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n \"pi-hub:subtitle\" extensions hub/src -g \"*.ts\" | head; rg -n -i \"why|blocked|reason\" hub/web/app.ts | rg -i \"waiting|tone\" | head -8": {
+   "count": 1,
+   "ms": 139,
+   "maxMs": 139,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n -i \"side.by.side|compare|grid of|all variants|overview\" extensions/design*.ts hub/src/design*.ts hub/web/*.ts 2>/dev/null | rg -i design | head -8; rg -n -i \"font|weight|line.?height|ali": {
+   "count": 1,
+   "ms": 191,
+   "maxMs": 191,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n -i \"variant|direction|thumbnail\" hub/web/design-view.ts | head -8; rg -n -i \"\\\"Set |color|radius|spacing\" hub/web/design-view.ts | head -6": {
+   "count": 1,
+   "ms": 129,
+   "maxMs": 129,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n -i \"lint|tell|check.*(css|html)|contrast\" extensions/design.ts extensions/design-render.ts extensions/design-runtime.ts | head -10": {
+   "count": 1,
+   "ms": 102,
+   "maxMs": 102,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; ls extensions | rg -i image; rg -n -i \"cost|\\\\\\$|price\" extensions/work-images.ts 2>/dev/null | head -5; rg -n -i \"sonnet\" extensions/*.ts | head -5": {
+   "count": 1,
+   "ms": 177,
+   "maxMs": 177,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n -i \"sonnet.?5.?5\" docs --glob \"!docs/upstream/processed-videos.json\" | head -8; rg -n -B2 -A3 \"aBPAmYi1FfU\" docs/upstream/processed-videos.json | head -10": {
+   "count": 1,
+   "ms": 157,
+   "maxMs": 157,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; ls docs/plans/*.md; ls -t docs/plans/done | head -5; rg -n -A3 \"aBPAmYi1FfU\" docs/upstream/processed-videos.json | rg evidence": {
+   "count": 1,
+   "ms": 145,
+   "maxMs": 145,
+   "failures": 1
+  },
+  "bash\u0000cd \".\"; f=\"docs/plans/done/2026-11-17-mine-the-32-newly-reviewed-videos-for-orchestration-quality--f75ccea6-plan3.md\"; rg -n \"^### IDEA|^#### |status: (accepted|rejected)\" \"$f\" | head -40; rg -n -i \"s": {
+   "count": 1,
+   "ms": 123,
+   "maxMs": 123,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/Downloads/video-digests\"; chk(){ d=$(ls -d *\"$1\"* | head -1); for f in \"${@:3}\"; do [ -f \"$d/frames/$f\" ] && echo \"ok $d/frames/$f\" || echo \"MISSING $d/frames/$f\"; done; rg -n -F \"$2": {
+   "count": 1,
+   "ms": 839,
+   "maxMs": 839,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/Downloads/video-digests/2026-10-19-i-put-ponytail-5-0-to-the-test-all-hype\"; ls frames/1-38.jpg frames/1-12.jpg; rg -n -F \"[1:12]\" digest.md | head -2; rg -n -F \"[0:02]\" ../2026-10-1": {
+   "count": 1,
+   "ms": 179,
+   "maxMs": 179,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n -i \"prefactor\" extensions/*.ts | head -5; rg -n \"find\\?\\.\\(|modelRegistry\\?\\.(find|getAll|getAvailable)\" extensions/*.ts | head -8; rg -n -o \"\\\"(gpt-[0-9.]+-(luna|sol|terra|astra)|claude": {
+   "count": 1,
+   "ms": 408,
+   "maxMs": 408,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; f=\"docs/plans/2026-11-19-mine-20-new-video-digests-for-ce-workflow-ideas-f01355e6-plan3.md\"; rg -n \"^### IDEA|[Ss]tatus:|^- \\*\\*Status\" \"$f\" | head -40; git status --short | head -30; git log ": {
+   "count": 1,
+   "ms": 181,
+   "maxMs": 181,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git diff --stat docs/upstream/processed-videos.json; git diff docs/upstream/processed-videos.json | head -60; node scripts/work-video-status.mjs \"C:/Users/Flex/Downloads/video-digests\" | head ": {
+   "count": 1,
+   "ms": 1367,
+   "maxMs": 1367,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/work-video-status.mjs \"C:/Users/Flex/Downloads/video-digests\" > \"$TEMP/vs.json\"; node -e \"const l=require(process.env.TEMP+'/vs.json');console.log(l.length);for(const v of l)conso": {
+   "count": 1,
+   "ms": 287,
+   "maxMs": 287,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; tail -c 20 docs/upstream/processed-videos.json | od -c | tail -3; node \"$TEMP/ledger-add.mjs\" && node scripts/work-video-status.mjs \"C:/Users/Flex/Downloads/video-digests\"; git diff --stat doc": {
+   "count": 1,
+   "ms": 330,
+   "maxMs": 330,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/test-work-video-status.mjs 2>&1 | tail -3": {
+   "count": 1,
+   "ms": 198,
+   "maxMs": 198,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git show HEAD:docs/upstream/processed-videos.json > \"$TEMP/ledger-head.json\"; node -e \"const fs=require('fs');const h=JSON.parse(fs.readFileSync(process.env.TEMP+'/ledger-head.json','utf8'));c": {
+   "count": 1,
+   "ms": 255,
+   "maxMs": 255,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git add \"docs/plans/2026-11-19-mine-20-new-video-digests-for-ce-workflow-ideas-f01355e6-plan3.md\" docs/plans/logs/f01355e6.md && git commit -q -m \"plan3 f01355e6 M2-M3: 6 of 8 video ideas acce": {
+   "count": 1,
+   "ms": 254,
+   "maxMs": 254,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n \"^- \\[.\\] \\*\\*\" docs/plans/2026-11-19-mine-20-new-video-digests-for-ce-workflow-ideas-f01355e6-plan3.md; rg -n -i \"budget|cost|\\\\$\" docs/plans/2026-11-19-mine-20-new-video-digests-for-ce": {
+   "count": 1,
+   "ms": 150,
+   "maxMs": 150,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -l \"self-verify>|test-sensitivity>|locked-writes>|reporting>|project-map>\" extensions scripts | head; ls scripts | rg -i \"bench|self-verify|compare\" | head -20": {
+   "count": 1,
+   "ms": 182,
+   "maxMs": 182,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n \"self-verify|test-sensitivity|locked-writes|<reporting|project-map\" scripts/test-context-report.mjs | head -8; rg -n -i \"cost|usd|\\\\\\$[0-9]|tasks? *=|reps|--\" scripts/benchmark-self-veri": {
+   "count": 1,
+   "ms": 155,
+   "maxMs": 155,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; ls .pi/self-verify-bench 2>/dev/null | tail -3; for d in $(ls -d .pi/self-verify-bench/*/ 2>/dev/null | tail -2); do node -e \"const fs=require('fs');const d=process.argv[1];const f=fs.readdirS": {
+   "count": 1,
+   "ms": 263,
+   "maxMs": 263,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; tail -4 .pi/self-verify-bench/terra-3.log; ls .pi/compaction-model-benchmark | tail -3; rg -o \"cost[^,]*\" -m3 .pi/self-verify-bench/terra-3.log | head -3": {
+   "count": 1,
+   "ms": 123,
+   "maxMs": 123,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n \"2915,2960p\" extensions/work-models.ts; sed -n \"105,125p\" extensions/agents-audit.ts; ls scripts | rg -i \"agents-audit|work-models|scout\"": {
+   "count": 1,
+   "ms": 122,
+   "maxMs": 122,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n \"modelRegistry\\??\\.(getAll|getAvailable)\\b\" extensions hub/src | head -5; rg -n \"getAll\\(|getAvailable\\(\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-": {
+   "count": 1,
+   "ms": 246,
+   "maxMs": 246,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; head -40 extensions/advisor-model.ts; wc -l extensions/advisor-model.ts; rg -n \"advisor-model\" extensions scripts | head": {
+   "count": 1,
+   "ms": 156,
+   "maxMs": 156,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; head -20 scripts/test-advisor-model.mjs; rg -n \"test-advisor-model|test-agents-audit|test-work-extension-scout\" scripts/verify-package.mjs package.json": {
+   "count": 1,
+   "ms": 103,
+   "maxMs": 103,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/test-latest-model.mjs; sed -n \"105,112p\" scripts/verify-package.mjs": {
+   "count": 1,
+   "ms": 148,
+   "maxMs": 148,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git stash list | head -0; git show HEAD:extensions/work-models.ts > \"$TEMP/wm-head.ts\"; echo pre-existing check; node scripts/test-agents-audit.mjs 2>&1 | tail -2; node scripts/test-work-exten": {
+   "count": 1,
+   "ms": 2542,
+   "maxMs": 2542,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/test-work-extension-scout.mjs 2>&1 | rg -v \"^\\s+at \" | tail -25; sed -n \"860,885p\" scripts/test-work-extension-scout.mjs": {
+   "count": 1,
+   "ms": 1636,
+   "maxMs": 1636,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \"const fs=require('fs');const f='scripts/test-work-extension-scout.mjs';let s=fs.readFileSync(f,'utf8');const a='find: (provider, id) => ({ provider, id }),\\n';const n=s.split(a).lengt": {
+   "count": 1,
+   "ms": 1793,
+   "maxMs": 1793,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/test-work-extension-scout.mjs 2>&1 | rg -v \"^ok|^\\s+at \" | tail -8; git stash push -q -- extensions/work-models.ts extensions/agents-audit.ts scripts/test-work-extension-scout.mjs": {
+   "count": 1,
+   "ms": 3601,
+   "maxMs": 3601,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; pi --list-models 2>&1 | rg -i \"openai-codex.*(luna|astra)\" | head; pi -p --no-extensions --model openai-codex/gpt-6-luna \"Return only this JSON array, nothing else: [{\\\"name\\\":\\\"x\\\",\\\"plausibl": {
+   "count": 1,
+   "ms": 5625,
+   "maxMs": 5625,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n \"latestModel\" extensions/work-models.ts; git diff --stat extensions/work-models.ts extensions/agents-audit.ts scripts/verify-package.mjs scripts/test-work-extension-scout.mjs; git diff e": {
+   "count": 1,
+   "ms": 154,
+   "maxMs": 154,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \" const fs=require('fs'),cp=require('child_process'); let s=cp.execSync('git show HEAD:extensions/work-models.ts',{encoding:'utf8',maxBuffer:1e8}); const before=s; s=s.replace('import ": {
+   "count": 1,
+   "ms": 316,
+   "maxMs": 316,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git diff extensions/agents-audit.ts scripts/test-work-extension-scout.mjs | rg \"^[+-][^+-]\"; git add extensions/agents-audit.ts scripts/test-work-extension-scout.mjs scripts/verify-package.mjs": {
+   "count": 1,
+   "ms": 114,
+   "maxMs": 114,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git add \"docs/plans/2026-11-19-mine-20-new-video-digests-for-ce-workflow-ideas-f01355e6-plan3.md\" docs/plans/logs/f01355e6.md && git commit -q -m \"plan3 f01355e6 X1,X11,X12: latestModel resolv": {
+   "count": 1,
+   "ms": 263,
+   "maxMs": 263,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n -i \"tell|slop|generic|AI-design|purple|gradient\" skills/frontend-design/SKILL.md | head -20; rg -n -i \"rendered|computed|getComputedStyle|look\" extensions/design.ts | head -30; ls extens": {
+   "count": 1,
+   "ms": 180,
+   "maxMs": 180,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n \"report|evaluate|overflow|function reportText|export\" extensions/design-render.ts | head -40; ls scripts | rg -i \"design\"": {
+   "count": 1,
+   "ms": 139,
+   "maxMs": 139,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n \"renderDesign|reportText|agentBrowser\\(\\)|skip\" scripts/test-work-design.mjs | head -20": {
+   "count": 1,
+   "ms": 103,
+   "maxMs": 103,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n \"352,366p\" scripts/test-work-design.mjs; rg -n \"const fixture\" scripts/test-work-design.mjs; sed -n \"219,243p\" extensions/design-render.ts; where agent-browser": {
+   "count": 1,
+   "ms": 146,
+   "maxMs": 146,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n \"reportText|renderDesign\" extensions hub/src --glob \"!design-render.ts\" | head; rg -n \"designStateJson\" extensions/design-render.ts | head -3": {
+   "count": 1,
+   "ms": 146,
+   "maxMs": 146,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/test-work-design.mjs 2>&1 | rg -v \"^ok\" | tail -15": {
+   "count": 1,
+   "ms": 291249,
+   "maxMs": 291249,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n \"\\\"(typecheck|tsc|lint)[^\\\"]*\\\":\" package.json; rg -n \"latestModel\" extensions/work-models.ts": {
+   "count": 1,
+   "ms": 101,
+   "maxMs": 101,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; d=\"$TEMP/tells-sens\"; rm -rf \"$d\"; mkdir -p \"$d/fix\"; cp -r extensions \"$d/ext\"; cat > \"$d/check.mjs\" <<'EOF' import fs from \"node:fs\"; import path from \"node:path\"; import assert from \"node:a": {
+   "count": 1,
+   "ms": 2660,
+   "maxMs": 2660,
+   "failures": 1
+  },
+  "bash\u0000d=\"$TEMP/tells-sens\"; node \"$d/check.mjs\" \"file:///$(cygpath -m \"$d\")/ext/design-render.ts\" 2>&1 | rg -v \"^\\s+at \" | tail -6": {
+   "count": 1,
+   "ms": 169,
+   "maxMs": 169,
+   "failures": 0
+  },
+  "bash\u0000d=\"$TEMP/tells-sens\"; cmd //c mklink /J \"$(cygpath -w \"$d\")\\\\node_modules\" \"C:\\\\SOFT\\\\git\\\\ce-workflow\\\\node_modules\" >/dev/null; node \"$d/check.mjs\" \"file:///$(cygpath -m \"$d\")/ext/design-render.ts\" ": {
+   "count": 1,
+   "ms": 253,
+   "maxMs": 253,
+   "failures": 0
+  },
+  "bash\u0000d=\"$TEMP/tells-sens\"; node -e \"require('fs').symlinkSync('./node_modules', process.argv[1], 'junction')\" \"$(cygpath -m \"$d\")/node_modules\"; node \"$d/check.mjs\" \"file:///$(cygpath -m \"$d\")/ext/design-r": {
+   "count": 1,
+   "ms": 1999,
+   "maxMs": 1999,
+   "failures": 0
+  },
+  "bash\u0000d=\"$TEMP/tells-sens\"; node \"$d/check.mjs\" \"file:///$(cygpath -m \"$d\")/ext/design-render.ts\" 2>&1 | rg \"AssertionError\"; rm -rf \"$d\"": {
+   "count": 1,
+   "ms": 2468,
+   "maxMs": 2468,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git add extensions/design-render.ts scripts/test-work-design.mjs \"docs/plans/2026-11-19-mine-20-new-video-digests-for-ce-workflow-ideas-f01355e6-plan3.md\" docs/plans/logs/f01355e6.md && git co": {
+   "count": 1,
+   "ms": 222,
+   "maxMs": 222,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; ls scripts | rg -i compact; head -30 scripts/test-benchmark-compaction-model.mjs; ls .pi/compaction-model-benchmark/e2 | head": {
+   "count": 1,
+   "ms": 259,
+   "maxMs": 259,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n \"export (async )?function \\w*(ummar|ompact)\\w*\" extensions | head -20; head -25 scripts/audit-compaction.mjs": {
+   "count": 1,
+   "ms": 142,
+   "maxMs": 142,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n \"1,100p\" hub/src/pi-sdk.ts | rg -n \"export|ModelRegistry|AuthStorage|import\" | head -30; rg -ln \"ModelRegistry|modelRegistry\" scripts | head": {
+   "count": 1,
+   "ms": 166,
+   "maxMs": 166,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n \"ModelRegistry|modelRegistry|AuthStorage|piSdk|import \" scripts/benchmark-jev-live.mjs | head -20; sed -n \"20,44p;74,100p\" hub/src/pi-sdk.ts": {
+   "count": 1,
+   "ms": 105,
+   "maxMs": 105,
+   "failures": 0
+  },
+  "bash\u0000P=\"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist/core\"; sed -n \"1,80p\" \"$P/model-registry.d.ts\" | rg -n \"class|static|constructor|find|streamSimple|c": {
+   "count": 1,
+   "ms": 126,
+   "maxMs": 126,
+   "failures": 0
+  },
+  "bash\u0000pi --help 2>&1 | rg -n -i \"system-prompt|no-tools|tools|extension|thinking|print|mode\" | head -20; rg -n \"claude.*provider|extension.*claude|anthropic\" ./scripts/benchmark-reasoning-strip-live.mjs | h": {
+   "count": 1,
+   "ms": 1380,
+   "maxMs": 1380,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n \"15,30p\" extensions/work-compaction.ts; rg -n \"function gather|function clean\\b|const header\" extensions/work-compaction-memory.ts; rg -n \"\\\"message\\\"|usage|stopReason\" scripts/benchmar": {
+   "count": 1,
+   "ms": 148,
+   "maxMs": 148,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n \"78,100p\" extensions/work-compaction-memory.ts; rg -n \"sessionEntries|function metrics|providerExtension\" scripts/benchmark-self-verify-live.mjs | head -5; ls -S ~/.pi/agent/sessions/*c": {
+   "count": 1,
+   "ms": 7003,
+   "maxMs": 7003,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; pi --help 2>&1 | grep -E \"no-tools|no-session|system-prompt|no-extensions|mode\" ; ls \"$(dirname \"$(which node)\")/node_modules/@earendil-works/pi-coding-agent/dist/cli.js\" 2>&1; rg -n \"launcher": {
+   "count": 1,
+   "ms": 1284,
+   "maxMs": 1284,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \" const fs=require('fs');const f='scripts/benchmark-compaction-recall-live.mjs';let s=fs.readFileSync(f,'utf8'); s=s.replace('const launcher = path.join(path.dirname(process.execPath),": {
+   "count": 1,
+   "ms": 112,
+   "maxMs": 112,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/test-compaction-recall.mjs": {
+   "count": 1,
+   "ms": 130,
+   "maxMs": 130,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; f=$(ls -S ~/.pi/agent/sessions/--C--soft-git-ce-workflow--/*.jsonl | head -1); node scripts/benchmark-compaction-recall-live.mjs --models openai-codex/gpt-6-luna --sizes 30000 --transcripts \"$": {
+   "count": 1,
+   "ms": 14083,
+   "maxMs": 14083,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -i \"s/costUsd: result.usage?.cost?.total ?? 0,/costUsd: result.usage?.cost?.total ?? 0, inputTokens: result.usage?.input, summary: result.summary,/\" scripts/benchmark-compaction-recall-liv": {
+   "count": 1,
+   "ms": 18042,
+   "maxMs": 18042,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -i \"112a\\\\ \\\"test-compaction-recall.mjs\\\",\" scripts/verify-package.mjs; sed -n \"108,116p\" scripts/verify-package.mjs; git status --short scripts/verify-package.mjs; git diff --stat scripts": {
+   "count": 1,
+   "ms": 126,
+   "maxMs": 126,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git diff --cached --stat; git add scripts/benchmark-compaction-recall-live.mjs scripts/test-compaction-recall.mjs scripts/verify-package.mjs && git commit -q -m \"Add planted-fact compaction re": {
+   "count": 1,
+   "ms": 223,
+   "maxMs": 223,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -i \"s/token: \\\"retry limit at 7\\\", role: \\\"assistant\\\", text: \\\"Decision with the user: keep the retry limit at 7 because/token: \\\"RETRY_LIMIT=7\\\", role: \\\"assistant\\\", text: \\\"Decision wi": {
+   "count": 1,
+   "ms": 273,
+   "maxMs": 273,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git commit -qm \"Recall benchmark: identifier token for the retry fact\" -- scripts/benchmark-compaction-recall-live.mjs; git log --oneline -1": {
+   "count": 1,
+   "ms": 163,
+   "maxMs": 163,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/benchmark-compaction-recall-live.mjs --models \"openai-codex/gpt-6-luna,openai-codex/gpt-5.6-terra,anthropic/claude-opus-5-5\" --sizes \"30000,80000,150000\" --output \".pi/compaction-": {
+   "count": 1,
+   "ms": 766577,
+   "maxMs": 766577,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; pi --list-models 2>/dev/null | grep -iE \"sonnet-5|astra|sol\" | head": {
+   "count": 1,
+   "ms": 1139,
+   "maxMs": 1139,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/benchmark-compaction-recall-live.mjs --models \"anthropic/claude-sonnet-5-5,openai-codex/gpt-6.2-astra\" --sizes \"30000,80000,150000\" --output \".pi/compaction-recall/x9\" 2>&1 | grep": {
+   "count": 1,
+   "ms": 616913,
+   "maxMs": 616913,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -i \"101s/.*/ \\/\\/ Models run in parallel: each has its own pi processes (--no-session) and its own result file.\\n await Promise.all(models.map(async (model) => {/; 117s/.*/ }));/\" scripts/": {
+   "count": 1,
+   "ms": 267,
+   "maxMs": 267,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git commit -qm \"Recall benchmark: run models in parallel\" -- scripts/benchmark-compaction-recall-live.mjs; grep -n \"^#\" docs/agent-rules.md; grep -n \"compaction\" -i docs/agent-rules.md | head;": {
+   "count": 1,
+   "ms": 203,
+   "maxMs": 203,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git commit -qm \"Document the compaction fact-recall rerun and baseline\" -- docs/agent-rules.md; git log --oneline -1": {
+   "count": 1,
+   "ms": 149,
+   "maxMs": 149,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; npx tsc --noEmit --allowJs false --skipLibCheck --target esnext --module nodenext --moduleResolution nodenext --allowImportingTsExtensions extensions/work-models.ts 2>&1 | grep \"work-models.ts": {
+   "count": 1,
+   "ms": 3478,
+   "maxMs": 3478,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git status --short extensions/work-compaction-memory.ts; grep -ln \"work-compaction-memory\" scripts/test-*.mjs; grep -rn \"preserve scopes, operational values\" scripts/ extensions/ | grep -v \"wo": {
+   "count": 1,
+   "ms": 161,
+   "maxMs": 161,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/test-work-compaction-single-pass.mjs 2>&1 | tail -3; node scripts/test-work-compaction.mjs 2>&1 | tail -3": {
+   "count": 1,
+   "ms": 305,
+   "maxMs": 305,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/benchmark-compaction-recall-live.mjs --models \"openai-codex/gpt-6-luna,openai-codex/gpt-6.2-astra\" --sizes \"30000,80000,150000\" --output \".pi/compaction-recall/x10-prompt\" 2>&1 | ": {
+   "count": 1,
+   "ms": 497696,
+   "maxMs": 497696,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \"const d=require('./.pi/compaction-recall/x10-prompt/openai-codex_gpt-6-luna.json'); for (const r of d.runs) if(r.mode!=='hybrid') console.log(r.size,r.error)\"; node scripts/benchmark-": {
+   "count": 1,
+   "ms": 377615,
+   "maxMs": 377615,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git commit -qm \"Compaction prompt: keep open checks, decisions, constraints, exact values and next steps from any record (recall Luna 16->28%, Terra 16->60%, Astra 0->93%)\" -- extensions/work-": {
+   "count": 1,
+   "ms": 242,
+   "maxMs": 242,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; head -30 scripts/test-benchmark-compaction-model.mjs | grep -n \"import\\|benchmark\"; ls scripts | grep -i \"compaction-model\"; ls .pi/compaction-model-benchmark/e2/": {
+   "count": 1,
+   "ms": 103,
+   "maxMs": 103,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \"const r=require('./.pi/compaction-model-benchmark/e2/results-L.json'); console.log(JSON.stringify(r.meta ?? r.args ?? Object.keys(r)).slice(0,800)); const x=(r.runs??r)[0]; console.lo": {
+   "count": 1,
+   "ms": 119,
+   "maxMs": 119,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n \"value(\\\"--\" scripts/benchmark-reasoning-strip-live.mjs; grep -n \"results-\\|writeFileSync\" scripts/benchmark-reasoning-strip-live.mjs | head; node scripts/compare-benchmark-runs.mjs 2>": {
+   "count": 1,
+   "ms": 145,
+   "maxMs": 145,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/benchmark-reasoning-strip-live.mjs --model anthropic/claude-opus-5-5 --matrix compaction-model --repetitions 3 --output \".pi/compaction-model-benchmark/x10\" > \"$TEMP/x10-e2.log\" 2": {
+   "count": 1,
+   "ms": 593428,
+   "maxMs": 593428,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; for a in L T; do echo \"== $a\"; node scripts/compare-benchmark-runs.mjs \".pi/compaction-model-benchmark/e2/results-$a.json\" \".pi/compaction-model-benchmark/x10/results-$a.json\"; done 2>&1 | hea": {
+   "count": 1,
+   "ms": 219,
+   "maxMs": 219,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \" const fs=require('fs');const f='docs/agent-rules.md';let s=fs.readFileSync(f,'utf8'); s=s.replace('Baseline (2026-11, 9 runs each, medium thinking): Opus 5.5 71% (\\$0.30/run), Terra ": {
+   "count": 1,
+   "ms": 218,
+   "maxMs": 218,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n \"<(locked-writes|test-sensitivity|self-verify|project-map|reporting|ponytail)>\" extensions | head; rg -n \"ponytail\" package.json; sed -n \"84,135p\" scripts/benchmark-self-verify-live.mjs": {
+   "count": 1,
+   "ms": 144,
+   "maxMs": 144,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n \"locked-writes|Test sensitivity \\(every|Clear reports|project-map>|Verify it yourself\" extensions --glob \"!*.md\" | head -20; grep -n \"piEnv\" scripts/benchmark-self-verify-live.mjs | head": {
+   "count": 1,
+   "ms": 131,
+   "maxMs": 131,
+   "failures": 0
+  },
+  "bash\u0000cd ~/.pi/agent/git/github.com/DietrichGebert/ponytail; ls; cat package.json | head -30; rg -n \"before_agent_start|sections|systemPrompt\" --glob \"*.ts\" --glob \"*.js\" --glob \"!node_modules\" . | head": {
+   "count": 1,
+   "ms": 142,
+   "maxMs": 142,
+   "failures": 0
+  },
+  "bash\u0000cd ~/.pi/agent/git/github.com/DietrichGebert/ponytail; sed -n \"1,40p;200,236p\" pi-extension/index.js | grep -n \"level\\|config\\|env\\|readFile\\|homedir\" | head -20; grep -rn \"ponytail\" ~/.pi/agent/setti": {
+   "count": 1,
+   "ms": 122,
+   "maxMs": 122,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/docs\"; sed -n \"1320,1332p\" extensions.md; grep -n \"getSystemPrompt\\b\\|getSystemPrompt()\" extensions.md |": {
+   "count": 1,
+   "ms": 133,
+   "maxMs": 133,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/benchmark-self-verify-live.mjs --dry-run --ponytail --reps 1 --scenarios explain --arms \"on,no-locked-writes,no-ponytail+reporting,no-test-sensitivity+self-verify\" --output \"$TEMP": {
+   "count": 1,
+   "ms": 1711,
+   "maxMs": 1711,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git status --short scripts/benchmark-self-verify-live.mjs scripts/bench-sections-off.ts; git add scripts/bench-sections-off.ts scripts/benchmark-self-verify-live.mjs && git commit -qm \"Self-ve": {
+   "count": 1,
+   "ms": 209,
+   "maxMs": 209,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git diff extensions/work-models.ts; ls extensions/anthropic-inline-tools.ts 2>&1; git status --short extensions/ | head": {
+   "count": 1,
+   "ms": 135,
+   "maxMs": 135,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; cat > \"$TEMP/sc-check.mjs\" <<'EOF' import { execFileSync } from \"node:child_process\"; import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from \"node:fs\"; import os from \"nod": {
+   "count": 1,
+   "ms": 787,
+   "maxMs": 787,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -i \"s/\\[--scenarios web,cli,explain\\]/[--scenarios web,cli,explain,regress,locked,webapp,desktop]/\" scripts/benchmark-self-verify-live.mjs; node --check scripts/benchmark-self-verify-live.": {
+   "count": 1,
+   "ms": 239,
+   "maxMs": 239,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/benchmark-self-verify-live.mjs --dry-run --ponytail --model anthropic/claude-opus-5-5 --reps 1 --scenarios regress --arms \"on,no-ponytail\" --output \"$TEMP/x3-dry\" 2>&1 | tail -3": {
+   "count": 1,
+   "ms": 2058,
+   "maxMs": 2058,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git commit -qm \"Self-verify benchmark: load the Claude provider extension for anthropic/ models\" -- scripts/benchmark-self-verify-live.mjs && git log --oneline -1": {
+   "count": 1,
+   "ms": 154,
+   "maxMs": 154,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/benchmark-self-verify-live.mjs --model anthropic/claude-opus-5-5 --ponytail --scenarios \"cli,regress,locked\" --arms \"on,no-locked-writes,no-test-sensitivity,no-self-verify,no-repo": {
+   "count": 1,
+   "ms": 165057,
+   "maxMs": 165057,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n \"6p\" browser-fetch/extension/manifest.json | cut -c1-80; sed -n \"1139p\" docs/plans/logs/ffd99fd1.stats.json | cut -c1-160; sed -n \"38p;163p\" extensions/astryx-runtime/previews/component": {
+   "count": 1,
+   "ms": 161,
+   "maxMs": 161,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; B=.pi/self-verify-bench/x3; for a in no-locked-writes no-test-sensitivity no-self-verify no-reporting no-ponytail; do echo \"== $a\"; node scripts/compare-benchmark-runs.mjs $B/on/results.json $": {
+   "count": 1,
+   "ms": 563,
+   "maxMs": 563,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \" const {execFileSync}=require('child_process'); const fs=require('fs'); const B='.pi/self-verify-bench/x3'; for (const a of ['on','no-locked-writes','no-test-sensitivity','no-self-ver": {
+   "count": 1,
+   "ms": 2791,
+   "maxMs": 2791,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; for m in opus sonnet; do node scripts/benchmark-self-verify-live.mjs --model \"anthropic/claude-$m-5-5\" --ponytail --scenarios \"cli,regress,locked\" --arms on --reps 5 --parallel 4 --output \".pi": {
+   "count": 1,
+   "ms": 61543,
+   "maxMs": 61543,
+   "failures": 1
+  },
+  "bash\u0000cd \".\"; for m in opus sonnet; do tail -n 2 \"$TEMP/x6-$m.log\"; done; node scripts/compare-benchmark-runs.mjs .pi/self-verify-bench/x6-opus/on/results.json .pi/self-verify-bench/x6-sonnet/on/results.jso": {
+   "count": 1,
+   "ms": 130,
+   "maxMs": 130,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \" for (const m of ['opus','sonnet']) { const r=require('./.pi/self-verify-bench/x6-'+m+'/on/results.json').results; const by={}; for (const x of r) (by[x.scenario]??=[]).push((x.pass?'": {
+   "count": 1,
+   "ms": 150,
+   "maxMs": 150,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n \"6p\" browser-fetch/extension/manifest.json | cut -c1-80; sed -n \"1139p\" docs/plans/logs/ffd99fd1.stats.json | cut -c1-120; sed -n \"38p;163p\" extensions/astryx-runtime/previews/component": {
+   "count": 1,
+   "ms": 171,
+   "maxMs": 171,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n -i \"IDEA-3d820eac\" -A30 docs/plans/2026-11-19-mine-20-new-video-digests-for-ce-workflow-ideas-f01355e6-plan3.md | sed -n \"1,45p\"; ls scripts | grep -i -E \"design|judge|bench\"": {
+   "count": 1,
+   "ms": 99,
+   "maxMs": 99,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -rln -i \"locked.writes\" docs/plans docs/proposals 2>/dev/null | head; grep -n -i \"ideas\" -A0 docs/plans/2026-11-19-mine-20-new-video-digests-for-ce-workflow-ideas-f01355e6-plan3.md | head": {
+   "count": 1,
+   "ms": 106,
+   "maxMs": 106,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n \"1,60p\" scripts/skills-lab-judge.mjs; grep -n \"export\\|function \" extensions/work-design*.ts 2>/dev/null | head -30; ls extensions | grep -i design": {
+   "count": 1,
+   "ms": 136,
+   "maxMs": 136,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; awk \"/^## Ideas/{f=1} f\" docs/plans/2026-11-19-mine-20-new-video-digests-for-ce-workflow-ideas-f01355e6-plan3.md | grep -n \"3d820eac\" -A40 | head -60": {
+   "count": 1,
+   "ms": 124,
+   "maxMs": 124,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n \"41,66p;110,120p;143,148p;176,200p\" scripts/benchmark-self-verify-live.mjs; grep -n -i \"scope\\|brief\\|ponytail\" skills/frontend-design/SKILL.md | head; grep -n -i \"frontend-design\\|brie": {
+   "count": 1,
+   "ms": 128,
+   "maxMs": 128,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/benchmark-self-verify-live.mjs --model anthropic/claude-opus-5-5 --ponytail --scenarios landing --arms on --reps 1 --parallel 1 --dry-run --output \"$TEMP/x13dry\" 2>&1 | tail -n 3;": {
+   "count": 1,
+   "ms": 1318,
+   "maxMs": 1318,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/benchmark-self-verify-live.mjs --model anthropic/claude-opus-5-5 --ponytail --scenarios landing,pricing --arms on --reps 3 --parallel 3 --output .pi/self-verify-bench/x13-base > \"": {
+   "count": 1,
+   "ms": 163603,
+   "maxMs": 163603,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; for d in .pi/self-verify-bench/x13-base/on/*/sessions; do echo \"$d $(grep -c \"frontend-design\" \"$d\"/*.jsonl) $(grep -o \"frontend-design.SKILL.md\" \"$d\"/*.jsonl | wc -l)\"; done; wc -l .pi/self-v": {
+   "count": 1,
+   "ms": 516,
+   "maxMs": 516,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -o \"\\\"name\\\":\\\"read\\\",\\\"arguments\\\":{[^}]*}\" .pi/self-verify-bench/x13-base/on/*/sessions/*.jsonl | head; grep -o \"frontend-design.\\{0,60\\}\" .pi/self-verify-bench/x13-base/on/landing-1/se": {
+   "count": 1,
+   "ms": 132,
+   "maxMs": 132,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -rn \"Build the design now\" scripts extensions hub | grep -v \"^extensions/design.ts:109\" | head": {
+   "count": 1,
+   "ms": 30453,
+   "maxMs": 30453,
+   "failures": 1
+  },
+  "bash\u0000cd \".\"; git grep -n \"Build the design now\" | head": {
+   "count": 1,
+   "ms": 117,
+   "maxMs": 117,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/benchmark-self-verify-live.mjs --model anthropic/claude-opus-5-5 --ponytail --scenarios landing,pricing --arms on --reps 3 --parallel 3 --output .pi/self-verify-bench/x14-scope > ": {
+   "count": 1,
+   "ms": 495005,
+   "maxMs": 495005,
+   "failures": 0
+  },
+  "bash\u0000node \"$HOME/.pi/agent/bin/pi-launcher.js\" --help 2>&1 | grep -i -E \"no-|tools|system-prompt\" | head -20": {
+   "count": 1,
+   "ms": 1084,
+   "maxMs": 1084,
+   "failures": 0
+  },
+  "bash\u0000node \"$HOME/.pi/agent/bin/pi-launcher.js\" --help 2>&1 | grep -n \"@\" | head; wc -c .pi/self-verify-bench/x13-base/on/*/result.json >/dev/null; node -e \"for (const a of ['x13-base','x14-scope']) for (co": {
+   "count": 1,
+   "ms": 1184,
+   "maxMs": 1184,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/judge-design-extras.mjs .pi/self-verify-bench/x13-base/on/results.json .pi/self-verify-bench/x14-scope/on/results.json --output .pi/self-verify-bench/x14-judge 2>&1 | tail -n 6": {
+   "count": 1,
+   "ms": 12109,
+   "maxMs": 12109,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; timeout 600 node hub/scripts/test-api.mjs 2>&1 | tail -n 3": {
+   "count": 1,
+   "ms": 30069,
+   "maxMs": 30069,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/work-video-status.mjs \"C:/Users/Flex/Downloads/video-digests\" 2>&1 | tail -n 5; grep -n \"^Status:\" docs/plans/2026-11-19-mine-20-new-video-digests-for-ce-workflow-ideas-f01355e6-p": {
+   "count": 1,
+   "ms": 335,
+   "maxMs": 335,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/test-work-video-status.mjs 2>&1 | tail -n 2; git status --short | head -40": {
+   "count": 1,
+   "ms": 283,
+   "maxMs": 283,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; P=docs/plans/2026-11-19-mine-20-new-video-digests-for-ce-workflow-ideas-f01355e6-plan3.md; D=docs/plans/done/2026-11-19-mine-20-new-video-digests-for-ce-workflow-ideas-f01355e6-plan3.md; git a": {
+   "count": 1,
+   "ms": 257,
+   "maxMs": 257,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git status --short | grep -i \"f01355e6\\|design\\|judge\\|benchmark-self\"; git log --oneline -1 | cat": {
+   "count": 1,
+   "ms": 178,
+   "maxMs": 178,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n \"export\\|Self-verify check\\|function \\|const [A-Z_]* =\" extensions/self-verify.ts | head -40; wc -l extensions/self-verify.ts": {
+   "count": 1,
+   "ms": 2478,
+   "maxMs": 2478,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git log --format=\"%h %ad %s\" --date=short -- extensions/self-verify.ts | cat; grep -n -i \"self-verify\" docs/agent-rules.md CHANGELOG.md | head -12": {
+   "count": 1,
+   "ms": 166,
+   "maxMs": 166,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; for n in 1 3; do echo \"== locked-$n\"; grep -o \"\\\"name\\\":\\\"bash\\\",\\\"arguments\\\":{\\\"command\\\":\\\"[^\\\"]\\{0,160\\}\" .pi/self-verify-bench/x3/no-self-verify/locked-$n/sessions/*.jsonl; done": {
+   "count": 1,
+   "ms": 104,
+   "maxMs": 104,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; for n in 1 3; do echo \"== locked-$n\"; node -e \" const fs=require('fs'),p=require('path');const d=process.argv[1];for(const f of fs.readdirSync(d))for(const l of fs.readFileSync(p.join(d,f),'ut": {
+   "count": 1,
+   "ms": 137,
+   "maxMs": 137,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git show 17b68ef2 --stat --format=\"%B\" | head -30; grep -rln \"benchmark-self-verify-live\" docs/plans/done | head": {
+   "count": 1,
+   "ms": 102,
+   "maxMs": 102,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git log --all --format=\"%h %s\" | grep -i -E \"self-verify|hand-off|nudge\" | head; ls .pi/self-verify-bench | head -30; grep -rn -i \"self-verify\" docs/plans/logs/*.md 2>/dev/null | grep -i -E \"w": {
+   "count": 1,
+   "ms": 170,
+   "maxMs": 170,
+   "failures": 0
+  },
+  "bash\u0000cd \"./.pi/self-verify-bench\"; for d in opus-1 sol-1 sonnet-1 sonnet-2 sonnet-3 terra-1 terra-2 terra-3; do for a in off on; do f=\"$d/$a/results.json\"; [ -f \"$f\" ] && node -e \" const r=require('./'+pro": {
+   "count": 1,
+   "ms": 873,
+   "maxMs": 873,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git commit -q -m \"Self-verify benchmark: count test_sensitivity as a check; correct X3 record\" -- scripts/benchmark-self-verify-live.mjs docs/plans/done/2026-11-19-mine-20-new-video-digests-fo": {
+   "count": 1,
+   "ms": 225,
+   "maxMs": 225,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n \"Verify it yourself\" -A3 extensions/self-verify.ts | cut -c1-400; cd .pi/self-verify-bench; for a in off on; do node -e \" const r=require('./opus-1/'+process.argv[1]+'/results.json').r": {
+   "count": 1,
+   "ms": 181,
+   "maxMs": 181,
+   "failures": 0
+  },
+  "bash\u0000cd \"./.pi/self-verify-bench\"; node -e \"const r=require('./opus-1/on/results.json').results[0]; console.log(Object.keys(r).join(' '))\"; for a in off on; do node -e \" const r=require('./opus-1/'+process": {
+   "count": 1,
+   "ms": 198,
+   "maxMs": 198,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n \"1,40p\" scripts/judge-design-extras.mjs; ls scripts | grep -i -E \"compare|judge|classif\"": {
+   "count": 1,
+   "ms": 133,
+   "maxMs": 133,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -rhoE \"openai-codex/gpt-[0-9.]+-luna\" scripts docs .pi 2>/dev/null | sort | uniq -c | head": {
+   "count": 1,
+   "ms": 30327,
+   "maxMs": 30327,
+   "failures": 1
+  },
+  "\u0000(other)": {
+   "count": 62,
+   "ms": 4500,
+   "maxMs": 98,
+   "failures": 1
+  },
+  "bash\u0000cd \".\"; node scripts/judge-handoff.mjs .pi/self-verify-bench/opus-1/off/results.json .pi/self-verify-bench/opus-1/on/results.json 2>&1 | tail -3; node scripts/benchmark-self-verify-live.mjs --model an": {
+   "count": 1,
+   "ms": 10171,
+   "maxMs": 10171,
+   "failures": 1
+  },
+  "bash\u0000cd \"./.pi/self-verify-bench\"; node -e \"const r=require('./opus-1/off/results.json').results; console.log(r.filter(x=>x.finalText).length, r.length)\"; ls opus-1/off | head -3; ls opus-1/off/web-1": {
+   "count": 1,
+   "ms": 139,
+   "maxMs": 139,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/judge-handoff.mjs .pi/self-verify-bench/opus-1/off/results.json .pi/self-verify-bench/opus-1/on/results.json 2>&1 | tail -3": {
+   "count": 1,
+   "ms": 6110,
+   "maxMs": 6110,
+   "failures": 0
+  },
+  "bash\u0000cd \"./.pi/self-verify-bench\"; node -e \" const fs=require('fs'),path=require('path'); for (const [arm,sc] of [['off','web'],['off','webapp'],['off','desktop'],['on','desktop']]) { const r=require('./op": {
+   "count": 1,
+   "ms": 100,
+   "maxMs": 100,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/benchmark-self-verify-live.mjs --model anthropic/claude-opus-5-5 --arms on,soft --scenarios web,webapp,desktop --reps 3 --parallel 4 --output .pi/self-verify-bench/soft-1 > .pi/se": {
+   "count": 1,
+   "ms": 117352,
+   "maxMs": 117352,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/judge-handoff.mjs .pi/self-verify-bench/soft-1/on/results.json .pi/self-verify-bench/soft-1/soft/results.json 2>&1 | tail -2; cd .pi/self-verify-bench/soft-1; for a in on soft; do": {
+   "count": 1,
+   "ms": 3762,
+   "maxMs": 3762,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/test-work-self-verify.mjs 2>&1 | tail -2; git add scripts/judge-handoff.mjs scripts/benchmark-self-verify-live.mjs && git commit -q -m \"Self-verify benchmark: soft-wording arm and": {
+   "count": 1,
+   "ms": 307,
+   "maxMs": 307,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; cat scripts/test-work-self-verify.mjs; grep -rn \"Verify it yourself\\|SOFT_SELF_VERIFY\\|self-verify\" --include=*.ts --include=*.mjs --include=*.md extensions scripts docs/agent-rules.md AGENTS.": {
+   "count": 1,
+   "ms": 103,
+   "maxMs": 103,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \" const fs=require('fs'); const b='scripts/benchmark-self-verify-live.mjs'; let s=fs.readFileSync(b,'utf8'); const soft=s.match(/export const SOFT_SELF_VERIFY = (\\\".*\\\");/)[1]; const l": {
+   "count": 1,
+   "ms": 204,
+   "maxMs": 204,
+   "failures": 1
+  },
+  "bash\u0000cd \".\"; git diff scripts/benchmark-self-verify-live.mjs | cat; sed -n \"1,12p\" CHANGELOG.md; git diff CHANGELOG.md | cat": {
+   "count": 1,
+   "ms": 152,
+   "maxMs": 152,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n \"120,128p\" scripts/test-work-plan3.mjs; grep -n \"^### Changed\" CHANGELOG.md | head -1": {
+   "count": 1,
+   "ms": 110,
+   "maxMs": 110,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \" const fs=require('fs'); let p=fs.readFileSync('scripts/test-work-plan3.mjs','utf8'); p=p.replace('\\\\\\\\*\\\\\\\\*Verify it yourself \\\\\\\\(every session\\\\\\\\)\\\\\\\\*\\\\\\\\*/','\\\\\\\\*\\\\\\\\*Check wi": {
+   "count": 1,
+   "ms": 1406,
+   "maxMs": 1406,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/test-work-self-verify.mjs; node scripts/test-work-plan3.mjs > \"$TEMP/p3.log\" 2>&1; echo \"plan3 exit $?\"; grep -n -i \"judge-handoff\\|Error\" \"$TEMP/p3.log\" | head -5; tail -2 \"$TEMP": {
+   "count": 1,
+   "ms": 1698,
+   "maxMs": 1698,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; for i in 1 2; do node scripts/test-work-plan3.mjs > \"$TEMP/p3.log\" 2>&1; echo \"exit $?\"; grep -m1 \"^Error\\|AssertionError\" \"$TEMP/p3.log\"; done; git log -3 --format=\"%h %ar %s\" -- scripts/test": {
+   "count": 1,
+   "ms": 18784,
+   "maxMs": 18784,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git diff CHANGELOG.md | grep \"^[+-]\" | grep -v \"^+++\\|^---\" | cut -c1-120; git commit -q -m \"Self-verify rule: checking is the agent's call, but through tools, not the user (soft-1 A/B)\" -- ex": {
+   "count": 1,
+   "ms": 243,
+   "maxMs": 243,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; line=$(grep -n \"^- The always-on self-check rule\" CHANGELOG.md | cut -d: -f1); git show HEAD:CHANGELOG.md | node -e \" const fs=require('fs'); const head=fs.readFileSync(0,'utf8'); const mine=f": {
+   "count": 1,
+   "ms": 433,
+   "maxMs": 433,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; F=docs/plans/done/2026-11-19-mine-20-new-video-digests-for-ce-workflow-ideas-f01355e6-plan3.md; grep -n -i \"ponytail\" \"$F\" | cut -c1-400; echo ----; grep -n -i \"X9\\|X10\\|X11\\|luna\\|recall\" \"$F": {
+   "count": 1,
+   "ms": 99,
+   "maxMs": 99,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n -A14 \"Compaction Model Fact Recall\" docs/agent-rules.md | cut -c1-500; ls .pi/compaction-recall; grep -o \"\\\"compactionModel\\\"[^,]*\" \"$USERPROFILE/.pi/agent/settings.json\"": {
+   "count": 1,
+   "ms": 98,
+   "maxMs": 98,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n \"34p\" docs/agent-rules.md | cut -c480-2000; ls .pi/compaction-recall/x10-prompt; for f in .pi/compaction-recall/x10-prompt/*.json; do node -e \"const d=require('./'+process.argv[1]); con": {
+   "count": 1,
+   "ms": 254,
+   "maxMs": 254,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n -i \"compaction\" \"$USERPROFILE/.pi/agent/settings.json\"; grep -rn \"compactionModel\" extensions/*.ts hub/src/*.ts 2>/dev/null | cut -c1-220 | head -20; P=\"$USERPROFILE/.pi/agent/git/gith": {
+   "count": 1,
+   "ms": 159,
+   "maxMs": 159,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; P=\"$USERPROFILE/.pi/agent/git/github.com/DietrichGebert/ponytail/pi-extension/index.js\"; sed -n \"25,50p;225,260p\" \"$P\"; grep -n -i \"ponytail\" extensions/design.ts skills/frontend-design/SKILL.": {
+   "count": 1,
+   "ms": 116,
+   "maxMs": 116,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; P=\"$USERPROFILE/.pi/agent/git/github.com/DietrichGebert/ponytail/pi-extension/index.js\"; grep -n \"normalizePersistedMode\\|RUNTIME_MODES =\\|\\\"off\\\"\" \"$P\" | head; grep -n \"before_agent_start\\|sy": {
+   "count": 1,
+   "ms": 110,
+   "maxMs": 110,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \"const s=require(process.env.USERPROFILE+'/.pi/agent/settings.json'); console.log(JSON.stringify(s.packages,null,0).slice(0,1500))\"; P=\"$USERPROFILE/.pi/agent/git/github.com/DietrichGe": {
+   "count": 1,
+   "ms": 112,
+   "maxMs": 112,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/test-work-design.mjs 2>&1 | tail -2": {
+   "count": 1,
+   "ms": 233787,
+   "maxMs": 233787,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n \"DEFAULT_COMPACTION_MODEL =\" -A3 extensions/work-models.ts; sed -n \"4476,4530p\" extensions/work-models.ts | cut -c1-260; grep -n -i \"luna\" README.md docs/*.md | grep -i compact | cut -": {
+   "count": 1,
+   "ms": 122,
+   "maxMs": 122,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n \"1,30p\" scripts/benchmark-compaction-recall-live.mjs | cut -c1-250; grep -n \"claude-ex\\|anthropic\\|--reps\\|reps\" scripts/benchmark-compaction-recall-live.mjs | head": {
+   "count": 1,
+   "ms": 116,
+   "maxMs": 116,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \"const d=require('./.pi/compaction-recall/x10-prompt/openai-codex_gpt-6-luna.json'); console.log(Object.keys(d)); const r=d.results||d.runs; console.log(r.length, JSON.stringify(r[0]).": {
+   "count": 1,
+   "ms": 99,
+   "maxMs": 99,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; S=\"C:/Users/Flex/.pi/agent/sessions/--C--soft-git-ce-workflow--\"; node scripts/benchmark-compaction-recall-live.mjs --models \"anthropic/claude-opus-5-5\" --thinking medium --sizes \"30000,80000,": {
+   "count": 1,
+   "ms": 289776,
+   "maxMs": 289776,
+   "failures": 0
+  },
+  "bash\u0000cd \"./.pi/compaction-recall/x10-prompt\"; ls; for f in *.json; do node -e \"const d=require('./'+process.argv[1]); const r=d.runs; const by={}; for(const x of r)(by[x.size]??=[]).push(x.recall); const c": {
+   "count": 1,
+   "ms": 248,
+   "maxMs": 248,
+   "failures": 0
+  },
+  "bash\u0000cd \"./.pi/compaction-recall/x10-prompt\"; for f in *.json; do node -e \"const d=require('./'+process.argv[1]); const r=d.runs; console.log(d.model, r.map(x=>x.recall).join(' '), '\\$'+(r.reduce((s,x)=>s+": {
+   "count": 1,
+   "ms": 346,
+   "maxMs": 346,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n \"on(\\\"session_start\\\"\\|on?.(\\\"session_start\\\"\" extensions/work-models.ts | head; grep -n \"ui.notify(\" extensions/work-models.ts | head -5": {
+   "count": 1,
+   "ms": 125,
+   "maxMs": 125,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/test-work-compaction.mjs 2>&1 | tail -2; node scripts/test-work-compaction-notifications.mjs 2>&1 | tail -2": {
+   "count": 1,
+   "ms": 1943,
+   "maxMs": 1943,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/test-work-compaction-notifications.mjs > \"$TEMP/cn.log\" 2>&1; echo \"exit $?\"; grep -v \"^ at \" \"$TEMP/cn.log\" | head -30": {
+   "count": 1,
+   "ms": 1363,
+   "maxMs": 1363,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n \"\\\"current\\\"\\|'current'\" scripts/test-work-compaction-notifications.mjs | head; grep -n \"luna\\|compactionModel\" scripts/test-work-compaction-notifications.mjs | head": {
+   "count": 1,
+   "ms": 112,
+   "maxMs": 112,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; W=\"$TEMP/cewf-head\"; rm -rf \"$W\"; git worktree add -q --detach \"$W\" HEAD && cmd //c mklink //J \"$(cygpath -w \"$W/node_modules\")\" \"$(cygpath -w \"$PWD/node_modules\")\" > /dev/null; cd \"$W\"; node ": {
+   "count": 1,
+   "ms": 1929,
+   "maxMs": 1929,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; W=\"$TEMP/cewf-head\"; cmd //c rmdir \"$(cygpath -w \"$W/node_modules\")\"; ls node_modules | wc -l; git worktree remove --force \"$W\"; git worktree list | cat": {
+   "count": 1,
+   "ms": 272,
+   "maxMs": 272,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git diff extensions/work-models.ts > \"$TEMP/wm.patch\"; node -e \" const fs=require('fs'); const p=fs.readFileSync(process.env.TEMP+'/wm.patch','utf8'); const [head,...hunks]=p.split(/(?=^@@ )/m": {
+   "count": 1,
+   "ms": 333,
+   "maxMs": 333,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git show :extensions/work-models.ts | grep -c \"prefixInlineToolAdditions\"; B='- Compaction keeps more facts: the compaction model setting now shows measured recall (Luna 24%, Terra 60%, Astra ": {
+   "count": 1,
+   "ms": 551,
+   "maxMs": 551,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; F=docs/plans/done/2026-11-19-mine-20-new-video-digests-for-ce-workflow-ideas-f01355e6-plan3.md; grep -n \"^- \\[x\\] \\*\\*X[4-7]\\*\\*\\|^- \\[x\\] \\*\\*X1[2-8]\\*\\*\" \"$F\" | cut -c1-400; grep -n -i -A25 ": {
+   "count": 1,
+   "ms": 107,
+   "maxMs": 107,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; F=docs/plans/done/2026-11-19-mine-20-new-video-digests-for-ce-workflow-ideas-f01355e6-plan3.md; grep -n -i \"discard\" \"$F\" | cut -c1-200 | head; grep -n -i -B2 -A30 \"^### Discarded\\|^## Discard": {
+   "count": 1,
+   "ms": 118,
+   "maxMs": 118,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -l -i \"discarded\" docs/plans/logs/f01355e6* 2>/dev/null; S=\"C:/Users/Flex/.pi/agent/sessions/--C--soft-git-ce-workflow--\"; f=$(grep -l \"Discarded\" $(ls -t \"$S\"/*.jsonl | head -15) | head ": {
+   "count": 1,
+   "ms": 328,
+   "maxMs": 328,
+   "failures": 0
+  },
+  "bash\u0000S=\"C:/Users/Flex/.pi/agent/sessions/--C--soft-git-ce-workflow--\"; for f in $(grep -l \"f01355e6\" \"$S\"/*.jsonl); do grep -l \"Discarded\" \"$f\"; done | head": {
+   "count": 1,
+   "ms": 407,
+   "maxMs": 407,
+   "failures": 0
+  },
+  "bash\u0000S=\"C:/Users/Flex/.pi/agent/sessions/--C--soft-git-ce-workflow--/2026-11-08T12-05-37-012Z_01a1bb0c-be72-7588-b1ff-e72fa1fe4ea7.jsonl\"; node -e \" const lines=require('fs').readFileSync(process.argv[1],'": {
+   "count": 2,
+   "ms": 271,
+   "maxMs": 150,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git log --oneline -6; git status --short | head -30": {
+   "count": 1,
+   "ms": 129,
+   "maxMs": 129,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n -i \"discarded\" --glob \"!docs/plans/**\" --glob \"!*.jsonl\" . ~/.pi/agent/*.json 2>/dev/null | cut -c1-300 | head -20": {
+   "count": 1,
+   "ms": 371,
+   "maxMs": 371,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git status --short; rg -l \"Mine videos\" -g \"!node_modules\" . ~/.pi 2>/dev/null | head": {
+   "count": 1,
+   "ms": 456,
+   "maxMs": 456,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git diff --stat; git diff extensions/work-models.ts | head -60; git diff CHANGELOG.md; grep -rn \"anthropic-inline-tools\" --include=*.ts --include=*.mjs --include=*.json . 2>/dev/null | grep -v": {
+   "count": 1,
+   "ms": 19878,
+   "maxMs": 19878,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/test-anthropic-inline-tools.mjs 2>&1 | tail -5; echo EXIT $?; node -e \"JSON.parse(require('fs').readFileSync('docs/upstream/processed-videos.json','utf8'));console.log('json ok')\"": {
+   "count": 1,
+   "ms": 195,
+   "maxMs": 195,
+   "failures": 1
+  },
+  "bash\u0000cd \".\"; git ls-files \"docs/plans/logs/*.stats.json\" | head -3; git add -u && git add docs/plans/done/2026-11-08-adopt-matt-pocock-skill-ideas-project-care-questioning-skill-79614d24-plan3.md docs/plan": {
+   "count": 1,
+   "ms": 340,
+   "maxMs": 340,
+   "failures": 0
+  }
+ },
+ "steps": {
+  "M1": {
+   "ms": 122967,
+   "testMs": 0,
+   "replies": 7,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 7
+   }
+  },
+  "M2": {
+   "ms": 2267797,
+   "testMs": 0,
+   "replies": 40,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 40
+   },
+   "failures": 2
+  },
+  "M3": {
+   "ms": 36311,
+   "testMs": 198,
+   "replies": 7,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 7
+   }
+  },
+  "X1": {
+   "ms": 57445,
+   "testMs": 0,
+   "replies": 8,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 8
+   }
+  },
+  "X2": {
+   "ms": 4082148,
+   "testMs": 304983,
+   "replies": 129,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 129
+   },
+   "failures": 3
+  },
+  "X3": {
+   "ms": 364015,
+   "testMs": 170469,
+   "replies": 21,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 21
+   }
+  },
+  "X4": {
+   "ms": 6559,
+   "testMs": 0,
+   "replies": 2,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 2
+   }
+  },
+  "X6": {
+   "ms": 102014,
+   "testMs": 61987,
+   "replies": 9,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 9
+   },
+   "failures": 1
+  },
+  "X7": {
+   "ms": 18482,
+   "testMs": 0,
+   "replies": 5,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 5
+   }
+  },
+  "X13": {
+   "ms": 883413,
+   "testMs": 703887,
+   "replies": 25,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 25
+   },
+   "failures": 1
+  },
+  "X14": {
+   "ms": 3927,
+   "testMs": 0,
+   "replies": 1,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 1
+   }
+  },
+  "(none)": {
+   "ms": 1382249,
+   "testMs": 400585,
+   "replies": 107,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 107
+   },
+   "failures": 4
+  }
+ },
+ "spans": [
+  {
+   "start": "2026-11-19T12:55:23.505Z",
+   "ms": 8837616
+  },
+  {
+   "start": "2026-11-19T15:22:41.146Z",
+   "ms": 1855541
+  },
+  {
+   "start": "2026-11-19T16:03:06.158Z",
+   "ms": 115286
+  },
+  {
+   "start": "2026-11-19T17:13:41.651Z",
+   "ms": 28369
+  },
+  {
+   "start": "2026-11-19T17:18:59.925Z",
+   "ms": 287872
+  },
+  {
+   "start": "2026-11-19T19:17:56.363Z",
+   "ms": 141880
+  },
+  {
+   "start": "2026-11-19T19:20:27.784Z",
+   "ms": 48348
+  },
+  {
+   "start": "2026-11-19T19:26:31.631Z",
+   "ms": 803621
+  },
+  {
+   "start": "2026-11-19T19:43:01.728Z",
+   "ms": 132000
+  },
+  {
+   "start": "2026-11-19T19:48:22.438Z",
+   "ms": 248505
+  }
+ ],
+ "hints": [
+  {
+   "at": "2026-11-19T14:24:24.797Z",
+   "step": "X2",
+   "shape": "node scripts/benchmark-compaction-recall-live.mjs"
+  }
+ ]
+}

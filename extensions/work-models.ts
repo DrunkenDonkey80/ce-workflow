@@ -10,6 +10,7 @@ import { basename, delimiter, dirname, isAbsolute, join, relative, resolve } fro
 import { askConfirm, askText, showListDialog } from "./ask-user/menu.ts";
 import { publish } from "./hub-channel.ts";
 import { latestModel } from "./latest-model.ts";
+import { prefixInlineToolAdditions } from "./anthropic-inline-tools.ts";
 import { handleDesignLibraryCommand, handleHubCommand, intercomParkedSessions, peerTools, projectCommandsTool, scheduleTool, sessionDialogTool, longSleepWait, LONG_WAIT_REASON, undeclaredBackground, BACKGROUND_REASON } from "./hub-command.ts";
 import { handleEnvCommand } from "./work-env.ts";
 import { registerAgentsAudit } from "./agents-audit.ts";
@@ -3952,7 +3953,7 @@ if (blockedInternalBackgroundCompletionTurn) {
 			ctx.abort();
 			return event.payload;
 		}
-		return event.payload;
+		return prefixInlineToolAdditions(event.payload);
 	});
 
 	// Every model gets img- references: pixels replayed each turn cost more than a process_image call. Vision model None opts out.

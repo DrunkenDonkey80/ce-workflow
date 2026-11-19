@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: blocked
+status: complete
 created: 2026-11-08
-updated: 2026-11-10T23:47:02.200Z
+updated: 2026-11-19T09:30:18.141Z
 started: 2026-11-09T11:22:42.019Z
 ---
 
@@ -165,3 +165,4 @@ Append material changes and their reasons; preserve the original request and set
 - 2026-11-10: Added C-13 after C-12: D-12: mechanical zero-arg updater wrapping drove the C1e regression; the user asked to build a check into ce-workflow and retest.
 - 2026-11-10: Added C-14 after C-03: User chose Try150k as the default after the completed C2 comparison.
 - 2026-11-10: Planned C3 to C6 (D-17 to D-22): C5 became an audit, C3 is logic-only with scripted reactions, C6 uses 8 declared mutations; C-04 to C-07 turned from design steps into run steps, C-15 (harness) and C-16 (live run) added, C-09 is the report.
+- 2026-11-19: Force-finished by the user with unfinished steps: C-16.

@@ -31,9 +31,14 @@ export function piSdk(dir = agentDir()): Promise<any> {
 	return sdks.get(dir)!;
 }
 
-/** One ModelRuntime per agent folder (auth.json and models.json); never refreshes catalogs over the network on create. */
+/** One ModelRuntime per agent folder (auth.json and models.json), never refreshing catalogs over the network. It restores the
+ * catalogs running Pis cached on disk (models newer than the built-in list) and is rebuilt after a minute to pick up new ones. */
+const runtimeBuilt = new Map<string, number>();
 export function piRuntime(dir = agentDir()): Promise<any> {
-	if (!runtimes.has(dir)) runtimes.set(dir, piSdk(dir).then(sdk => sdk.ModelRuntime.create({ authPath: join(dir, "auth.json"), modelsPath: join(dir, "models.json"), refreshOnCreate: false })));
+	if (!runtimes.has(dir) || Date.now() - runtimeBuilt.get(dir)! > 60_000) {
+		runtimeBuilt.set(dir, Date.now());
+		runtimes.set(dir, piSdk(dir).then(sdk => sdk.ModelRuntime.create({ authPath: join(dir, "auth.json"), modelsPath: join(dir, "models.json"), allowModelNetwork: false })));
+	}
 	return runtimes.get(dir)!;
 }
 
@@ -117,7 +122,7 @@ export function piModels(dir = agentDir()): ParkedModels {
 			const { scopedModels, diagnostics } = patterns.length ? await sdk.resolveModelScopeWithDiagnostics(patterns, await piRuntime(dir)) : { scopedModels: [], diagnostics: [] };
 			// Patterns that match nothing now (a provider without a login) stay, as Pi's own scoped-models screen keeps them.
 			const kept = diagnostics.filter((item: any) => item.code === "no-match" && item.pattern).map((item: any) => item.pattern as string);
-			const next = [...kept, ...scopedModels.map((entry: any) => entry.model.provider + "/" + entry.model.id).filter((key: string) => key !== target), ...on ? [target] : []];
+			const next = [...new Set([...kept, ...scopedModels.map((entry: any) => entry.model.provider + "/" + entry.model.id).filter((key: string) => key !== target)])].filter(key => key !== target).concat(on ? [target] : []);
 			settings.setEnabledModels(next.length ? next : undefined); await settings.flush();
 		},
 	};

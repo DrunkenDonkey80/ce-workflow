@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: active
+status: complete
 created: 2026-11-17
-updated: 2026-11-18T11:33:26.981Z
+updated: 2026-11-19T09:30:13.337Z
 size: plan
 reviewed: 2026-11-18
 tagsChecked: a310673c,811f1a0f
@@ -146,3 +146,4 @@ Append material changes and their reasons; preserve the original request and set
   - 6 camera sync: **accepted**. `syncCameraTools` re-adds or removes camera tools at every agent start (`work-models.ts` 4265), so E7 now changes it.
   - 7 runPhase ownership and restore: **accepted**. Bias changes without a plan call runPhase (`plan3.ts` 1198), and the restore hook excludes planning (1118–1121). E5 now covers both.
   - 8 asymmetric quality fields: **accepted**. Missing or mismatched values count as not comparable.
+- 2026-11-19: Force-finished by the user with unfinished steps: E6.

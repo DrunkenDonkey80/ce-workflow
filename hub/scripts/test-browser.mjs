@@ -510,6 +510,11 @@ try {
  assert.deepEqual([resumes, early], [[id, id], [id]], "one resume for the first keystrokes, then the woken session compacts early if it needs to");
  hub.host.prompt = sendPrompt;
  assert.equal(await evaluate("document.querySelector('#model-button') !== null"), true);
+ // A click on the model button wakes a parked session, so the menu lists all its models, not only the scoped ones.
+ await browser("fill", "#message-input", ""); publish("status", { ...status, parked: true }); await browser("wait", "200"); resumes.length = 0;
+ await evaluate("document.getElementById('model-button').click()"); await browser("wait", "--fn", "!!document.querySelector('#model-menu .model-option')"); // phone layout: the button sits in the closed drawer
+ // The second resume is the models read (every hub call resumes first; a no-op on a live session).
+ assert.deepEqual(resumes, [id, id], "the model button resumes a parked session before loading its models"); await evaluate("document.getElementById('model-button').click()");
  hub.host.resume = resume; await browser("fill", "#message-input", "");
  await browser("click", "#title"); assert(await evaluate("!document.getElementById('title-menu').hidden && document.getElementById('title-menu').contains(document.getElementById('plan-menu')) && !document.getElementById('plan-menu').hidden && document.getElementById('drawer-sessions').contains(document.getElementById('session-list'))"), "phone: the title opens plans and commands; sessions sit in the drawer");
  await browser("press", "Escape"); assert.equal(await evaluate("document.getElementById('title-menu').hidden"), true);

@@ -2666,7 +2666,9 @@ function modelMenu(menu: HTMLElement, value, mode: "chat" | "default" | "work" |
 }
 $("model-button").addEventListener("click", async () => {
  if (!$("model-menu").hidden) return toggleMenu("model-button", "model-menu", false);
- const menu = $("model-menu"); menu.replaceChildren("Loading models…"); toggleMenu("model-button", "model-menu", true);
+ const menu = $("model-menu"), parked = !!state.status?.parked; menu.replaceChildren(parked ? "Waking the session…" : "Loading models…"); toggleMenu("model-button", "model-menu", true);
+ // A parked session knows only the scoped models (D10): the click wakes it for the full list; a failed wake still shows that list.
+ if (parked && !waking) { waking = true; if (!await sessionAction({ action: "resume", id: sessionId })) waking = false; }
  try { modelMenu(menu, await get("models")); } catch (error) { menu.replaceChildren("Models failed to load: " + error.message); }
 });
 $("context-button").addEventListener("click", () => toggleMenu("context-button", "context-menu"));

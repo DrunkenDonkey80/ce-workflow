@@ -26,6 +26,12 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - A blank session declares 20 tools (26 KB of schema) instead of 28 (40 KB): `research_note` and `research_exit` exist only while research mode is on; `knowledge`, Context7, `project_report`, `module_report` and `pi_lens_activate_tools` moved to `tools_enable`; the ask_user and `tools_enable` schemas are shorter. The `/goal` tools stay declared because pi-goal needs them when `/goal` starts.
 - Code reviews skip lockfiles, carry a do-not-flag list, drop uncertain findings the source does not confirm, and the diff reviewer reports what it could not verify instead of a plain `ok`.
 
+### Fixed
+
+- Hub: clicking the model button on a parked session wakes it, so the menu lists all its models instead of only the scoped ones.
+- Hub: Set scoped models now ticks and unticks models newer than Pi's built-in list (e.g. GPT-6.2 Astra). Before, it saved them without showing a tick, a click could not remove them, and clicks left duplicate entries in Pi's settings.
+- Sessions on a Claude subscription no longer fail every turn with `400 tool_reference_unresolved` after a tool was added mid-session and later removed (for example `plan3_create`). Run `/reload` in a stuck session to recover it.
+
 ## 1.1.1 — 2026-11-18
 
 ### Changed
