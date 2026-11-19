@@ -3,7 +3,7 @@
 // self-verify.ts stubbed and tool-loader.ts from HEAD (the old one-line catalog), everything else identical.
 // Each run: a fresh git fixture in temp, one `pi -p` prompt, then scoring from its session file.
 // Usage: node scripts/benchmark-self-verify-live.mjs [--model ID] [--thinking L] [--reps N] [--arms on,off]
-//          [--scenarios web,cli,explain] [--parallel N] [--output DIR] [--append FILE]
+//          [--scenarios web,cli,explain,regress,locked,webapp,desktop] [--parallel N] [--output DIR] [--append FILE]
 // --append FILE adds FILE to the system prompt of every arm (prompt A/B: run once without, once with, then compare).
 // Block ablation: an arm "no-<tag>[+<tag>...]" is "on" without those system-prompt sections (locked-writes, test-sensitivity,
 // self-verify, reporting, ponytail, project-map), removed by scripts/bench-sections-off.ts. --ponytail also loads the
@@ -78,6 +78,33 @@ const SCENARIOS = {
 		prompt: "In the Counter app (`python counter.py`), pressing Reset doesn't set the number back to 0. Fix it.",
 		pass: (dir) => /def reset\(\):[\s\S]*?label(?:\.config(?:ure)?\(|\[)/.test(readFileSync(path.join(dir, "counter.py"), "utf8")),
 		verified: (calls) => calls.some((c) => c.name === "app_act" || c.name === "screen_read" || (c.name === "bash" && /python[\s\S]*(?:invoke|reset\(\)|event_generate)/i.test(c.args))),
+	},
+	regress: { // test-sensitivity: the fix needs a regression test that fails on the old code
+		files: {
+			"price.mjs": "export function total(amount) {\n\treturn amount > 100 ? amount * 0.9 : amount;\n}\n",
+			"test.mjs": "import assert from \"node:assert/strict\";\nimport { total } from \"./price.mjs\";\n\nassert.equal(total(50), 50);\nassert.equal(total(200), 180);\nconsole.log(\"ok\");\n",
+		},
+		prompt: "Orders of 100 or more should get 10% off, but an order of exactly 100 gets no discount. Fix it. Tests: `node test.mjs`.",
+		pass: (dir) => { // fixed code passes the agent's test, and that test fails on the original code
+			const run = () => { try { execFileSync(process.execPath, ["test.mjs"], { cwd: dir, stdio: "ignore" }); return true; } catch { return false; } };
+			const fixed = readFileSync(path.join(dir, "price.mjs"), "utf8");
+			if (!run()) return false;
+			try { execFileSync("git", ["checkout", "HEAD", "--", "price.mjs"], { cwd: dir }); return !run(); }
+			finally { writeFileSync(path.join(dir, "price.mjs"), fixed); }
+		},
+		verified: (calls) => calls.some((c) => c.name === "bash" && /test\.mjs/.test(c.args)),
+	},
+	locked: { // locked-writes: decisions must come from the state read inside the lock
+		files: {
+			"store.mjs": "import { readFile, writeFile } from \"node:fs/promises\";\n\nlet chain = Promise.resolve();\nexport function withLock(fn) {\n\tconst run = chain.then(fn, fn);\n\tchain = run.catch(() => {});\n\treturn run;\n}\n\n// Counts every visit and remembers each user once.\nexport async function addVisit(file, user) {\n\tconst data = JSON.parse(await readFile(file, \"utf8\"));\n\tconst seen = data.users.includes(user);\n\treturn withLock(async () => {\n\t\tif (!seen) data.users.push(user);\n\t\tdata.visits += 1;\n\t\tawait writeFile(file, JSON.stringify(data));\n\t\treturn data.visits;\n\t});\n}\n",
+		},
+		prompt: "When several requests call addVisit in store.mjs at the same time, visits get lost. Fix it.",
+		pass: (dir) => { // 20 concurrent visits by 5 users: 20 visits, 5 users
+			const code = `import { addVisit } from "./store.mjs"; import { readFileSync, writeFileSync } from "node:fs"; writeFileSync("bench-store.json", JSON.stringify({ visits: 0, users: [] })); await Promise.all(Array.from({ length: 20 }, (_, i) => addVisit("bench-store.json", "u" + (i % 5)))); const d = JSON.parse(readFileSync("bench-store.json", "utf8")); console.log(d.visits === 20 && d.users.length === 5);`;
+			try { return execFileSync(process.execPath, ["--input-type=module", "-e", code], { cwd: dir, encoding: "utf8" }).trim() === "true"; } catch { return false; }
+			finally { rmSync(path.join(dir, "bench-store.json"), { force: true }); }
+		},
+		verified: (calls) => calls.some((c) => c.name === "bash" && /node\b/.test(c.args) && /store|addVisit/.test(c.args)),
 	},
 	explain: { // control: explanation requested, files must stay untouched, no checks expected
 		files: { "sum.mjs": "const [a, b] = process.argv.slice(2);\nconsole.log(Number(a) + Number(b));\n" },
