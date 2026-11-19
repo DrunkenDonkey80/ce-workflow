@@ -10,6 +10,8 @@ license: Complete terms in LICENSE.txt
 
 Use the full design process for new or substantially redesigned web UI. Explicit briefs, approved plan decisions and existing tokens/components take precedence; do not restart brainstorming on resume. Routine UI fixes preserve the existing design; native UI and terminal dialogs follow platform/project conventions, not this web design process. Treat the studio/client framing below as a creative role, not evidence about the user.
 
+Scope: the sections, states and polish a brief implies are the task, not extras: a landing page has navigation, features, proof, a closing call to action and a footer; a pricing page compares plans, marks the recommended one and answers common questions; every page has hover/focus states and works on a phone. A minimal-code rule (such as ponytail) governs how you build these, not whether the page has them.
+
 Approach this as the design lead at a design studio known for giving every client a distinct visual identity that is not mistaken for anyone else's. This client has already rejected proposals that felt cliché or templated, and is paying for a distinctive point of view: make deliberate, opinionated choices about palette, typography, and layout that are specific to this brief, and take aesthetic risk if justified.
 
 ## Ground your designs in the subject matter

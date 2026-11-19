@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: ready
+status: complete
 created: 2026-11-19
-updated: 2026-11-19T13:54:02.780Z
+updated: 2026-11-19T15:52:59.161Z
 size: plan
 started: 2026-11-19T12:55:51.528Z
 ---
@@ -71,6 +71,14 @@ Non-goals: implementing ideas the user did not accept; re-reviewing videos alrea
 - **D-04 Experiment order and form (X1).** Free code steps first: X11-X12 resolver, X5 look tells, X8 recall script; then paid: X9-X10, X2-X4 with X15 as one ablation (arms: all-on, each of our blocks off, ponytail off), X6-X7, X13-X14. Source: agent.
 - **D-05 Budget $35 total for paid live runs; ablation runs on Opus 5.5.** Estimates: ablation ~$16 (+~40% for two added tasks, ~$22), X6 ~$4, X9 ~$3, design ~$8; trim design reps if the ablation overruns. Source: user, X1.
 - **D-06 Ablation adds two small tasks**: a behavior change needing a regression test (test-sensitivity) and a concurrent-write fix (locked-writes), so those blocks can show a quality loss, not only a token saving. Source: user, X1.
+- **D-07 Budget raised to ~$45** after X9 overran its estimate ($7.72 vs $3): ablation 3 reps (cli, regress, locked × on + 5 blocks off, ≈ $13.5), X6 ≈ $4, design in full ≈ $8. Source: user, after X2.
+- **D-08 Always-on blocks: keep all five (X4, X15).** X3 found no block whose removal is free: test-sensitivity buys the regression tests (locked: 3/3 with, 0/3 without) for +27% cost; self-verify and reporting prevent hand-offs and unverified finishes; ponytail keeps reports ~30% shorter at no diff-size cost (no duplicate logic seen either way). locked-writes showed no gain on Opus (it fixed the race correctly without the rule), but the rule guards against data loss and the earlier rework-lab builds (plan 427dd6a8 D-10) measured fewer races with it at medium effort; one Opus task with 3 reps is not enough to remove it. Limit: small tasks, Opus only; pass rate saturated at 9/9 in every arm. Source: agent, from X3 numbers.
+- **D-09 Coding model stays Opus 5.5 (X7).** X6: Sonnet 5.5 is 54% cheaper but skipped the regression test on the concurrent-write task 5/5 times (Opus 1/5) and failed one regress run; the saving does not pay for weaker tests on code changes. Sonnet stays fine for read-only readers (M1 used it). Limit: three small tasks, 5 reps. Source: agent, from X6 numbers.
+- **D-10 Keep the design scope line (X14).** Landing-page extras rose 50→75% with ponytail ultra on, must-haves unchanged, pages longer only by the added sections. Limit: the gain sits on the examples the line names, pricing showed no change, n=3 per prompt, one judge model reading source (not renders). Rerun: benchmark-self-verify-live.mjs --scenarios landing,pricing, then scripts/judge-design-extras.mjs over both results. Source: agent, from X13-X14 numbers.
+
+
+
+
 
 
 
@@ -117,20 +125,20 @@ Commands:
 ### Phase 2: Experiments [think]
 
 - [x] **X1** Order, form and $35 budget set (D-04..D-06); ablation on Opus 5.5 with two added tasks, ponytail arm merged in.
-- [ ] **X2** Add a per-block off switch to the self-verify live benchmark; check: a dry run shows the block missing from the system prompt.
-- [ ] **X3** Run all-on vs each block off, 3 tasks x 3 reps; check: compare-benchmark-runs report per arm.
-- [ ] **X4** Trim or scope blocks with no gain; check: targeted prompt tests pass and the rerun shows no regression.
+- [x] **X2** benchmark-self-verify-live.mjs takes arms no-<tag>[+<tag>] (sections removed by scripts/bench-sections-off.ts, loaded last), --ponytail (loads the user's ponytail extension) and --dry-run (dumps the first provider payload, no request) (d79976dd).
+- [x] **X3** Ablation on Opus 5.5 (cli, regress, locked × 6 arms × 3 reps, $3.6): every arm passes 9/9. Off-arm effects: test-sensitivity off -21.5% cost but 0/3 locked runs leave a regression test (on: 3/3); self-verify off 2 unverified + 2 hand-offs; reporting off +20% final words, 2 hand-offs; locked-writes off no loss; ponytail off -10% cost, same diff size, ~40% longer reports.
+- [x] **X4** No block trimmed: each off-arm lost something (tests, verification, hand-offs, report length) except locked-writes, kept as a data-loss guard on thin Opus-only evidence (D-08).
 - [x] **X5** design look reports "AI-design tells" (cream bg, near-black, terracotta, ALL-CAPS labels, card kit, middle dots, em-dash label, → suffix, headline accent, 01/02/03) via pageTells in design-render.ts.
-- [ ] **X6** Run Opus 5.5 vs Sonnet 5.5 as worker on the same benchmark tasks; check: compare-benchmark-runs shows pass rate, cost, tokens, turns per arm.
-- [ ] **X7** Recommend a Coding model setting from the result; check: the decision and numbers are recorded in Decisions.
-- [ ] **X8** Write a reusable planted-fact recall script (any --model) over 2-3 real transcripts; check: self-check scores a perfect summary 100% and an empty one 0%.
-- [ ] **X9** Score gpt-6-luna, gpt-5.6-terra and the main model; check: results.json per model and a recall table per length bucket.
-- [ ] **X10** Document the rerun-on-new-model command in docs/agent-rules.md; change the compaction default only on a clear win; check: compare-benchmark-runs on E2 shows no regression.
+- [x] **X6** Sonnet 5.5 costs 54% less than Opus 5.5 (cli/regress/locked × 5 reps, $1.48) but passed 14/15 vs 15/15 and left a regression test on the locked task 0/5 vs 4/5 (regress 4/5 vs 5/5). Keep Opus as worker; Sonnet only for tasks that need no new tests. Regress prompt wording fixed after Sonnet flagged it as contradictory, so its hand-off counts in X3/X6 are not reliable.
+- [x] **X7** Coding model stays Opus 5.5 (D-09): Sonnet's 54% saving costs regression tests on code changes; no setting changed.
+- [x] **X8** scripts/benchmark-compaction-recall-live.mjs plants 5 facts at depths 0.1–0.9 of real transcripts and scores compactMemory output per model (--models, any provider via pi rpc); offline self-check scripts/test-compaction-recall.mjs in verify-package (commit 05bef263).
+- [x] **X9** Recall (9 runs each, 30/80/150 KB): Opus 5.5 71% (93/73/47) $2.73; Luna 16% $0.03; Terra 16% $0.70; Sonnet 5.5 17% (2 invalid JSON) $1.31; Astra 6.2 0% $2.94. Total $7.72; results .pi/compaction-recall/x9.
+- [x] **X10** Rerun command + baseline in docs/agent-rules.md "Compaction Model Fact Recall"; user picked a prompt fix over a model switch: compactMemory now keeps open checks/decisions/constraints/exact values/next steps from any record (999060e9) → recall Luna 16→28%, Terra 16→60%, Astra 0→93%; default stays Luna.
 - [x] **X11** extensions/latest-model.ts latestModel(registry, provider, family) picks the highest gpt-<version>-<family> available; test-latest-model.mjs added to verify-package.
 - [x] **X12** Scout's two Luna calls and agents-audit's Astra call use latestModel (now gpt-6-luna and gpt-6.2-astra); scout test fakes gained getAvailable.
-- [ ] **X13** Run 'landing page' and 'pricing page' design prompts with ponytail ultra as baseline; check: blind judge scores expected extras.
-- [ ] **X14** Add the scope line to frontend-design and the design prompt, rerun; check: extras score rises with no regression in must-haves.
-- [ ] **X15** Add a ponytail-off arm to the always-on block ablation on coding tasks; check: pass rate, lines added and duplicate-logic count per arm decide keep, scope or drop.
+- [x] **X13** Baseline (Opus 5.5, ponytail ultra, landing + pricing scenarios × 3, $1.70): must-haves 17/18; blind-judged extras landing 50%, pricing 76%; landing pages had no nav, no proof, no footer in 3/3.
+- [x] **X14** Scope line added to skills/frontend-design/SKILL.md and the design session prompt (extensions/design.ts): landing extras 50→75%, pricing 76→76%, must-haves unchanged 17/18, pages ~25% longer (more sections, $2.16). Gains are on the items the line names (nav, proof, footer); unnamed ones (FAQ, plan teaser) barely moved. Kept (D-10).
+- [x] **X15** Ponytail-off arm ran inside X3: pass 9/9 both, diff sizes equal (locked 18/2/18 vs 18/17/17 lines), final reports ~30% longer and cost -10% without it; decision keep (D-08).
 
 ## Global validation
 
@@ -140,7 +148,7 @@ Commands:
 
 ## Resume context
 
-Planning done; no step started. Next: M1, launch four parallel read-only readers over the 20 digests from C1 (reader contract in Relevant files). HEAD 8991eaf7; local commits unpushed. Never stage `docs/plans/logs/4d2fa07b.stats.json` or `f75ccea6.stats.json`.
+All 18 steps done; global validation passed (C1 [] , C2 via C1, C3 self-checks passed; 6 ideas accepted, 2 rejected, all accepted steps done). Paid spend ≈ $24 of the $45 cap (X3 $3.6, X6 $1.5, X13-14 $3.9 + judge). Nothing left to run.
 
 ## Amendments
 

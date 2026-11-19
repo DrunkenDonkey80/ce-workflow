@@ -3,7 +3,7 @@
 // self-verify.ts stubbed and tool-loader.ts from HEAD (the old one-line catalog), everything else identical.
 // Each run: a fresh git fixture in temp, one `pi -p` prompt, then scoring from its session file.
 // Usage: node scripts/benchmark-self-verify-live.mjs [--model ID] [--thinking L] [--reps N] [--arms on,off]
-//          [--scenarios web,cli,explain,regress,locked,webapp,desktop] [--parallel N] [--output DIR] [--append FILE]
+//          [--scenarios web,cli,explain,regress,locked,webapp,desktop,landing,pricing] [--parallel N] [--output DIR] [--append FILE]
 // --append FILE adds FILE to the system prompt of every arm (prompt A/B: run once without, once with, then compare).
 // Block ablation: an arm "no-<tag>[+<tag>...]" is "on" without those system-prompt sections (locked-writes, test-sensitivity,
 // self-verify, reporting, ponytail, project-map), removed by scripts/bench-sections-off.ts. --ponytail also loads the
@@ -42,6 +42,7 @@ const extensionList = (() => {
 	catch (error) { throw new Error(`cannot read pi.extensions from package.json: ${error.message}`, { cause: error }); }
 })();
 
+const TIDEPOOL = "# Tidepool\n\nShared grocery lists for families: everyone adds items from their phone, whoever is at the store ticks them off, and the list syncs live.\n";
 const SCENARIOS = {
 	web: {
 		files: {
@@ -87,7 +88,7 @@ const SCENARIOS = {
 			"price.mjs": "export function total(amount) {\n\treturn amount > 100 ? amount * 0.9 : amount;\n}\n",
 			"test.mjs": "import assert from \"node:assert/strict\";\nimport { total } from \"./price.mjs\";\n\nassert.equal(total(50), 50);\nassert.equal(total(200), 180);\nconsole.log(\"ok\");\n",
 		},
-		prompt: "Orders of 100 or more should get 10% off, but an order of exactly 100 gets no discount. Fix it. Tests: `node test.mjs`.",
+		prompt: "Orders of 100 or more should get 10% off, but right now an order of exactly 100 gets no discount. Fix it. Tests: `node test.mjs`.",
 		pass: (dir) => { // fixed code passes the agent's test, and that test fails on the original code
 			const run = () => { try { execFileSync(process.execPath, ["test.mjs"], { cwd: dir, stdio: "ignore" }); return true; } catch { return false; } };
 			const fixed = readFileSync(path.join(dir, "price.mjs"), "utf8");
@@ -108,6 +109,19 @@ const SCENARIOS = {
 			finally { rmSync(path.join(dir, "bench-store.json"), { force: true }); }
 		},
 		verified: (calls) => calls.some((c) => c.name === "bash" && /node\b/.test(c.args) && /store|addVisit/.test(c.args)),
+	},
+	// Vague design briefs (plan f01355e6 X13): pass is only the must-haves; score expected extras with scripts/judge-design-extras.mjs.
+	landing: {
+		files: { "README.md": TIDEPOOL },
+		prompt: "Build a landing page for Tidepool (see README.md) as index.html.",
+		pass: (dir) => /<html/i.test(readFileSync(path.join(dir, "index.html"), "utf8")),
+		verified: (calls) => SCENARIOS.web.verified(calls),
+	},
+	pricing: {
+		files: { "README.md": TIDEPOOL },
+		prompt: "Build a pricing page for Tidepool (see README.md) as pricing.html, with Free, Family and Pro plans.",
+		pass: (dir) => { const html = readFileSync(path.join(dir, "pricing.html"), "utf8"); return ["Free", "Family", "Pro"].every((plan) => html.includes(plan)); },
+		verified: (calls) => SCENARIOS.web.verified(calls),
 	},
 	explain: { // control: explanation requested, files must stay untouched, no checks expected
 		files: { "sum.mjs": "const [a, b] = process.argv.slice(2);\nconsole.log(Number(a) + Number(b));\n" },
