@@ -14,6 +14,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ### Changed
 
+- The always-on self-check rule no longer forces a check after every change: whether to check is the agent's call, but when it would check, or would tell you to run, open or test something, it does it with its tools and asks you only when no tool can, saying why. In a 9-run A/B on Opus 5.5 (web, web-app, desktop) it checked as often as before (9/9), handed fewer checks to you (0 vs 1) and cost 28% less. A cheap-model judge () now scores benchmark hand-offs; the old regex counted honest caveats as hand-offs.
 - Plan3 execute runs can no longer `git push` (blocked in code, not just asked in the prompt); a later ordinary request can still push. Night mode also blocks `git push`, `git reset --hard`, `git clean -f` and recursive deletes outside the project and temp folders.
 - Cancelling an ask_user dialog now tells the agent not to ask the same thing again.
 - Twelve almost-never-used tools now start switched off and are listed in `tools_enable` instead: the four camera tools, `browser_search`, `browser_fetch`, `jev_triage`, `plan3_diagram`, `session_dialog`, and pi-lens's `symbol_search`, `read_enclosing` and `effective_config`. A live session start declares 27 tools instead of 39, an estimated 12 KB less tool schema per request. The harness switches on `plan3_diagram` and `session_dialog` itself when it tells the model to use them.
