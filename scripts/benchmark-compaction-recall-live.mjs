@@ -98,7 +98,8 @@ async function main() {
 	const out = path.resolve(value("--output", path.join(repo, ".pi", "compaction-recall", new Date().toISOString().replace(/[:.]/g, "-"))));
 	mkdirSync(out, { recursive: true });
 	const registry = rpcRegistry(thinking);
-	for (const model of models) {
+	// Models run in parallel: each has its own pi processes (--no-session) and its own result file.
+	await Promise.all(models.map(async (model) => {
 		const runs = [];
 		for (let rep = 1; rep <= reps; rep++) for (const file of transcripts) for (const size of sizes) {
 			const messages = plant(transcriptMessages(file), size);
@@ -114,7 +115,7 @@ async function main() {
 		console.log(`${model}: ${ok.length}/${runs.length} valid checkpoints, cost $${runs.reduce((s, r) => s + r.costUsd, 0).toFixed(3)}`);
 		for (const size of sizes) { const rs = ok.filter((r) => r.size === size); console.log(`  ${size} bytes: recall ${rs.length ? Math.round(100 * rs.reduce((s, r) => s + r.recall, 0) / rs.length) : "-"}% (${rs.length} runs)`); }
 		for (const depth of DEPTHS) { const ks = ok.flatMap((r) => r.kept.filter((k) => k.depth === depth)); console.log(`  depth ${depth}: ${ks.filter((k) => k.kept).length}/${ks.length}`); }
-	}
+	}));
 	console.log(`results: ${out}`);
 }
 
