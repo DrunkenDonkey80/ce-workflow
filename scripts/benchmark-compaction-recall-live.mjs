@@ -17,7 +17,7 @@ const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // Each fact is a unique token a summary must keep to continue the work; kinds follow what compaction must preserve.
 export const FACTS = [
 	{ token: "check-quartz-ledger-41", role: "toolResult", text: "FAIL scripts/check-quartz-ledger-41.mjs: expected 3 ledger rows, got 2. This is the one failing check left; fix it before the release." },
-	{ token: "retry limit at 7", role: "assistant", text: "Decision with the user: keep the retry limit at 7 because the vendor rate limit resets every 7 seconds; do not raise it." },
+	{ token: "RETRY_LIMIT=7", role: "assistant", text: "Decision with the user: keep RETRY_LIMIT=7 in src/vendor-client.ts because the vendor rate limit resets every 7 seconds; do not raise it." },
 	{ token: "48213", role: "toolResult", text: "dev server listening on port 48213 (the only port the corporate proxy allows; other ports are blocked)" },
 	{ token: "zephyr-lock.json", role: "assistant", text: "Constraint from the user: never edit vendor/zephyr-lock.json by hand; regenerate it with the vendor tool." },
 	{ token: "otter-sync-93", role: "toolResult", text: "Next step agreed: finish test-otter-sync-93 (keeps the cursor after reconnect) once the ledger check passes." },
