@@ -29,6 +29,9 @@ const parallel = Number(value("--parallel", "4"));
 const append = value("--append", undefined);
 const ponytail = args.includes("--ponytail") ? [path.join(os.homedir(), ".pi", "agent", "git", "github.com", "DietrichGebert", "ponytail", "pi-extension", "index.js")] : [];
 const dryRun = args.includes("--dry-run");
+// Anthropic runs need the user's OAuth pool provider: --no-extensions would leave a revoked auth.json token.
+const providerExtension = path.join(os.homedir(), ".pi", "agent", "git", "github.com", "DrunkenDonkey80", "pi-provider-claude-ex", "index.ts");
+const provider = model.startsWith("anthropic/") && existsSync(providerExtension) ? [providerExtension] : [];
 const BLOCKS = ["locked-writes", "test-sensitivity", "self-verify", "reporting", "ponytail", "project-map"];
 const out = path.resolve(value("--output", path.join(repo, ".pi", "self-verify-bench", new Date().toISOString().replace(/[:.]/g, "-"))));
 const launcher = path.join(os.homedir(), ".pi", "agent", "bin", "pi-launcher.js");
@@ -149,7 +152,7 @@ async function one(arm, extDir, name, repetition) {
 	const art = path.join(out, arm, `${name}-${repetition}`);
 	mkdirSync(art, { recursive: true });
 	const dir = fixture(scenario), sessions = path.join(art, "sessions");
-	const extArgs = [...extensionList.map((rel) => path.join(extDir, path.relative("extensions", rel))), ...ponytail, path.join(repo, "scripts", "bench-sections-off.ts")].flatMap((file) => ["--extension", file]);
+	const extArgs = [...extensionList.map((rel) => path.join(extDir, path.relative("extensions", rel))), ...provider, ...ponytail, path.join(repo, "scripts", "bench-sections-off.ts")].flatMap((file) => ["--extension", file]);
 	const payload = path.join(art, "dry-run-payload.json");
 	const started = Date.now();
 	const { code, timedOut } = await new Promise((resolve) => {
