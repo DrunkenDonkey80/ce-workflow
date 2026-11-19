@@ -157,8 +157,16 @@ function elapsed(ms: number) {
  const total = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(total / 3600), m = Math.floor(total / 60) % 60, s = String(total % 60);
  return h ? `${h}:${String(m).padStart(2, "0")}:${s.padStart(2, "0")}` : m ? `${m}:${s.padStart(2, "0")}` : s + "s";
 }
+// L13: a running bash call silent for 2 min shows "quiet for N min" and its last output line; display only, never a kill.
+const QUIET_MS = 120_000;
+function showQuiet(item: HTMLElement) {
+ const ms = Date.now() - Number(item.dataset.since), line = item.dataset.line;
+ item.hidden = ms < QUIET_MS;
+ item.textContent = item.hidden ? "" : `quiet for ${Math.floor(ms / 60_000)} min` + (line ? `, last: ${line}` : ", no output yet");
+}
 setInterval(() => {
  for (const item of document.querySelectorAll<HTMLElement>(".tool-elapsed")) item.textContent = elapsed(Date.now() - Number(item.dataset.start));
+ for (const item of document.querySelectorAll<HTMLElement>(".tool-quiet")) showQuiet(item);
  for (const item of document.querySelectorAll<HTMLElement>(".session-timer")) item.textContent = "⏰ " + elapsed(Number(item.dataset.due) - Date.now());
 }, 1000);
 function renderActivity() {
@@ -176,6 +184,7 @@ function renderActivity() {
  for (const tool of tools) {
   const row = section(tool.id, [tool.name + toolArg(tool.args), tool.state, tool.durationMs === undefined ? "" : Math.round(tool.durationMs) + " ms"].filter(Boolean).join(" · "));
   if (tool.state === "running" && tool.startedAt) { const clock = make("span", elapsed(Date.now() - tool.startedAt), "tool-elapsed"); clock.dataset.start = String(tool.startedAt); row.firstElementChild!.prepend("(", clock, ") "); } // first, so a stuck tool shows at a glance
+  if (tool.state === "running" && tool.name === "bash" && tool.startedAt) { const quiet = make("span", "", "tool-quiet"); quiet.dataset.since = String(tool.outputAt ?? tool.startedAt); if (tool.lastLine) quiet.dataset.line = tool.lastLine; showQuiet(quiet); row.firstElementChild!.append(quiet); }
   row.className = "tool-row tool-" + (tool.state === "error" ? "error" : tool.state === "done" ? "ok" : "pending") + (tool.parent ? " nested-tool" : "");
   for (const [label, text] of [["Arguments", tool.args], ["Progress", tool.progress], ["Result", tool.result]]) if (text) { row.append(make("strong", label), make("pre", text)); }
  }

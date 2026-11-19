@@ -31,7 +31,7 @@ const terminalCommands = new Set(["settings", "model", "thinking", "scoped-model
 export function forwardDiagramChat(pi, ctx, diagram: Diagram | { diagram: Diagram; ids?: string[] }[], message: unknown, comments: unknown, publish: (event: string, value: unknown) => void, references?: { ids: string[]; context: string }, followUp = false) {
 	const contextual = diagramChatMessage(diagram, message, comments, references?.ids);
 	const prepared = contextual.mentions.length || (Array.isArray(comments) && comments.length) ? contextual : { message: (message as string).trim(), mentions: [], unknownMentions: [] };
-	if (references) prepared.message += "\n\n" + references.context;
+	if (references) prepared.message += `\n\n${references.context}`;
 	if (Buffer.byteLength(prepared.message) > 128_000) throw new WebError(400, "Chat context too large; use fewer references/mentions/comments.");
 	const command = prepared.message.startsWith("/");
 	const name = command ? prepared.message.slice(1).split(/\s/, 1)[0] : "";
@@ -59,14 +59,14 @@ export function forwardDiagramChat(pi, ctx, diagram: Diagram | { diagram: Diagra
 	return { queued, ...(queued && followUp ? { followUp: true } : {}), mentions: prepared.mentions, unknownMentions: prepared.unknownMentions };
 }
 
-type ToolActivity = { id: string; name: string; state: string; parent?: string; args?: string; progress?: string; result?: string; startedAt?: number; durationMs?: number };
+type ToolActivity = { id: string; name: string; state: string; parent?: string; args?: string; progress?: string; result?: string; startedAt?: number; durationMs?: number; outputAt?: number; lastLine?: string };
 type SubagentActivity = { id: string; label: string; model?: string; state: string; turns?: number; tools?: number; tool?: string };
 // pi-subagents' public status RPC; undefined when it is not loaded or does not answer.
 function subagentRuns(pi): Promise<{ runs: any[]; fleet: any[] } | undefined> {
 	if (!pi.events?.on || !pi.events?.emit) return Promise.resolve(undefined);
 	return new Promise(resolve => {
 		const requestId = randomUUID();
-		let off;
+		let off: (() => void) | undefined;
 		const done = (value?: { runs: any[]; fleet: any[] }) => { clearTimeout(timer); off?.(); resolve(value); };
 		const timer = setTimeout(() => done(), 2000);
 		off = pi.events.on(`subagents:rpc:v1:reply:${requestId}`, reply => done(reply?.success && Array.isArray(reply.data?.asyncSnapshot?.runs) ? { runs: reply.data.asyncSnapshot.runs, fleet: Array.isArray(reply.data.fleet?.entries) ? reply.data.fleet.entries : [] } : undefined));
@@ -83,12 +83,16 @@ export function createActivityMirror(pi, publish: (event: string, value: unknown
 	const brief = (value: unknown) => {
 		try {
 			const text = typeof value === "string" ? value : JSON.stringify(value, (_key, item) => item?.type === "image" ? { type: "image", note: "Image omitted from activity" } : item) ?? "";
-			return text.length > 16_000 ? text.slice(0, 16_000) + "\n… truncated" : text;
+			return text.length > 16_000 ? `${text.slice(0, 16_000)}\n… truncated` : text;
 		} catch { return "[Unserializable tool data]"; }
 	};
 	// Tool results are { content: [{ type: "text", text }] }: show their text, not escaped JSON.
+	const partText = (part?: { type?: string; text?: string }) => {
+		if (part?.type === "text") return part.text ?? "";
+		return part?.type === "image" ? "[image]" : "";
+	};
 	const resultText = (value: unknown) => Array.isArray((value as { content?: unknown })?.content)
-		? brief((value as { content: { type?: string; text?: string }[] }).content.map(part => part?.type === "text" ? part.text ?? "" : part?.type === "image" ? "[image]" : "").filter(Boolean).join("\n"))
+		? brief((value as { content: { type?: string; text?: string }[] }).content.map(partText).filter(Boolean).join("\n"))
 		: brief(value);
 	const snapshot = ctx => {
 		const hasPendingMessages = ctx?.hasPendingMessages?.();
@@ -142,7 +146,13 @@ export function createActivityMirror(pi, publish: (event: string, value: unknown
 		emit();
 	});
 	pi.on("tool_execution_start", event => tool(event, { state: "running", startedAt: Date.now(), args: brief(event.args) }));
-	pi.on("tool_execution_update", event => tool(event, { progress: resultText(event.partialResult) }));
+	// L13: stamp the last nonempty output and keep its last line before the 16,000-character clip; silence sends no
+	// event, so the page measures quiet time from outputAt on its own clock. Pi's bash sends one empty update at start.
+	pi.on("tool_execution_update", event => {
+		const raw = Array.isArray(event.partialResult?.content) ? event.partialResult.content.filter(part => part?.type === "text").map(part => part.text ?? "").join("\n") : "";
+		const lastLine = raw.split(/\r?\n/).map(line => line.trim()).filter(Boolean).at(-1);
+		tool(event, { progress: resultText(event.partialResult), ...(lastLine ? { outputAt: Date.now(), lastLine: lastLine.slice(0, 200) } : {}) });
+	});
 	pi.on("tool_execution_end", event => {
 		const startedAt = tools.find(row => row.id === event.toolCallId)?.startedAt;
 		tool(event, { state: event.isError ? "error" : "done", result: resultText(event.result), durationMs: event.durationMs ?? (startedAt === undefined ? undefined : Date.now() - startedAt) });

@@ -1359,6 +1359,19 @@ try {
  assert.equal(await evaluate("document.querySelectorAll(\".nested-tool\").length"), 1); assert.equal(await evaluate("document.querySelector(\"#activity script\")"), null);
  assert.equal(await evaluate("document.querySelector(\"details[data-id=tool_1]\").open"), false, "tool rows start collapsed");
  assert.equal(await evaluate("document.querySelector(\"details[data-id=tool_1] summary\").textContent"), "(1:05) read src/app.ts · running", "the running time leads the live tool line");
+ // L13: a bash call silent past 2 min shows quiet time and its last line; new output clears it; a finished call has none.
+ const quietBash = (patch) => ({ ...activity, compacting: false, tools: [{ id: "bash_q", name: "bash", state: "running", startedAt: liveToolNow - 200_000, args: JSON.stringify({ command: "npm ci" }), ...patch }] });
+ const quietText = "document.querySelector('details[data-id=bash_q] summary')?.textContent";
+ publish("activity", quietBash({ outputAt: liveToolNow - 150_000, lastLine: "Downloading 3/9" }));
+ await browser("wait", "--fn", `(${quietText} || '').includes('quiet')`);
+ assert.match(await evaluate(quietText), /^\(3:20\) bash .*· runningquiet for 2 min, last: Downloading 3\/9$/, "quiet notice with the last line");
+ publish("activity", quietBash({ outputAt: liveToolNow - 5_000, lastLine: "Downloading 4/9" }));
+ await browser("wait", "--fn", `!(${quietText} || 'quiet').includes('quiet')`);
+ publish("activity", quietBash({ state: "done", durationMs: 200_000 }));
+ await browser("wait", "--fn", `(${quietText} || '').includes('done')`);
+ assert.equal(await evaluate("document.querySelectorAll('.tool-quiet').length"), 0, "a finished call has no quiet notice");
+ if (process.env.QUIET_SHOT) { publish("activity", quietBash({ outputAt: liveToolNow - 150_000, lastLine: "Downloading 3/9" })); await browser("wait", ".tool-quiet:not([hidden])"); await browser("screenshot", process.env.QUIET_SHOT); }
+ publish("activity", activity); await browser("wait", "details[data-id=tool_1]");
  await evaluate("Date.now=window.liveToolClock;delete window.liveToolClock");
  // While working, Thinking and Compact keep the live thinking and only the latest tool call; Compact drops thinking once settled.
  const activityShown = () => evaluate("['#activity [data-id=tool_1]', '#activity [data-id=tool_2]', '#activity .thinking-row'].map(sel => !!document.querySelector(sel) && getComputedStyle(document.querySelector(sel)).display !== 'none')");

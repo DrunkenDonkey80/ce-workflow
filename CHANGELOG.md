@@ -12,6 +12,9 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - `compare-benchmark-runs` compares an optional `passed` or `score` per run and warns when the candidate passes less or scores lower, even when it is cheaper; pairs where only one side reports it are shown as not comparable.
 - `compare-benchmark-runs` reads the self-verify benchmark's `pass` field, counts distinct scenarios and changes in both directions, prints a 95% Wilson interval per arm for pass/fail and says "not established" when the intervals overlap. A judge error (`<field>Error`) or a null (not applicable) leaves the pair unscored instead of failed; its cost still counts.
 - `judge-handoff` and `judge-design-extras` give each judge call a 5-minute deadline and one retry on a wrong-shaped reply. A call that still fails marks only its batch or page as a judge error (unscored) and the rest keep scoring. Summaries print rates with a 95% interval: handoffs over judged runs (empty replies are n/a), design must-haves over pages; extras stay item counts.
+- Hub activity: a running bash command that has printed nothing for 2 minutes shows "quiet for N min" and its last output line under its row; new output clears it. It only informs: nothing is stopped and the agent is not told.
+
+![A running bash row with the quiet notice](docs/changelog/quiet-bash.png)
 - The reasoning-strip benchmark has a `compaction-model` matrix: Luna vs Terra as the ultrafull summarizer, one results file per arm, with each run's compaction model and cost.
 - `scripts/tool-usage-census.mjs` counts tool use per Plan3 phase and tool-loading period from real session logs (this PC plus files fetched from paired hubs), reading only tool names, never message text or arguments; it also lists always-on tools that are almost never used and their schema size.
 

@@ -135,7 +135,24 @@ assert.equal(activityMirror.snapshot().tools[0].state, "done");
 assert.equal(activityMirror.snapshot().tools[0].durationMs, 12);
 assert.deepEqual([activityMirror.snapshot().tools[0].progress, activityMirror.snapshot().tools[0].result], ["half", "[image]\nresult"], "tool results show their text, not JSON");
 activityHooks.get("tool_execution_start")({ toolCallId: "tool2", toolName: "bash" });
+// L13 with a fake clock: the empty start update stamps nothing; output stamps outputAt and the true last line, even
+// past the 16,000-character clip; silence (no event) keeps the stamp; new output moves it.
+const realNow = Date.now; let fakeNow = 1_000_000; Date.now = () => fakeNow;
+try {
+	const bashRow = () => activityMirror.snapshot().tools[1];
+	activityHooks.get("tool_execution_update")({ toolCallId: "tool2", toolName: "bash", partialResult: { content: [] } });
+	assert.deepEqual([bashRow().outputAt, bashRow().lastLine], [undefined, undefined], "the empty start update is not output");
+	fakeNow += 1000;
+	activityHooks.get("tool_execution_update")({ toolCallId: "tool2", toolName: "bash", partialResult: { content: [{ type: "text", text: "x".repeat(20_000) + "\nDownloading 3/9\n\n" }] } });
+	assert.deepEqual([bashRow().outputAt, bashRow().lastLine], [1_001_000, "Downloading 3/9"], "last line survives the progress clip");
+	assert.doesNotMatch(bashRow().progress, /Downloading/, "progress itself is clipped to the first 16,000 characters");
+	fakeNow += 300_000; // silence: no event, nothing changes
+	assert.equal(bashRow().outputAt, 1_001_000);
+	activityHooks.get("tool_execution_update")({ toolCallId: "tool2", toolName: "bash", partialResult: { content: [{ type: "text", text: "Downloading 4/9" }] } });
+	assert.deepEqual([bashRow().outputAt, bashRow().lastLine], [1_301_000, "Downloading 4/9"], "new output moves the stamp");
+} finally { Date.now = realNow; }
 activityHooks.get("tool_execution_end")({ toolCallId: "tool2", toolName: "bash", result: "ok" });
+assert.equal(activityMirror.snapshot().tools[1].state, "done");
 assert(Number.isFinite(activityMirror.snapshot().tools[1].durationMs));
 assert.equal(activityMirror.snapshot({ isIdle: () => false, hasPendingMessages: () => true }).hasPendingMessages, true);
 assert(!JSON.stringify(activityMirror.snapshot()).includes("private-base64"));

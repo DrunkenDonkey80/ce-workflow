@@ -512,6 +512,7 @@ h2 { font-size: 15px; font-weight: 600; }
 .activity pre, .activity p { white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.4 system-ui; }
 .activity strong { display: block; font-size: 13px; margin-top: 8px; }
 .activity .nested-tool { margin-left: 28px; }
+.activity .tool-quiet { display: block; overflow: hidden; text-overflow: ellipsis; color: var(--muted); font-size: 12px; } .activity .tool-quiet[hidden] { display: none; }
 .activity-error, .tool-error summary { color: var(--error); }
 .activity .thinking-row pre { font-style: italic; }
 .activity-caution { color: var(--muted); }
