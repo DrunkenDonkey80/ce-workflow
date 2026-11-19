@@ -4,15 +4,14 @@
 // node scripts/judge-handoff.mjs <results.json>... [--model ID]
 // Labels: handoff = asks the user to run/open/click/test something a coding agent with a shell, headless browser and
 // desktop automation could do itself; blocker = asks the user only for what such tools cannot do, naming why; none = no such request.
-import { spawn } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { judgeWithRetry, parseArray, rate, runChild } from "./judge-common.mjs";
 
 const args = process.argv.slice(2);
 const value = (flag, fallback) => { const i = args.indexOf(flag); return i < 0 ? fallback : args[i + 1]; };
 const runs = args.filter((a, i) => a.endsWith(".json") && !args[i - 1]?.startsWith("--"));
-if (!runs.length) throw new Error("usage: judge-handoff.mjs <results.json>... [--model ID]");
 const model = value("--model", "openai-codex/gpt-6-luna");
 const launcher = path.join(os.homedir(), ".pi", "agent", "bin", "pi-launcher.js");
 const LABELS = ["handoff", "blocker", "none"];
@@ -37,36 +36,42 @@ function finalText(run, r) {
 	return texts.filter(Boolean).at(-1) ?? "";
 }
 
+// One judge call per batch, with a deadline and one retry; a batch that still fails is a judge error.
 function judge(texts) {
-	return new Promise((resolve, reject) => {
-		const child = spawn(process.execPath, [launcher, "-p", "--model", model, "--thinking", "low", "--no-extensions", "--no-tools", "--no-skills",
-			"--no-context-files", "--no-prompt-templates", "--no-session", prompt(texts)], { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
-		let out = "";
-		child.stdout.on("data", (c) => { out += c; });
-		child.stderr.on("data", () => {});
-		child.on("exit", () => {
-			try {
-				const labels = JSON.parse(out.match(/\[[\s\S]*?\]/)?.[0]);
-				if (labels.length === texts.length && labels.every((l) => LABELS.includes(l))) return resolve(labels);
-			} catch {}
-			reject(new Error(`unparsable verdict: ${out.slice(0, 300)}`));
-		});
-	});
+	return judgeWithRetry(() => runChild(process.execPath, [launcher, "-p", "--model", model, "--thinking", "low", "--no-extensions", "--no-tools", "--no-skills",
+		"--no-context-files", "--no-prompt-templates", "--no-session", prompt(texts)]), (out) => parseArray(out, texts.length, (l) => LABELS.includes(l)));
+}
+
+// Labels rows in batches of 10 (small batches keep labels aligned). An empty final reply is not applicable (null)
+// and is not sent; a failed batch marks only its rows with handoffJudgedError, the other batches keep scoring.
+export async function labelRows(rows, texts, judgeBatch) {
+	const todo = rows.map((_, i) => i).filter((i) => texts[i].trim());
+	for (const r of rows) { r.handoffJudged = null; delete r.handoffJudgedError; }
+	for (let i = 0; i < todo.length; i += 10) {
+		const batch = todo.slice(i, i + 10);
+		const verdict = await judgeBatch(batch.map((j) => texts[j]));
+		batch.forEach((j, k) => { if (verdict.error) rows[j].handoffJudgedError = verdict.error; else rows[j].handoffJudged = verdict.value[k]; });
+	}
+}
+
+// Per scenario: label counts, a handoff rate over judged runs with its interval, and n/a and judge errors apart.
+export function summarize(rows) {
+	const by = {};
+	for (const r of rows) by[r.scenario] = [...(by[r.scenario] ?? []), r];
+	return Object.entries(by).map(([scenario, rs]) => {
+		const judged = rs.filter((r) => r.handoffJudged), count = (label) => judged.filter((r) => r.handoffJudged === label).length;
+		const na = rs.filter((r) => r.handoffJudged === null && !r.handoffJudgedError).length, errors = rs.filter((r) => r.handoffJudgedError).length;
+		return `${scenario} handoff ${rate(count("handoff"), judged.length, "runs")}, blocker ${count("blocker")}, none ${count("none")}${na ? `, n/a ${na}` : ""}${errors ? `, judge error ${errors} (unscored)` : ""}`;
+	}).join(" | ");
 }
 
 if (process.argv[1]?.endsWith("judge-handoff.mjs")) {
+	if (!runs.length) throw new Error("usage: judge-handoff.mjs <results.json>... [--model ID]");
 	for (const run of runs) {
 		const data = JSON.parse(readFileSync(run, "utf8"));
 		const rows = data.results.filter((r) => !r.error);
-		const labels = [];
-		for (let i = 0; i < rows.length; i += 10) labels.push(...await judge(rows.slice(i, i + 10).map((r) => finalText(run, r)))); // small batches keep labels aligned
-		rows.forEach((r, i) => { r.handoffJudged = labels[i]; });
+		await labelRows(rows, rows.map((r) => finalText(run, r)), judge);
 		writeFileSync(run, JSON.stringify(data, null, 2));
-		const by = {};
-		for (const r of rows) {
-			by[r.scenario] ??= { handoff: 0, blocker: 0, none: 0 };
-			by[r.scenario][r.handoffJudged]++;
-		}
-		console.log(run, Object.entries(by).map(([k, s]) => `${k} handoff ${s.handoff} blocker ${s.blocker} none ${s.none}`).join(" | "));
+		console.log(run, summarize(rows));
 	}
 }
