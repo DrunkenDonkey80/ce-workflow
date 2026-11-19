@@ -4,7 +4,6 @@
 // Each run: a fresh git fixture in temp, one `pi -p` prompt, then scoring from its session file.
 // Usage: node scripts/benchmark-self-verify-live.mjs [--model ID] [--thinking L] [--reps N] [--arms on,off]
 //          [--scenarios web,cli,explain,regress,locked,webapp,desktop,landing,pricing] [--parallel N] [--output DIR] [--append FILE]
-// Arm "soft": "on" with SELF_VERIFY replaced by SOFT_SELF_VERIFY below (verification optional, hand-offs only when no tool can).
 // Hand-offs: the regex in self-verify.ts is noisy; score them with scripts/judge-handoff.mjs <results.json>...
 // --append FILE adds FILE to the system prompt of every arm (prompt A/B: run once without, once with, then compare).
 // Block ablation: an arm "no-<tag>[+<tag>...]" is "on" without those system-prompt sections (locked-writes, test-sensitivity,
@@ -143,16 +142,6 @@ function offExtensions() {
 	return dir;
 }
 
-export const SOFT_SELF_VERIFY = "**Check with your tools, not the user (every session)**: whether a change needs checking is your call. When you want something checked, or you are about to tell the user to run, open, click or test something, do it yourself with the tools: tests and commands through bash; local web UI in a headless browser (agent-browser) with screen_read; desktop apps with app_act; phones and simulators with mobile_act; installers with vm_act; external logged-in sites with browser_act (enable these through tools_enable). Ask the user to check something only when no tool can (missing permission, device, credential, or a physical or subjective judgment only they can make), and name that exact reason.";
-
-function softExtensions() {
-	const dir = path.join(repo, `extensions-bench-soft-${process.pid}`);
-	rmSync(dir, { recursive: true, force: true });
-	cpSync(path.join(repo, "extensions"), dir, { recursive: true });
-	writeFileSync(path.join(dir, "self-verify.ts"), readFileSync(path.join(dir, "self-verify.ts"), "utf8").replace(/export const SELF_VERIFY = ".*";/, `export const SELF_VERIFY = ${JSON.stringify(SOFT_SELF_VERIFY)};`));
-	return dir;
-}
-
 function fixture(scenario) {
 	const dir = mkdtempSync(path.join(os.tmpdir(), "sv-"));
 	const files = typeof scenario.files === "function" ? scenario.files(41000 + Math.floor(Math.random() * 9000)) : scenario.files; // own port: runs are parallel
@@ -223,7 +212,7 @@ async function one(arm, extDir, name, repetition) {
 }
 
 const benchStart = new Date();
-const extDirs = { on: path.join(repo, "extensions"), off: arms.includes("off") ? offExtensions() : undefined, soft: arms.includes("soft") ? softExtensions() : undefined };
+const extDirs = { on: path.join(repo, "extensions"), off: arms.includes("off") ? offExtensions() : undefined };
 const jobs = [];
 for (let repetition = 1; repetition <= reps; repetition++) for (const name of scenarioNames) for (const arm of arms) jobs.push([arm, extDirs[arm] ?? extDirs.on, name, repetition]);
 const results = [];
@@ -238,7 +227,7 @@ try {
 	};
 	await Promise.all(Array.from({ length: Math.min(parallel, jobs.length) }, () => worker()));
 } finally {
-	for (const arm of ["off", "soft"]) if (extDirs[arm]) rmSync(extDirs[arm], { recursive: true, force: true });
+	if (extDirs.off) rmSync(extDirs.off, { recursive: true, force: true });
 	// Agents may leave the fixture app or server running; stop only those started during this benchmark.
 	if (process.platform === "win32") try {
 		execFileSync("powershell", ["-NoProfile", "-Command", `Get-CimInstance Win32_Process | Where-Object { $_.CreationDate -gt [datetime]'${benchStart.toISOString()}' -and $_.CommandLine -match 'counter\\.py|server\\.mjs' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`], { stdio: "ignore", timeout: 60_000 });

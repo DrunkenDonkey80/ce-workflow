@@ -122,9 +122,9 @@ try {
 	}
 	const sensitivitySections = {};
 	const sensitivityLegacy = hooks.get("before_agent_start")({ systemPrompt: "BASE" }).systemPrompt;
-	assert.match(sensitivityLegacy, /\*\*Test sensitivity \(every project\)\*\*[\s\S]*\*\*Verify it yourself \(every session\)\*\*/, "every session carries the self-verify rule");
+	assert.match(sensitivityLegacy, /\*\*Test sensitivity \(every project\)\*\*[\s\S]*\*\*Check with your tools, not the user \(every session\)\*\*/, "every session carries the self-verify rule");
 	hooks.get("before_agent_start")({ systemPromptOptions: { sections: sensitivitySections } });
-	assert.match(sensitivitySections["self-verify"], /Verify it yourself[\s\S]*no-tests/, "standing verification instructions remain active without a follow-up");
+	assert.match(sensitivitySections["self-verify"], /Check with your tools, not the user[\s\S]*no-tests/, "standing verification instructions remain active without a follow-up");
 	assert.match(sensitivitySections["test-sensitivity"], /failing-before-fix[\s\S]*test_sensitivity[\s\S]*unrelated failures/);
 	hooks.get("before_agent_start")({ systemPromptOptions: { sections: sensitivitySections } });
 	assert.equal(Object.keys(sensitivitySections).filter(name => name === "test-sensitivity").length, 1, "reinjection is stable after compaction");

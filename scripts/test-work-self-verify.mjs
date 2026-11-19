@@ -8,6 +8,6 @@ for (const text of ["Fixed and verified: tests pass, screenshot shows the button
 	assert(!handsOff(reply(text)), `no false trigger: ${text}`);
 assert(!handsOff(reply("Now you can run it.", { stopReason: "aborted" })), "aborted runs are not scored as handoffs");
 assert(!handsOff([{ role: "user", content: "please run it" }]), "user text alone never triggers");
-assert.match(SELF_VERIFY, /agent-browser[\s\S]*app_act[\s\S]*mobile_act[\s\S]*Reading the code or diff does not verify a UI change[\s\S]*name that exact blocker[\s\S]*no-tests/);
+assert.match(SELF_VERIFY, /your call[\s\S]*about to tell the user to run, open, click or test[\s\S]*agent-browser[\s\S]*app_act[\s\S]*mobile_act[\s\S]*only when no tool can[\s\S]*exact reason[\s\S]*no-tests/);
 
 console.log("ok - self-verify standing rule and benchmark hand-off scoring");
