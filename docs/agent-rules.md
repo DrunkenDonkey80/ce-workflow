@@ -29,6 +29,10 @@ Never retain or describe a workflow optimization as successful from focused test
 
 Live tests and benchmarks run the `ultrafull` compaction mode (the coming default). Use `ultracompact` only in tests of behavior that exists only in that mode (rolling stripping, the reasoning-strip benchmark) and in tests that cover every mode.
 
+## Compaction Model Fact Recall
+
+On every new model release, and before changing the compaction model, run the planted-fact check: `node scripts/benchmark-compaction-recall-live.mjs --models "<provider/id>,<current compaction model>" --sizes "30000,80000,150000"` (models run in parallel; results in `.pi/compaction-recall/`). It plants 5 facts (failing check, decision, port, constraint, next step) at depths 0.1-0.9 of the 3 largest ce-workflow sessions and scores the real `compactMemory` checkpoint by exact token match. Compare recall per length and the cost; switch only on a clear win at an acceptable cost, and confirm with `scripts/compare-benchmark-runs.mjs` on the E2 task run that task outcomes do not regress. Baseline (2026-11, 9 runs each, medium thinking): Opus 5.5 71% ($0.30/run), Terra 16%, Luna 16% ($0.004/run), Sonnet 5.5 17%, Astra 6.2 0%.
+
 ## Changelog screenshots
 
 For a visible hub change, add a tight crop: `node hub/scripts/changelog-shot.mjs "<selector>" docs/changelog/<version>-<name>.png "<setup JS>"` (throwaway hub with a fake Pi; `--pad=N` keeps some surroundings, `--ask=<ask_user JSON>` shows a dialog, `--size=WxH` for tall ones): shoot the control and the dialog it opens, then put `![what it shows](docs/changelog/<file>.png)` lines right after that bullet.
