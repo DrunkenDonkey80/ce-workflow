@@ -364,6 +364,16 @@ try {
 		fs.writeFileSync(path.join(fixture, "form.html"), '<form id="local"><input required value="valid"><button>Save</button></form><script>local.addEventListener("submit",event=>{event.preventDefault();const saved=document.createElement("p");saved.dataset.id="saved";saved.textContent="Saved locally";document.body.append(saved);});local.requestSubmit();</script>');
 		const localForm = await renderDesign({ folder: fixture, screen: "form.html", width: 360, height: 800, element: "@saved" });
 		assert.equal(localForm.report.missing, undefined, "renderer allows prevented local form handlers");
+		// AI-design tells from the frontend-design skill: each planted one is named, a plain page gets none.
+		const card = '<div style="border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.1)">';
+		fs.writeFileSync(path.join(fixture, "tells.html"), `<body style="background:#F4F1EA"><p style="text-transform:uppercase;letter-spacing:.2em">Eyebrow</p><p style="text-transform:uppercase;letter-spacing:.2em;color:#D97757">Label</p><h1>Build <em>faster</em> today</h1><p>Docs · Blog · Pricing</p><p>Craft — made for teams</p><a href="#">Start now →</a>${card}<b>01</b></div>${card}<b>02</b></div>${card}<b>03</b></div></body>`);
+		const planted = (await renderDesign({ folder: fixture, screen: "tells.html", width: 1024, height: 800 })).report.tells;
+		for (const tell of [/cream/, /terracotta/, /ALL-CAPS/, /SaaS-card/, /middle dots/, /em dash/, /→/, /headline/, /numbered/]) assert(planted.some(line => tell.test(line)), `planted tell ${tell} is reported: ${planted.join("; ")}`);
+		fs.writeFileSync(path.join(fixture, "plain.html"), '<body style="background:#fff;color:#222"><h1>Field notes</h1><p>Weekly observations from the river survey.</p><a href="#">Read the notes</a></body>');
+		const plain = await renderDesign({ folder: fixture, screen: "plain.html", width: 1024, height: 800 });
+		assert.deepEqual(plain.report.tells, [], "a plain page has no tells");
+		assert.doesNotMatch(reportText(plain.report), /AI-design/);
+		assert.match(reportText((await renderDesign({ folder: fixture, screen: "tells.html", width: 1024, height: 800 })).report), /AI-design tells .*cream/);
 		assert.ok(localForm.png.length, `saved content was rendered: ${reportText(localForm.report)}`);
 		fs.copyFileSync(new URL("../hub/scripts/fixtures/design-interactions.html", import.meta.url), path.join(fixture, "interaction.html"));
 		const targetHeights = [];

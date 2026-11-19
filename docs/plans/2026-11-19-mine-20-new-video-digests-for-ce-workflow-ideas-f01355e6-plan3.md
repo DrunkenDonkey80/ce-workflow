@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-19
-updated: 2026-11-19T13:43:43.295Z
+updated: 2026-11-19T13:54:02.780Z
 size: plan
 started: 2026-11-19T12:55:51.528Z
 ---
@@ -120,7 +120,7 @@ Commands:
 - [ ] **X2** Add a per-block off switch to the self-verify live benchmark; check: a dry run shows the block missing from the system prompt.
 - [ ] **X3** Run all-on vs each block off, 3 tasks x 3 reps; check: compare-benchmark-runs report per arm.
 - [ ] **X4** Trim or scope blocks with no gain; check: targeted prompt tests pass and the rerun shows no regression.
-- [ ] **X5** Add tell rules from the skill to look's rendered-style pass; check: a test page with planted tells gets each warning and a clean page gets none.
+- [x] **X5** design look reports "AI-design tells" (cream bg, near-black, terracotta, ALL-CAPS labels, card kit, middle dots, em-dash label, → suffix, headline accent, 01/02/03) via pageTells in design-render.ts.
 - [ ] **X6** Run Opus 5.5 vs Sonnet 5.5 as worker on the same benchmark tasks; check: compare-benchmark-runs shows pass rate, cost, tokens, turns per arm.
 - [ ] **X7** Recommend a Coding model setting from the result; check: the decision and numbers are recorded in Decisions.
 - [ ] **X8** Write a reusable planted-fact recall script (any --model) over 2-3 real transcripts; check: self-check scores a perfect summary 100% and an empty one 0%.

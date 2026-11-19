@@ -21,7 +21,7 @@ export const DESIGN_CSP = (origin: string) => `${SANDBOX_CSP(origin).replace("sa
 // The render-state (S06): what to show. folder is absolute (a design folder or a history version); width and height already
 // carry the rotation; hash is the deck slide (location.hash); styleEdits are the preview's live, unsaved inline edits.
 export type RenderState = { folder: string; screen?: string; width: number; height: number; hash?: string; input?: "mouse" | "touch"; reducedMotion?: boolean; colorScheme?: "light" | "dark"; pageState?: DesignJson; state?: string; styleEdits?: { selector: string; styles: Record<string, string> }[]; element?: string; full?: boolean; maxEdge?: number };
-export type RenderReport = { state?: { restored: true }; viewport: string; colorScheme: "light" | "dark"; observedViewport: string; input: { requested: "mouse" | "touch"; requestedReducedMotion: boolean; touchPoints: number | null; coarse: boolean | null; reducedMotion: boolean | null }; readiness: { settled: boolean; ignoredAnimations: number; elapsedMs: number; error?: string }; scrollWidth: number; overflow: boolean; wide: string[]; errors: string[]; console: string[]; failed: string[]; missing?: string };
+export type RenderReport = { state?: { restored: true }; viewport: string; colorScheme: "light" | "dark"; observedViewport: string; input: { requested: "mouse" | "touch"; requestedReducedMotion: boolean; touchPoints: number | null; coarse: boolean | null; reducedMotion: boolean | null }; readiness: { settled: boolean; ignoredAnimations: number; elapsedMs: number; error?: string }; scrollWidth: number; overflow: boolean; wide: string[]; tells?: string[]; errors: string[]; console: string[]; failed: string[]; missing?: string };
 export type Rendered = { png: Buffer; width: number; height: number; report: RenderReport };
 
 const MIME: Record<string, string> = { ".html": "text/html; charset=utf-8", ".htm": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".mjs": "text/javascript; charset=utf-8", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp", ".ico": "image/x-icon", ".woff": "font/woff", ".woff2": "font/woff2", ".ttf": "font/ttf", ".otf": "font/otf", ".mp4": "video/mp4", ".webm": "video/webm" };
@@ -83,6 +83,29 @@ const SETTLE_SCRIPT = `(async () => {
 		input: { touchPoints: navigator.maxTouchPoints, coarse: matchMedia("(pointer: coarse)").matches, reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches, dark: matchMedia("(prefers-color-scheme: dark)").matches } };
 })()`;
 
+// Runs in the page (injected via toString): the measurable AI-design tells from skills/frontend-design/SKILL.md.
+export function pageTells() {
+	const all = [...document.body.querySelectorAll("*")].filter(el => el.getClientRects().length), css = el => getComputedStyle(el), tells = [];
+	const near = (color, hex, distance) => { const [r, g, b, a = 1] = (color.match(/[\d.]+/g) || []).map(Number); return a >= 0.5 && Math.abs(r - parseInt(hex.slice(1, 3), 16)) + Math.abs(g - parseInt(hex.slice(3, 5), 16)) + Math.abs(b - parseInt(hex.slice(5, 7), 16)) <= distance; };
+	const body = css(document.body).backgroundColor, bg = /rgba\(0, 0, 0, 0\)|transparent/.test(body) ? css(document.documentElement).backgroundColor : body;
+	if (near(bg, "#F4F1EA", 30)) tells.push("warm cream page background (near #F4F1EA)");
+	if (near(bg, "#0B0B0B", 6) || near(bg, "#111111", 6)) tells.push("tinted near-black (#0B0B0B/#111) page background");
+	if (all.some(el => near(css(el).color, "#D97757", 30) || near(css(el).backgroundColor, "#D97757", 30))) tells.push("terracotta accent near #D97757 (Claude's own accent)");
+	const caps = all.filter(el => { const s = css(el); return s.textTransform === "uppercase" && parseFloat(s.letterSpacing) >= 0.05 * parseFloat(s.fontSize) && el.textContent.trim().length < 40; });
+	if (caps.length >= 2) tells.push(`${caps.length} tracked-out ALL-CAPS labels`);
+	const cards = {};
+	for (const el of all) { const s = css(el); if (s.boxShadow !== "none" && parseFloat(s.borderRadius) > 0) cards[s.borderRadius + s.boxShadow] = (cards[s.borderRadius + s.boxShadow] ?? 0) + 1; }
+	const kit = Math.max(0, ...Object.values(cards) as number[]);
+	if (kit >= 3) tells.push(`${kit} cards with the same radius and shadow (SaaS-card kit)`);
+	const lines = document.body.innerText.split("\n");
+	if (lines.some(line => line.split(" · ").length >= 3)) tells.push("meta string joined with middle dots (A · B · C)");
+	if (lines.some(line => /^[A-Z][A-Za-z]* — \S/.test(line.trim()))) tells.push("'WORD — fragment' label with a spaced em dash");
+	if ([...document.querySelectorAll("a, button")].some(el => el.textContent.trim().endsWith("→"))) tells.push("'→' appended to link or button text");
+	if ([...document.querySelectorAll("h1, h2")].some(h => [...h.querySelectorAll("*")].some(child => child.textContent.trim().split(/\s+/).length <= 3 && child.textContent.trim().length < h.textContent.trim().length && (css(child).color !== css(h).color || css(child).fontStyle !== css(h).fontStyle)))) tells.push("one word accented in a headline (color or italic)");
+	if (all.filter(el => !el.children.length && /^0\d\.?$/.test(el.textContent.trim())).length >= 3) tells.push("numbered markers 01 / 02 / 03 (fine only for a real sequence)");
+	return tells;
+}
+
 // Runs in the page: applies the live edits, marks the target element, and measures overflow and broken images.
 const PAGE_SCRIPT = (state: RenderState) => `(async () => {
 	await window.designReady;
@@ -108,7 +131,8 @@ const PAGE_SCRIPT = (state: RenderState) => `(async () => {
 	const vw = document.documentElement.clientWidth, name = el => el.dataset.id ? "@" + el.dataset.id : el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") + (el.classList[0] ? "." + el.classList[0] : "");
 	const wide = [...document.body.querySelectorAll("*")].filter(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.right > vw + 1 && getComputedStyle(el).position !== "fixed"; }).slice(0, 10).map(el => name(el) + " " + Math.round(el.getBoundingClientRect().right) + "px");
 	const broken = [...document.images].filter(img => img.complete && !img.naturalWidth).map(img => "image " + img.getAttribute("src"));
-	return JSON.stringify({ ...settled, state: replay ? { restored: true } : undefined, scrollWidth: document.documentElement.scrollWidth, vw, wide, broken, missing });
+	const tells = target ? [] : (${pageTells.toString()})();
+	return JSON.stringify({ ...settled, state: replay ? { restored: true } : undefined, scrollWidth: document.documentElement.scrollWidth, vw, wide, broken, missing, tells });
 })()`;
 
 type Step = { command: string[]; success: boolean; error: string | null; result: any };
@@ -231,7 +255,7 @@ export async function renderDesign(state: RenderState): Promise<Rendered> {
 		const { steps, page, png } = await visit(`${server.origin}/${screen.split("/").map(encodeURIComponent).join("/")}${hash}`, width, height, PAGE_SCRIPT(state), { element: !!state.element, full: state.full, input: state.input, reducedMotion: state.reducedMotion, colorScheme: state.colorScheme, tolerate: page => !!page.missing });
 		const report: RenderReport = {
 			state: page.state, viewport: `${width}×${height}`, colorScheme: state.colorScheme ?? "light", observedViewport: page.observedViewport ?? "unavailable", readiness: page.readiness,
-			input: { requested: state.input ?? "mouse", requestedReducedMotion: !!state.reducedMotion, touchPoints: page.input?.touchPoints ?? null, coarse: page.input?.coarse ?? null, reducedMotion: page.input?.reducedMotion ?? null }, scrollWidth: page.scrollWidth, overflow: page.scrollWidth > page.vw + 1, wide: page.wide ?? [],
+			input: { requested: state.input ?? "mouse", requestedReducedMotion: !!state.reducedMotion, touchPoints: page.input?.touchPoints ?? null, coarse: page.input?.coarse ?? null, reducedMotion: page.input?.reducedMotion ?? null }, scrollWidth: page.scrollWidth, overflow: page.scrollWidth > page.vw + 1, wide: page.wide ?? [], tells: page.tells ?? [],
 			errors: (steps.find(step => step.command[0] === "errors")?.result?.errors ?? []).map(item => String(item.text).split("\n")[0]).slice(0, 20),
 			console: (steps.find(step => step.command[0] === "console")?.result?.messages ?? []).filter(item => ["error", "warning"].includes(item.type)).map(item => `${item.type}: ${item.text}`).slice(0, 20),
 			failed: [...new Set([...server.failed, ...page.broken ?? []])].slice(0, 20),
@@ -299,6 +323,7 @@ export function reportText(report: RenderReport) {
 		report.missing,
 		report.overflow ? `horizontal overflow: page is ${report.scrollWidth}px wide in ${report.viewport}` : "",
 		report.wide.length ? `wider than the viewport: ${report.wide.join(", ")}` : "",
+		report.tells?.length ? `AI-design tells (fine when the brief asks for them): ${report.tells.join("; ")}` : "",
 		...report.errors.map(line => `page error: ${line}`), ...report.console.map(line => `console ${line}`), ...report.failed.map(line => `failed: ${line}`),
 	].filter(Boolean);
 	return lines.length ? lines.join("\n") : `${report.viewport}: no overflow, no errors`;
