@@ -4308,7 +4308,7 @@ function hasProjectOverride(settings, item) {
 	if (item.kind === "imageModel") return owns(block, "imageModel");
 	if (item.kind === "designModel") return owns(block, "designModel");
 	if (item.kind === "mappingModel") return owns(block, "mappingModel");
-	if (item.kind === "reviewAfterPlan" || item.kind === "reviewBeforeCommit") return owns(block, item.kind);
+	if (item.kind === "reviewAfterPlan" || item.kind === "reviewBeforeCommit" || item.kind === "stepRetros") return owns(block, item.kind);
 	return false;
 }
 
@@ -4504,6 +4504,11 @@ async function workSettingsLoop(ctx, pi = undefined) {
 				description: "/resume3 execution switches to this effort when it starts; planning switches back. Each switch re-reads the context uncached once.",
 			},
 {
+				kind: "stepRetros", value: "stepRetros",
+				label: `Plan3 → Step retros: ${settings.workOrchestrator?.stepRetros === false ? "off" : "on"}`,
+				description: "Enter toggles. On: a step that repeated a command 3+ times, had 3+ failed tools or took over 30 min gets a background Opus 5.5 retro; off: no model calls. The finish retro always runs.",
+			},
+{
 				kind: "scopedModels", value: "scopedModels",
 				label: `Set scoped models: ${(await scopedModelEntries(ctx)).length || "all"} ${SUBMENU_ARROW}`,
 				description: "Check the models listed first in every model picker (Tab shows all); Pi's enabledModels, for all projects.",
@@ -4689,6 +4694,15 @@ async function workSettingsLoop(ctx, pi = undefined) {
 			else settings.workOrchestrator.plan3.codingEffort = level;
 			writeScopedSettings(ctx.cwd, scope, settings);
 			ctx.ui.notify(`Plan3 coding effort: ${level}`, "info");
+			continue;
+		}
+		if (pick.kind === "stepRetros") {
+			const on = settings.workOrchestrator?.stepRetros !== false;
+			settings = readScopedSettings(ctx.cwd, scope);
+			settings.workOrchestrator ??= {};
+			settings.workOrchestrator.stepRetros = !on;
+			writeScopedSettings(ctx.cwd, scope, settings);
+			ctx.ui.notify(`Plan3 step retros: ${on ? "off" : "on"}`, "info");
 			continue;
 		}
 		if (pick.kind === "reviewAfterPlan" || pick.kind === "reviewBeforeCommit") {

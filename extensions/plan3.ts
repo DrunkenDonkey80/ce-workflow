@@ -18,7 +18,7 @@ import { deliverReferenceBundle } from "./design-bundles.ts";
 import { captureUrlReference } from "./browser-fetch.ts";
 import { originalForHub, pickForHub, searchForHub } from "./browser-search.ts";
 import { reworkRequest } from "./plan3-rework.ts";
-import { createStats, finishRetro, statsItems } from "./plan3-stats.ts";
+import { createStats, finishRetro, statsItems, stepRetro, stepSignal } from "./plan3-stats.ts";
 import { HUMAN, HUMAN_TEXT, availLine, changeMessage, chooseAvail, isOn, needsFile, readAvail, setBoth, setMode, unset, writeAvail } from "./plan3-needs.ts";
 import { hubActive, publish as hubPublish } from "./hub-channel.ts";
 import { releaseSessionLock, takeSessionLock } from "./session-lock.ts";
@@ -548,6 +548,11 @@ function keepOverrides(file, input) {
 		if (lost) appendToSection(next.lines, "Decisions", sized, true);
 		if (missing.length || lost) input.content = next.lines.join(next.eol);
 	} catch { /* Unclosed front matter: leave the write alone. */ }
+}
+// D-09: step retros run unless the project, else global, settings turn them off.
+export function stepRetrosOn(cwd) {
+	const agentDir = process.env.PI_CODING_AGENT_DIR ?? path.join(os.homedir(), ".pi", "agent");
+	return readJson(path.join(cwd, ".pi", "settings.json")).workOrchestrator?.stepRetros ?? readJson(path.join(agentDir, "settings.json")).workOrchestrator?.stepRetros ?? true;
 }
 // Per-phase model/effort; each key: plan override, then project, then global; unset keeps the session's own value.
 export function phaseSettings(cwd, plan?) {
@@ -1234,9 +1239,37 @@ export default function plan3(pi) {
 		},
 		step: async (file) => {
 			const work = workState(split(await readFile(file, "utf8")).lines, availOf(file));
-			return (work.wip[0] ?? work.next)?.id;
+			// Several wip steps: the activity belongs to no single step, so it feeds no step's retro signal.
+			return work.wip.length > 1 ? "(ambiguous)" : (work.wip[0] ?? work.next)?.id;
 		},
 	});
+	// D-04/D-05 step retros: plan-scope rules wait here for the next step start after they arrive.
+	const stepRules = new Map(), stepRetros = new Set();
+	function stepRetroAfter(ctx, plan, id) {
+		if (!id || stepRetros.has(`${plan.id}:${id}`) || !stepRetrosOn(ctx.cwd)) return;
+		stepRetros.add(`${plan.id}:${id}`);
+		const run = async () => {
+			const row = await statsHooks.stepRow(logFile(plan.file), id);
+			if (!stepSignal(row).length) return;
+			const result = await stepRetro(ctx.modelRegistry, { title: plan.title, step: id, row, log: await readFile(logFile(plan.file), "utf8").catch(() => "") });
+			await appendLog(plan.file, result.text);
+			const rules = [...result.retro.project, ...result.retro.workflow].filter((item) => item.scope === "plan");
+			const open = rules.length && (await listPlans(ctx.cwd)).find((candidate) => candidate.id === plan.id && isOpen(candidate));
+			if (open) {
+				await mutate(open, (lines) => appendToSection(lines, "Decisions", rules.map((rule) => `- **Step retro rule (${id})** ${rule.advice} Source: step retro, cites "${rule.cites.trim()}".`).join("\n"), true));
+				stepRules.set(plan.id, [...(stepRules.get(plan.id) ?? []), ...rules.map((rule) => rule.advice)]);
+			}
+			ctx.ui.notify(`Plan3 step retro ${id}: ${open ? `${rules.length} rule(s) for the rest of this plan, ` : ""}see ${path.relative(ctx.cwd, logFile(plan.file))}`, "info");
+		};
+		run().catch((error) => ctx.ui.notify(`Plan3 step retro ${id} skipped: ${error.message}`, "warning"));
+	}
+	// Sent once at a step start, never into a running step.
+	function sendStepRules(plan, started) {
+		const rules = started && stepRules.get(plan.id);
+		if (!rules?.length) return;
+		stepRules.delete(plan.id);
+		pi.sendMessage?.({ customType: "plan3-step-rule", display: true, content: `Plan3 step retro: work rules for the rest of this plan (also in its Decisions), starting with ${started}:\n${rules.map((rule) => `- ${rule}`).join("\n")}` }, { deliverAs: "steer" });
+	}
 	// Reconcile run settled: questions it added get the resolve dialog again instead of a typed /plan3 resolve.
 	async function afterResolve(ctx, aborted) {
 		const pending = resolving;
@@ -1850,6 +1883,8 @@ export default function plan3(pi) {
 					if (missing.length) throw new Error(`${args.id} needs ${missing.join(", ")}, which is off or undefined; continue with runnable work (the user switches requirements with Alt+A).`);
 					return markStep(lines, need("id"), mark, args);
 				});
+				if (mark === "done") stepRetroAfter(ctx, plan, args.id);
+				if (mark === "wip") sendStepRules(plan, args.id);
 			} else if (args.action === "next") {
 				const avail = availOf(plan.file);
 				result = await mutate(plan, (lines) => {
@@ -1863,6 +1898,8 @@ export default function plan3(pi) {
 					if (next) markStep(lines, next.id, "wip");
 					return { completed: current, started: next?.id, log };
 				});
+				sendStepRules(plan, result.started);
+				stepRetroAfter(ctx, plan, result.completed);
 			} else if (args.action === "section") {
 				const name = need("name"), text = need("text");
 				await mutate(plan, (lines) => {

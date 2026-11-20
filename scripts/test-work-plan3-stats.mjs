@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { classify, commandShape, createStats, planDigest, recordCommand, recordReply, sanitize, serialHint, statsItems, emptyStats, parseRetro, retroPrompt } from "../extensions/plan3-stats.ts";
+import { classify, commandShape, createStats, planDigest, recordCommand, recordReply, sanitize, serialHint, statsItems, emptyStats, parseRetro, retroPrompt, stepDigest, stepSignal } from "../extensions/plan3-stats.ts";
 
 assert.equal(classify("cd \"C:/x\" && node scripts/test-work-plan3.mjs"), "test");
 assert.equal(classify("cargo nextest run"), "test");
@@ -102,6 +102,30 @@ createStats({ on: (name, handler) => hooks2.set(name, handler) }, { plan: async 
 await hooks2.get("agent_start")({}, {});
 await hooks2.get("agent_settled")({}, {});
 assert.equal((await readJson(statsPath)).runs, 3, "the serial-hint run above plus this one");
+// Step slices (RF-02): each step counts its own commands, so a 2+1 split over two steps is no three-repeat signal.
+let sliceStep = "B-01";
+const hooks4 = new Map();
+const sliceHooks = createStats({ on: (name, handler) => hooks4.set(name, handler) }, { plan: async () => ({ file: planFile, log }), step: async () => sliceStep });
+await hooks4.get("agent_start")({}, {});
+const bashRun = async (id, command) => {
+	hooks4.get("tool_execution_start")({ toolCallId: id, toolName: "bash", args: { command } }, { cwd: directory });
+	hooks4.get("tool_execution_end")({ toolCallId: id, toolName: "bash", isError: false, durationMs: 1000 });
+};
+await bashRun("s1", "npm test"); await bashRun("s2", "npm test");
+sliceStep = "B-02"; await hooks4.get("turn_end")({}, {});
+await bashRun("s3", "npm test");
+const b1 = await sliceHooks.stepRow(log, "B-01"), b2 = await sliceHooks.stepRow(log, "B-02");
+assert.equal((await readJson(statsPath)).commands["bash\0npm test"].count, 4, "the plan-wide table still counts every run");
+assert.deepEqual([b1.commands["bash\0npm test"].count, b2.commands["bash\0npm test"].count], [2, 1]);
+assert.deepEqual([stepSignal(b1), stepSignal(b2)], [[], []], "2+1 over two steps fires no three-repeat signal");
+await bashRun("s4", "npm test"); await bashRun("s5", "npm test");
+assert.deepEqual(stepSignal(await sliceHooks.stepRow(log, "B-02")), ["a command ran 3 times"]);
+await hooks4.get("agent_settled")({}, {});
+assert.deepEqual(stepSignal({ ms: 31 * 60_000, failures: 3 }), ["3 failed tools", "31m 0s active"]);
+assert.deepEqual(stepSignal(undefined), [], "a step with no activity is quiet");
+const sDigest = stepDigest("B-02", { ms: 3000, failures: 1, commands: { "bash\0npm test": { count: 3, ms: 3000, maxMs: 1000, failures: 1 } } },
+	"# Plan3 log\n\n## 2026 B-01 done: x\n\n- check: old\n\n## 2026 B-02 done: fixed\n\n- [x] **B-02** fix\n  - check: npm test failed once, then ok\n\n## 2026 Superseded resume context\n\nother\n");
+assert.match(sDigest, /^Step B-02: 3s active, 1 failed tools\.\n\nRepeated commands in this step:\n- ×3, 3s: bash: npm test\n\nFailed commands in this step:\n- 1\/3 failed: bash: npm test\n\nStep log \(its notes and checks\):\n- \[x\] \*\*B-02\*\* fix\n- check: npm test failed once, then ok$/, "only this step's log entry");
 
 const labels = statsItems(saved).map((item) => item.label).join("\n");
 assert.match(labels, /Tests: \d+s/);
@@ -131,8 +155,14 @@ const rDigest = "Slowest steps:\n- S1: 5m\n- S2: 1m";
 const rec = (cites) => ({ advice: "do x", cites });
 const retro = parseRetro(`Sure: ${JSON.stringify({ project: [rec("- S1: 5m"), rec("S2: 1m"), rec("- S1: 5m"), rec("- S2: 1m")], workflow: [rec("- S9: invented"), rec("S1: 5m")] })}`, rDigest);
 assert.equal(retro.project.length, 3, "at most 3 per side");
-assert.deepEqual(retro.workflow, [rec("S1: 5m")], "an invented citation is dropped");
+assert.deepEqual(retro.workflow, [{ ...rec("S1: 5m"), scope: "ce-workflow" }], "an invented citation is dropped; a missing scope falls back to the list");
 assert.equal(retro.uncited, 1);
 assert.equal(parseRetro("{\"project\":[]}", rDigest), undefined);
 assert.match(retroPrompt("T", rDigest), /At most 3 per list[\s\S]*- S2: 1m$/);
+assert.doesNotMatch(retroPrompt("T", rDigest), /"plan"/, "the finish retro offers no plan scope");
+assert.match(retroPrompt("T", rDigest, "S2"), /^Step S2 of the plan "T" just finished[\s\S]*"plan" \(a work rule for the rest of this plan only\)/);
+const scopedReply = JSON.stringify({ project: [{ ...rec("S1: 5m"), scope: "script" }, { ...rec("S2: 1m"), scope: "bogus" }], workflow: [{ ...rec("S1: 5m"), scope: "plan" }] });
+const finishScoped = parseRetro(scopedReply, rDigest);
+assert.deepEqual([finishScoped.project.map((r) => r.scope), finishScoped.workflow, finishScoped.rejected], [["script", "project"], [], 1], "the finish retro rejects plan scope");
+assert.deepEqual(parseRetro(scopedReply, rDigest, { step: true }).workflow.map((r) => r.scope), ["plan"], "a step retro keeps it");
 console.log("ok - plan3 stats collection, classification, viewer and digest");
