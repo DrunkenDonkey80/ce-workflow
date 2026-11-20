@@ -3692,7 +3692,7 @@ export default function workModelsExtension(pi) {
 		execute(_id, args) {
 			const note = String(args.note ?? "").trim();
 			if (!note) throw new Error("The compaction note must not be empty.");
-			if (note.length > COMPACTION_NOTE_MAX) throw new Error(`Not saved: the note is ${note.length} characters; the limit is ${COMPACTION_NOTE_MAX}. Drop anything already in the plan, sidecar log or git and call again with normal spacing.`);
+			if (note.length > COMPACTION_NOTE_MAX) throw new Error(`Not saved: the note is ${note.length} characters; the limit is ${COMPACTION_NOTE_MAX}. Cut at least ${note.length - COMPACTION_NOTE_MAX + 200} characters (models undercount; a 200-character margin avoids another retry). Drop anything already in the plan, sidecar log or git and call again with normal spacing.`);
 			return { content: [{ type: "text", text: "Saved; it will be included verbatim in the next compaction summary. Continue working." }] };
 		},
 	});

@@ -8,6 +8,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 - The background-process guard no longer blocks commands that start parallel jobs and then `wait` for them all, such as four test suites run side by side.
 - `test_sensitivity` now says that its command runs from the copied project directory, and a red baseline points at the two usual causes: a path relative to a subfolder, or a missing `dependencyDirs` entry.
+- An over-long `compaction_note` is now rejected with how many characters to cut (with a small margin), so the agent saves it on the next try instead of trimming a few words at a time.
 
 ## 1.1.5 — 2026-11-20
 
