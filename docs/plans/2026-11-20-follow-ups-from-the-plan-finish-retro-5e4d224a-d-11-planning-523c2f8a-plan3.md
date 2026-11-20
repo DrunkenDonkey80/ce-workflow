@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-20
-updated: 2026-11-20T17:02:59.555Z
+updated: 2026-11-20T17:07:56.665Z
 reviewed: 2026-11-20
 started: 2026-11-20T16:56:31.811Z
 ---
@@ -74,9 +74,7 @@ None.
 
 ### Phase 3: Routing and requests [code]
 
-- [ ] **RF-03** Scope per item in the retro reply; code writes redacted, deduplicated request files under `.ce-workflow/local/requests/` (D-03, D-07), finish retro too
-  - Evidence comes from the canonical digest line the citation matched, redacted, never the model's citation text; advice and command shapes are redacted too (`commandShape` can keep a path or user name).
-  - Check: fixture items with a secret, a full path and a user name in advice, citation and command shape come out redacted; the same item twice writes one file; the folder carries its own `.gitignore`; the writer makes no network call.
+- [x] **RF-03** parseRetro keeps the matched digest line as evidence; writeRequests writes one redacted (secrets, full paths, user name) Markdown file per non-plan item to .ce-workflow/local/requests/<scope>-<hash>.md, deduplicated by scope and normalized advice, with a local/.gitignore "*", no network; called after both step and finish retros.
 
 ### Phase 4: Hub counter [code]
 

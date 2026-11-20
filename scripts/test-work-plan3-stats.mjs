@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { classify, commandShape, createStats, planDigest, recordCommand, recordReply, sanitize, serialHint, statsItems, emptyStats, parseRetro, retroPrompt, stepDigest, stepSignal } from "../extensions/plan3-stats.ts";
+import { classify, commandShape, createStats, planDigest, recordCommand, recordReply, sanitize, serialHint, statsItems, emptyStats, parseRetro, redactRequest, retroPrompt, stepDigest, stepSignal, writeRequests } from "../extensions/plan3-stats.ts";
 
 assert.equal(classify("cd \"C:/x\" && node scripts/test-work-plan3.mjs"), "test");
 assert.equal(classify("cargo nextest run"), "test");
@@ -155,7 +155,7 @@ const rDigest = "Slowest steps:\n- S1: 5m\n- S2: 1m";
 const rec = (cites) => ({ advice: "do x", cites });
 const retro = parseRetro(`Sure: ${JSON.stringify({ project: [rec("- S1: 5m"), rec("S2: 1m"), rec("- S1: 5m"), rec("- S2: 1m")], workflow: [rec("- S9: invented"), rec("S1: 5m")] })}`, rDigest);
 assert.equal(retro.project.length, 3, "at most 3 per side");
-assert.deepEqual(retro.workflow, [{ ...rec("S1: 5m"), scope: "ce-workflow" }], "an invented citation is dropped; a missing scope falls back to the list");
+assert.deepEqual(retro.workflow, [{ ...rec("S1: 5m"), evidence: "- S1: 5m", scope: "ce-workflow" }], "an invented citation is dropped; a missing scope falls back to the list");
 assert.equal(retro.uncited, 1);
 assert.equal(parseRetro("{\"project\":[]}", rDigest), undefined);
 assert.match(retroPrompt("T", rDigest), /At most 3 per list[\s\S]*- S2: 1m$/);
@@ -165,4 +165,21 @@ const scopedReply = JSON.stringify({ project: [{ ...rec("S1: 5m"), scope: "scrip
 const finishScoped = parseRetro(scopedReply, rDigest);
 assert.deepEqual([finishScoped.project.map((r) => r.scope), finishScoped.workflow, finishScoped.rejected], [["script", "project"], [], 1], "the finish retro rejects plan scope");
 assert.deepEqual(parseRetro(scopedReply, rDigest, { step: true }).workflow.map((r) => r.scope), ["plan"], "a step retro keeps it");
+// RF-03 requests: redacted (secret, full path, user name), quote the matched digest line, one file per item, self-ignoring folder.
+assert.equal(redactRequest("run C:\\Users\\jdoe\\repo\\test.mjs and /home/jdoe/x/y.sh with token=abc123def for jdoe", "jdoe"),
+	"run <path>/test.mjs and <path>/y.sh with token=[REDACTED] for <user>");
+const reqDir = await mkdtemp(path.join(os.tmpdir(), "plan3-req-"));
+const reqDigest = "Repeated commands:\n- ×4, 2m: bash: node C:/Users/jdoe/repo/scripts/t.mjs --key=sk-abcdefghijklmnop1234";
+const leaky = { advice: "Add a quick mode to C:/Users/jdoe/repo/scripts/t.mjs", cites: "bash: node C:/Users/jdoe/repo/scripts/t.mjs", scope: "script" };
+const parsed = parseRetro(JSON.stringify({ project: [leaky, leaky, { ...leaky, scope: "plan" }], workflow: [] }), reqDigest, { step: true });
+const items = [...parsed.project, ...parsed.workflow];
+assert.deepEqual(await writeRequests(reqDir, { title: "T", step: "S1", items }).then((files) => files.length), 1, "the same item twice writes one file; plan scope writes none");
+assert.equal((await writeRequests(reqDir, { title: "T", items })).length, 0, "a later retro repeating it writes nothing");
+assert.equal(await readFile(path.join(reqDir, ".ce-workflow", "local", ".gitignore"), "utf8"), "*\n");
+const [reqFile] = await readdir(path.join(reqDir, ".ce-workflow", "local", "requests"));
+assert.match(reqFile, /^script-[0-9a-f]{12}\.md$/);
+const body = await readFile(path.join(reqDir, ".ce-workflow", "local", "requests", reqFile), "utf8");
+assert.match(body, /^# Add a quick mode to <path>\/t\.mjs\n[\s\S]*- From: step S1 of plan "T"\n- Evidence: ×4, 2m: bash: node <path>\/t\.mjs --key=\[REDACTED\]/);
+assert.doesNotMatch(body, /jdoe|Users|sk-/, "no user, path or secret");
+await rm(reqDir, { recursive: true, force: true });
 console.log("ok - plan3 stats collection, classification, viewer and digest");

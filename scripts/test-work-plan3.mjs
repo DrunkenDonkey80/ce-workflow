@@ -940,19 +940,23 @@ try {
 		const calls = []; let release; const held = new Promise((r) => { release = r; }); let hold = false;
 		const reply = JSON.stringify({ project: [{ advice: "Add a quick test mode", cites: "bash: npm test", scope: "script" }], workflow: [{ advice: "Run the suite once per step", cites: "bash: npm test", scope: "plan" }] });
 		const saved = ctx.modelRegistry;
-		ctx.modelRegistry = { ...saved, find: (provider, id) => ({ provider, id }), streamSimple: (model, request) => { calls.push(request); const gate = hold ? held : null; return { result: async () => { await gate; return { stopReason: "stop", content: [{ type: "text", text: reply }] }; } }; } };
+		ctx.modelRegistry = { ...saved, find: (provider, id) => ({ provider, id }), streamSimple: (_model, request) => { calls.push(request); const gate = hold ? held : null; return { result: async () => { await gate; return { stopReason: "stop", content: [{ type: "text", text: reply }] }; } }; } };
 		const file = path.join(directory, "2026-10-03-steps-55555555-plan3.md");
 		await writeFile(file, validPlan("55555555", "Steps", "active", ["- [wip] **T-01** loud", "- [ ] **T-02** quiet", "- [ ] **T-03** loud via next", "- [ ] **T-04** quiet", "- [ ] **T-05** loud, setting off"].join("\n")));
 		const loud = { ms: 60000, testMs: 0, commands: { "bash\0npm test": { count: 3, ms: 3000, maxMs: 1000, failures: 0 } } };
 		await writeFile(path.join(directory, "logs", "55555555.stats.json"), JSON.stringify({ version: 1, activeMs: 1, runs: 1, steps: { "T-01": loud, "T-02": { ms: 1000, commands: { "bash\0npm test": { count: 2, ms: 2, maxMs: 1, failures: 0 } } }, "T-03": loud, "T-05": loud } }));
 		const rules = () => messages.filter((m) => m.customType === "plan3-step-rule");
 		const until = async (test) => { for (let i = 0; i < 150 && !test(); i++) await new Promise((r) => setTimeout(r, 20)); };
+		await rm(path.join(cwd, ".ce-workflow"), { recursive: true, force: true }); // the finish retro block above wrote its own requests
 		await tool({ action: "step", plan: "55555555", id: "T-01", mark: "done", summary: "loud" });
 		await until(() => /Step retro rule \(T-01\)/.test(readFileSync(file, "utf8")));
 		assert.equal(calls.length, 1, "a signal step gets one retro");
 		assert.match(calls[0].messages[0].content[0].text, /^Step T-01 of the plan "Steps" just finished[\s\S]*- ×3, 3s: bash: npm test/);
 		assert.match(readFileSync(file, "utf8"), /## Decisions\n[\s\S]*- \*\*Step retro rule \(T-01\)\*\* Run the suite once per step/);
 		assert.match(await readFile(path.join(directory, "logs", "55555555.md"), "utf8"), /Step retro T-01[\s\S]*Add a quick test mode \(cites: bash: npm test\) \[scope: script\]/);
+		const requestDir = path.join(cwd, ".ce-workflow", "local", "requests");
+		assert.deepEqual((await readdir(requestDir)).map((name) => name.split("-")[0]), ["script"], "the step retro writes its script-scope item as a request; the plan rule is not one");
+		await rm(path.join(cwd, ".ce-workflow"), { recursive: true });
 		assert.equal(rules().length, 0, "no steer while no step is starting");
 		await tool({ action: "step", plan: "55555555", id: "T-02", mark: "wip" });
 		assert.equal(rules().length, 1, "the rule goes out at the next step start");
@@ -1115,6 +1119,11 @@ try {
 	assert(!existsSync(path.join(directory, "2026-10-02-other-11111111-plan3.md")), "deleted only after confirmation");
 
 	// Legacy conversion: read-only store, markers, idempotent.
+	// RF-03 retro requests (.ce-workflow/local) are retro output, not workflow state.
+	if (existsSync(path.join(cwd, ".ce-workflow"))) {
+		assert.deepEqual(await readdir(path.join(cwd, ".ce-workflow")), ["local"]);
+		await rm(path.join(cwd, ".ce-workflow"), { recursive: true });
+	}
 	assert(![".pi", ".ce-workflow"].some((name) => existsSync(path.join(cwd, name))), "Plan3 writes no workflow state");
 	const legacyStore = path.join(cwd, ".ce-workflow", "work-items.json");
 	await mkdir(path.dirname(legacyStore), { recursive: true });

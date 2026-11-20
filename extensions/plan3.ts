@@ -18,7 +18,7 @@ import { deliverReferenceBundle } from "./design-bundles.ts";
 import { captureUrlReference } from "./browser-fetch.ts";
 import { originalForHub, pickForHub, searchForHub } from "./browser-search.ts";
 import { reworkRequest } from "./plan3-rework.ts";
-import { createStats, finishRetro, statsItems, stepRetro, stepSignal } from "./plan3-stats.ts";
+import { createStats, finishRetro, statsItems, stepRetro, stepSignal, writeRequests } from "./plan3-stats.ts";
 import { HUMAN, HUMAN_TEXT, availLine, changeMessage, chooseAvail, isOn, needsFile, readAvail, setBoth, setMode, unset, writeAvail } from "./plan3-needs.ts";
 import { hubActive, publish as hubPublish } from "./hub-channel.ts";
 import { releaseSessionLock, takeSessionLock } from "./session-lock.ts";
@@ -1253,6 +1253,7 @@ export default function plan3(pi) {
 			if (!stepSignal(row).length) return;
 			const result = await stepRetro(ctx.modelRegistry, { title: plan.title, step: id, row, log: await readFile(logFile(plan.file), "utf8").catch(() => "") });
 			await appendLog(plan.file, result.text);
+			await writeRequests(ctx.cwd, { title: plan.title, step: id, items: [...result.retro.project, ...result.retro.workflow] });
 			const rules = [...result.retro.project, ...result.retro.workflow].filter((item) => item.scope === "plan");
 			const open = rules.length && (await listPlans(ctx.cwd)).find((candidate) => candidate.id === plan.id && isOpen(candidate));
 			if (open) {
@@ -1666,7 +1667,8 @@ export default function plan3(pi) {
 			const result = await finishRetro(ctx.modelRegistry, { title: plan.title, statsPath: statsFile(file), logPath: logFile(file) });
 			if (!result) return;
 			await appendLog(file, result.text);
-			ctx.ui.notify(`Plan3 retro (${plan.title}): ${result.retro.project.length} project, ${result.retro.workflow.length} workflow recommendation(s) in ${path.relative(ctx.cwd, logFile(file))}`, "info");
+			const requests = await writeRequests(ctx.cwd, { title: plan.title, items: [...result.retro.project, ...result.retro.workflow] });
+			ctx.ui.notify(`Plan3 retro (${plan.title}): ${result.retro.project.length} project, ${result.retro.workflow.length} workflow recommendation(s) in ${path.relative(ctx.cwd, logFile(file))}${requests.length ? `, ${requests.length} new request(s) in .ce-workflow/local/requests` : ""}`, "info");
 		};
 		run().catch((error) => ctx.ui.notify(`Plan3 retro skipped: ${error.message}`, "warning"));
 	}
