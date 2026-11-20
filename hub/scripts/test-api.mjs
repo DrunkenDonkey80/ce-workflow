@@ -281,7 +281,7 @@ try {
 	const snapshot = (await get(id, "snapshot")).body;
 	assert.deepEqual(snapshot.target, { kind: "plan", id: "bbbbbbbb" });
 	assert.equal(snapshot.current, "bbbbbbbb");
-	assert.deepEqual(snapshot.status, { folder: "proj", tab: "1", modes: { research: "off", night: "off" }, git: null, commands: [], model: { provider: "fake", id: "fake-2", name: "Fake Two" }, effort: "high", context: null, parked: true });
+	assert.deepEqual(snapshot.status, { folder: "proj", tab: "1", modes: { research: "off", night: "off" }, git: null, requests: 0, commands: [], model: { provider: "fake", id: "fake-2", name: "Fake Two" }, effort: "high", context: null, parked: true });
 	// A parked session still gets the plan action row (Resolve/Review/Finish/Resume), built from the file; a click resumes it.
 	const parkedPlan = ({ id, title, open, bias, planning, finishable }) => ({ id, title, open, bias, planning, finishable });
 	assert.deepEqual(parkedPlan(snapshot.plan), { id: "bbbbbbbb", title: "Newer", open: 0, bias: 0, planning: false, finishable: false });
@@ -411,6 +411,27 @@ try {
 	// A write starts a parked session; message goes to ce-workflow as a hub call.
 	const sent = await post(id, "message", { target: "bbbbbbbb", text: "hi" });
 	assert.deepEqual(sent.body, { endpoint: "/api/message", data: { target: "bbbbbbbb", text: "hi" } });
+	{ // RF-04 (D-08, D-10): the Requests chip counts this folder's retro requests; the ce-workflow checkout adds other projects' ce-workflow ones.
+		const requests = (dir) => path.join(dir, ".ce-workflow", "local", "requests");
+		const other = fs.mkdtempSync(path.join(root, "other-")), baseline = path.join(folder, "extensions", "work-catch-up-baseline.json");
+		for (const [dir, name] of [[folder, "script-a.md"], [other, "ce-workflow-b.md"], [other, "project-c.md"]]) { fs.mkdirSync(requests(dir), { recursive: true }); fs.writeFileSync(path.join(requests(dir), name), "# x\n"); }
+		const twin = hub.registry.add({ name: "twin", folder, sessionFile: path.join(folder, "twin.jsonl"), state: "parked" });
+		const away = hub.registry.add({ name: "away", folder: other, sessionFile: path.join(other, "s.jsonl"), state: "parked" });
+		const count = async (sid) => (await get(sid, "snapshot")).body.status.requests;
+		try {
+			assert.deepEqual([await count(id), await count(away.id)], [1, 2], "outside the ce-workflow checkout a project counts only its own");
+			fs.mkdirSync(path.dirname(baseline), { recursive: true }); fs.writeFileSync(baseline, JSON.stringify({ packages: [] }));
+			assert.equal(await count(id), 2, "ce-workflow adds only the other project's ce-workflow-scope request; its own folder's second session counts nothing extra");
+			const started = await post(id, "requests", {});
+			assert.deepEqual(started.body, { ok: true, count: 2 });
+			assert.deepEqual([fs.readdirSync(path.join(requests(folder), "done")), fs.readdirSync(path.join(requests(other), "done")), fs.readdirSync(requests(other)).filter((name) => name.endsWith(".md"))], [["script-a.md"], ["ce-workflow-b.md"], ["project-c.md"]], "starting the analysis moves exactly the counted files to done/");
+			assert.deepEqual([await count(id), await count(away.id)], [0, 1]);
+			assert.equal((await post(id, "requests", {})).status, 409, "nothing left to analyze");
+		} finally {
+			hub.registry.remove(twin.id); hub.registry.remove(away.id);
+			fs.rmSync(path.join(folder, ".ce-workflow"), { recursive: true, force: true }); fs.rmSync(path.join(folder, "extensions"), { recursive: true, force: true });
+		}
+	}
 	{
 		const source = { id: "test:relay", revision: "a".repeat(64), name: "Relay fixture", provenance: "Local test", license: "Test" };
 		const ref = await addDesignReference(folder, id, { ...source, aspect: "colors" }, async () => ({ source, files: new Map([["colors.css", Buffer.from("body { color: purple; }")]]) })), submission = randomUUID();

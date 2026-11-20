@@ -34,7 +34,7 @@ const auth: RequestInit = token ? { credentials: "omit", headers: { Authorizatio
 let target = new URLSearchParams(location.search).get("target") ?? undefined;
 type Model = { provider: string; id: string; name: string };
 type Plan = { id: string; title: string; done?: number; total?: number; focus?: string; bias?: number; open?: number; planning?: boolean; finishable?: boolean };
-const state: { connected: boolean; diagram: Diagram | null; plan: Plan | null; status: { model: Model | null; effort: string | null; context?: number | null; tokens?: number | null; estimated?: boolean; window?: number | null; compacted?: number | null; git?: GitFiles | null; folder?: string; tab?: string; parked?: boolean; commands?: ProjectCommand[] } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]> & { thinkingLength: number }>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, status: null, activity: {}, pinning: false, more: false };
+const state: { connected: boolean; diagram: Diagram | null; plan: Plan | null; status: { model: Model | null; effort: string | null; context?: number | null; tokens?: number | null; estimated?: boolean; window?: number | null; compacted?: number | null; git?: GitFiles | null; requests?: number; folder?: string; tab?: string; parked?: boolean; commands?: ProjectCommand[] } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]> & { thinkingLength: number }>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, status: null, activity: {}, pinning: false, more: false };
 let commentPoint, hoverTimer, messageSending = false, commandSending = false;
 type ReferenceMessage = { text: string; target?: string; diagrams?: { target: string; ids: string[] }[]; references: { submission: string; refs: { ref: string; revision: number }[] } };
 let pendingSubmission: { text: string; refs: string[]; at: number; request?: ReferenceMessage } | undefined, draftEdits = 0;
@@ -140,9 +140,10 @@ function renderShell() {
  // The hub reads git on each status (run end, model change) and fetches in the background.
  const git = status?.git, busy = !state.connected || messageSending || !!state.activity.working || promptView.busy;
  $("git-commit").hidden = !git?.changed; $("git-push").hidden = !git?.changed && !git?.ahead; $("git-pull").hidden = !git?.behind;
+ $("retro-requests").hidden = !status?.requests; $("retro-requests").textContent = `Requests (${status?.requests ?? 0})`;
  $("git-pull-text").textContent = git?.behind ? `Pull latest (${git.behind})` : "Pull latest";
  $("git-commit-text").textContent = gitLabel("Commit", git); $("git-push-text").textContent = gitLabel("Commit and push", git, true);
- for (const id of ["git-pull", "git-commit", "git-push", "env-var", "drawer-env-var"]) ($(id) as HTMLButtonElement).disabled = busy;
+ for (const id of ["git-pull", "git-commit", "git-push", "retro-requests", "env-var", "drawer-env-var"]) ($(id) as HTMLButtonElement).disabled = busy;
  for (const button of document.querySelectorAll<HTMLButtonElement>(".session-git-action")) button.disabled = busy; // the sidebar copies (the drawer on phones)
  renderCommands(status?.commands ?? [], busy);
  $("send").disabled = !state.connected || messageSending || !!pendingSubmission; renderSendLabel();
@@ -2707,6 +2708,9 @@ $("settings-button").addEventListener("click", () => {
   $("hub-catchup").hidden = !list.wo.some(item => item.value === "catch-up");
   if (!$("hub-catchup").hidden) { try { reviewed = await get("catchup") as Record<string, string>; renderUpdates(); } catch { /* an older hub has no endpoint */ } }
  }, () => {});
+});
+$("retro-requests").addEventListener("click", async () => {
+ try { const { count } = await post("requests", {}) as { count: number }; showNotice(`Analyzing ${count} request(s); they are now marked processed.`, true); } catch (error) { showNotice(error.message); }
 });
 $("hub-catchup").addEventListener("click", async () => {
  closeMenus(); setDrawer(false);

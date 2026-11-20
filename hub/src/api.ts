@@ -3,7 +3,7 @@
 // what only Pi knows goes through RPC or a hub call (ce-workflow /pi-hub).
 import type http from "node:http";
 import { execFile, execFileSync, spawn } from "node:child_process";
-import { mkdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { readFile, statfs } from "node:fs/promises";
 import os from "node:os";
 import { promisify } from "node:util";
@@ -23,6 +23,7 @@ import { catalogReference, designCatalog, designDocs, designImage } from "../../
 import { fetchSystem } from "../../extensions/design.ts";
 import { addDesignReference, designReferences, editDesignReference, referenceAssets, urlReference, urlSnapshot } from "../../extensions/design-references.ts";
 import { currentPlan, listPlans, webPlan } from "../../extensions/plan3.ts";
+import { pendingRequests, requestsPrompt, startRequests } from "../../extensions/plan3-stats.ts";
 import { toForm, toResponse } from "./forms.ts";
 import { nextName as nextFreeName, type Registry, scanRecents, star } from "./registry.ts";
 import type { RpcRecord } from "./rpc-client.ts";
@@ -113,11 +114,14 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 		}
 		return gitLast.has(cwd) ? Promise.resolve(gitLast.get(cwd)!) : gitCache.get(cwd)!.state;
 	};
+	// D-08: retro requests the hub button counts and its analysis reads; the ce-workflow checkout (catch-up's baseline marks it)
+	// also counts every local project's ce-workflow-scope ones.
+	const requestSet = (cwd: string) => pendingRequests(cwd, existsSync(path.join(cwd, "extensions", "work-catch-up-baseline.json")) ? registry.groups().map(group => group.folder) : []);
 	const contextTokens = (tokens?: number | null, compacted?: number) => typeof tokens === "number" ? { tokens } : typeof compacted === "number" ? { tokens: compacted, estimated: true } : { tokens: null };
 	/** ce-workflow webStatus; context needs a running Pi, model and effort come from the record while parked. */
 	async function status(id: string) {
 		const record = registry.get(id)!, live = host.live.get(id);
-		const base = { folder: path.basename(record.folder), tab: record.name, modes: published(id)?.modes ?? record.modes ?? { research: "off", night: "off" }, git: await readGit(record.folder), commands: commands?.list(record.folder) ?? [] };
+		const base = { folder: path.basename(record.folder), tab: record.name, modes: published(id)?.modes ?? record.modes ?? { research: "off", night: "off" }, git: await readGit(record.folder), requests: (await requestSet(record.folder)).length, commands: commands?.list(record.folder) ?? [] };
 		if (!live) { const parked = await parkedModel(id); return { ...base, model: parked.model ?? null, effort: parked.thinking ?? null, context: null, parked: true }; }
 		const [state, stats] = await Promise.all([live.rpc.send({ type: "get_state" }), live.rpc.send({ type: "get_session_stats" })]);
 		void host.remember(live, state);
@@ -445,6 +449,15 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 			}
 			case "command": case "bias": case "generate": case "edit": case "comment": case "move": return call(id, `/api/${endpoint}`, data);
 			case "pool": if (!pool) throw fail(404, "The Claude pool is not available."); return pool.action(data);
+			// D-10: requests count as processed when the analysis starts; the /plan3 prompt names the moved files.
+			case "requests": {
+				only(data, ["target"], "Invalid fields.");
+				const moved = await startRequests(await requestSet(folder(id)));
+				if (!moved.length) throw fail(409, "No unprocessed requests.");
+				await call(id, "/api/message", { text: requestsPrompt(moved) });
+				void publishStatus(id).catch(() => {});
+				return { ok: true, count: moved.length };
+			}
 			case "paths": return linkedFiles(data.paths, folder(id), remote);
 			case "open": return openLinkedFile(data.path, folder(id), data.reveal === true, remote);
 			// Explore: the same files Download would serve this device, unpacked for the Files tab.

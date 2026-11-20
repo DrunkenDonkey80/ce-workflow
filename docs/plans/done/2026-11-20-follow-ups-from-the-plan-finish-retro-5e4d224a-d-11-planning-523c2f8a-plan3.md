@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: ready
+status: complete
 created: 2026-11-20
-updated: 2026-11-20T17:07:56.665Z
+updated: 2026-11-20T17:26:02.967Z
 reviewed: 2026-11-20
 started: 2026-11-20T16:56:31.811Z
 ---
@@ -78,9 +78,7 @@ None.
 
 ### Phase 4: Hub counter [code]
 
-- [ ] **RF-04** Hub button with the unprocessed request count (D-08) that starts a /plan3 analysis of those files; processed on start (D-10)
-  - The badge and the analysis read the same pending-file selection.
-  - Check: `node hub/scripts/test-browser.mjs` (or the narrowest hub test): two sessions in one folder count it once; a second local project adds only its ce-workflow-scope items to the ce-workflow total; starting the analysis moves the counted files to `done/` and drops the count to zero; the click starts the prompt; changelog screenshot.
+- [x] **RF-04** Hub "Requests (N)" chip counts pending retro requests (own folder all scopes; ce-workflow page adds ce-workflow-* from other local folders, deduped); click moves them to requests/done/ and starts a /plan3 analysis.
 
 ## Global validation
 
