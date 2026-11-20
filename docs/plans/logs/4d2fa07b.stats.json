@@ -1,0 +1,1541 @@
+{
+ "version": 1,
+ "activeMs": 7669832,
+ "runs": 13,
+ "waitingMs": 105368,
+ "toolWallMs": 4027768,
+ "compactions": {
+  "count": 3,
+  "ms": 23072
+ },
+ "models": {
+  "anthropic/claude-opus-5-5:high": {
+   "replies": 428,
+   "thinkingMs": 1811961,
+   "actingMs": 969742,
+   "input": 1042,
+   "output": 274105,
+   "cacheRead": 40034786,
+   "cacheWrite": 1373312,
+   "cost": 20.359785200000005,
+   "errors": 1
+  }
+ },
+ "tools": {
+  "plan3": {
+   "count": 29,
+   "ms": 4531,
+   "maxMs": 1295,
+   "failures": 0
+  },
+  "bash": {
+   "count": 313,
+   "ms": 3163031,
+   "maxMs": 224791,
+   "failures": 12
+  },
+  "codemode": {
+   "count": 9,
+   "ms": 153226,
+   "maxMs": 127936,
+   "failures": 1
+  },
+  "read": {
+   "count": 41,
+   "ms": 674,
+   "maxMs": 57,
+   "failures": 1
+  },
+  "write": {
+   "count": 8,
+   "ms": 23,
+   "maxMs": 6,
+   "failures": 0
+  },
+  "edit": {
+   "count": 51,
+   "ms": 587,
+   "maxMs": 89,
+   "failures": 1
+  },
+  "compaction_note": {
+   "count": 7,
+   "ms": 0,
+   "maxMs": 0,
+   "failures": 2
+  },
+  "lens_diagnostics": {
+   "count": 3,
+   "ms": 36064,
+   "maxMs": 17482,
+   "failures": 0
+  },
+  "test_sensitivity": {
+   "count": 12,
+   "ms": 516211,
+   "maxMs": 127743,
+   "failures": 7
+  },
+  "tools_enable": {
+   "count": 1,
+   "ms": 1,
+   "maxMs": 1,
+   "failures": 0
+  },
+  "peer_ls": {
+   "count": 12,
+   "ms": 5966,
+   "maxMs": 563,
+   "failures": 1
+  },
+  "peer_grep": {
+   "count": 3,
+   "ms": 1656,
+   "maxMs": 563,
+   "failures": 0
+  },
+  "peer_read": {
+   "count": 3,
+   "ms": 1430,
+   "maxMs": 519,
+   "failures": 2
+  },
+  "peer_fetch": {
+   "count": 3,
+   "ms": 33321,
+   "maxMs": 20975,
+   "failures": 0
+  },
+  "intercom": {
+   "count": 2,
+   "ms": 5012,
+   "maxMs": 5011,
+   "failures": 1
+  }
+ },
+ "categories": {
+  "shell": {
+   "count": 266,
+   "ms": 992445,
+   "maxMs": 166281,
+   "failures": 12
+  },
+  "test": {
+   "count": 44,
+   "ms": 2146074,
+   "maxMs": 224791,
+   "failures": 0
+  },
+  "build": {
+   "count": 3,
+   "ms": 24512,
+   "maxMs": 11111,
+   "failures": 0
+  }
+ },
+ "commands": {
+  "bash\u0000cd \".\" && git status --short && git log --oneline -5": {
+   "count": 1,
+   "ms": 164,
+   "maxMs": 164,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && wc -l hub/src/link.ts hub/src/hub.ts hub/src/api.ts hub/web/app.ts hub/scripts/test-link.mjs hub/scripts/test-remote.mjs && grep -n \"link\\|Link\" hub/src/hub.ts | head -80": {
+   "count": 1,
+   "ms": 255,
+   "maxMs": 255,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"link\" hub/scripts/test-remote.mjs | head -40; grep -rln \"linksOf\\|remoteSessions\\|linkProject\\|/api/hubs\\|action: \\\"links\\\"\\|post(\\\"links\\\"\" hub extensions scripts --include=*.ts --": {
+   "count": 1,
+   "ms": 479,
+   "maxMs": 479,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub/src\" && { head -n 112 link.ts; cat link-middle.tmp; tail -n +542 link.ts; } > link.new && mv link.new link.ts && rm link-middle.tmp && grep -n \"COMM = 2\\|^// 2:\" link.ts": {
+   "count": 1,
+   "ms": 227,
+   "maxMs": 227,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub/scripts\" && cat test-link.head test-link.tail > test-link.mjs && rm test-link.head test-link.tail && sed -i \"s/import { COMM, commMismatch, createLinks, createPeers, loadIntercom, saveInbox ": {
+   "count": 1,
+   "ms": 250,
+   "maxMs": 250,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/scripts/test-link.mjs 2>&1 | tail -30": {
+   "count": 1,
+   "ms": 12016,
+   "maxMs": 12016,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/scripts/test-remote.mjs 2>&1 | tail -15; grep -n \"\\\"typecheck\\|\\\"verify\\|tsc\" package.json | head": {
+   "count": 1,
+   "ms": 61087,
+   "maxMs": 61087,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \"const m=require('node:module');const s=require('fs').readFileSync('hub/web/app.ts','utf8');m.stripTypeScriptTypes(s);console.log('app strip ok')\" 2>&1 | grep -v Warning; npx tsc --n": {
+   "count": 1,
+   "ms": 3941,
+   "maxMs": 3941,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npx tsc --noEmit -p hub 2>&1 | tail -8; ls hub/scripts | grep -i \"test-web\\|test-app\\|test-ui\"": {
+   "count": 1,
+   "ms": 3644,
+   "maxMs": 3644,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npx tsc --noEmit -p hub 2>&1 | grep -E \"^hub/(src/(link|api|hub)|web/app)\\.ts\" | head; echo \"---\"; git stash -q && npx tsc --noEmit -p hub 2>&1 | grep -c \"error TS\"; git stash pop -q && npx ": {
+   "count": 1,
+   "ms": 11111,
+   "maxMs": 11111,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short && git add hub/src/link.ts hub/src/api.ts hub/src/hub.ts hub/web/app.ts hub/scripts/test-link.mjs \"docs/plans/2026-11-17-shared-projects-between-paired-hubs-with-remote-re": {
+   "count": 1,
+   "ms": 275,
+   "maxMs": 275,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git blame -L 2363,2363 hub/web/app.ts": {
+   "count": 1,
+   "ms": 172,
+   "maxMs": 172,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"devices\\|Devices\" hub/web/index.html | head -30; grep -n \"openDevices\\|devices-dialog\\|\\\"devices\\\"\\|showDevices\" hub/web/app.ts | head -30": {
+   "count": 1,
+   "ms": 105,
+   "maxMs": 105,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1920,1945p hub/web/app.ts; sed -n 2150,2195p hub/web/app.ts; sed -n 1350,1375p hub/web/app.ts; sed -n 60,75p hub/web/index.html; grep -n \"devices-button\" hub/web/app.ts": {
+   "count": 1,
+   "ms": 128,
+   "maxMs": 128,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"async function hubLinks\" -A22 hub/src/api.ts; grep -n \"state()\\|function state\\|dropped\\|clearDropped\\|unpair\\b\\|async unpair\\|unpair(\" hub/src/link.ts | head -40; grep -n \"/api/hub": {
+   "count": 1,
+   "ms": 140,
+   "maxMs": 140,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rn \"action: \\\"share\\\"\\|action: \\\"pair\\\"\\|hubLinks\\|api/hubs\\|clearDropped\\|store:\" hub/scripts hub/src extensions | grep -v node_modules | head -20; sed -n 160,180p hub/src/hub.ts; gre": {
+   "count": 1,
+   "ms": 223,
+   "maxMs": 223,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' import re p='hub/src/hub.ts'; s=open(p,encoding='utf8').read() s=s.replace(''' \"POST /api/hubs/unpair\": data => links.unpair(String(data.url ?? \"\")), ''',''' \"POST /api/hubs": {
+   "count": 1,
+   "ms": 285,
+   "maxMs": 285,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && file hub/src/api.ts hub/src/hub.ts; git diff --stat": {
+   "count": 1,
+   "ms": 151,
+   "maxMs": 151,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/\\tasync function hubLinks(data: Record<string, unknown>) {/\\tfunction hubLinks(data: Record<string, unknown>) {/\" hub/src/api.ts && grep -n \"id=\\\"pair-approve\\\"\" hub/web/index.html": {
+   "count": 1,
+   "ms": 172,
+   "maxMs": 172,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' p='hub/web/index.html'; s=open(p,encoding='utf8').read() a='''title=\"Paired phones and other devices; revoke one here\" hidden>Devices</button>''' assert a in s s=s.replace(a": {
+   "count": 1,
+   "ms": 122,
+   "maxMs": 122,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' p='hub/web/app.ts'; s=open(p,encoding='utf8').read() item=''' item(\"Hub links…\", () => void openHubLinks(anchor, session, path)), ''' assert item in s; s=s.replace(item,'',1": {
+   "count": 1,
+   "ms": 209,
+   "maxMs": 209,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"1944s#\\[\\\\\\\\/\\]#[\\\\\\\\\\\\\\\\/]#g\" hub/web/app.ts && sed -n 1944p hub/web/app.ts": {
+   "count": 1,
+   "ms": 115,
+   "maxMs": 115,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff -U0 hub/web/app.ts | grep \"^@@\"; sed -n 1838p hub/web/app.ts | cut -c1-200": {
+   "count": 1,
+   "ms": 123,
+   "maxMs": 123,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i -e \"690s/const listed = /const hubList = /\" -e \"691s/\\[listed.comm, listed.hubs, listed.dropped, listed.pairing, listed.standins\\]/[hubList.comm, hubList.hubs, hubList.dropped, hubLis": {
+   "count": 1,
+   "ms": 22922,
+   "maxMs": 22922,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1,60p hub/scripts/test-remote.mjs | cut -c1-260; grep -n \"linkRequest\\|startHub\" hub/scripts/test-remote.mjs hub/scripts/changelog-shot.mjs | head -20; which agent-browser": {
+   "count": 1,
+   "ms": 121,
+   "maxMs": 121,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"port\" hub/src/config.ts 2>/dev/null | head; grep -rn \"PI_HUB_PORT\\|port: \" hub/src/hub.ts | head -5; grep -n \"sessions: () =>\\|self:\" hub/src/hub.ts | head; sed -n 120,135p hub/src/": {
+   "count": 1,
+   "ms": 145,
+   "maxMs": 145,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"function intercomRoots\" -A8 hub/src/link.ts; grep -n \"const NEEDED\" hub/src/link.ts; grep -n \"old-intercom\\|IntercomClient {\" hub/scripts/test-link.mjs | head": {
+   "count": 1,
+   "ms": 120,
+   "maxMs": 120,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls node_modules/pi-intercom 2>&1 | head -3; P=$(ls -d node_modules/pi-intercom \"$HOME/.pi/agent/npm/node_modules/pi-intercom\" 2>/dev/null | head -1); echo $P; grep -rn \"PI_CODING_AGENT_DIR\\|": {
+   "count": 1,
+   "ms": 132,
+   "maxMs": 132,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/twohubs\" && (timeout 1800 node hub.mjs pc \"C:/Users/Flex/AppData/Local/Temp/twohubs/pc\" > pc.out 2> pc.err &) && (timeout 1800 node hub.mjs mac \"C:/Users/Flex/AppD": {
+   "count": 1,
+   "ms": 12202,
+   "maxMs": 12202,
+   "failures": 0
+  },
+  "bash\u0000agent-browser --help 2>&1 | head -60": {
+   "count": 1,
+   "ms": 257,
+   "maxMs": 257,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/twohubs\" && PC=$(node -p \"JSON.parse(require('fs').readFileSync('pc.out','utf8')).url\") && agent-browser --session pc open \"$PC\" >/dev/null && sleep 3 && agent-bro": {
+   "count": 1,
+   "ms": 3972,
+   "maxMs": 3972,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/twohubs\" && MACADDR=$(node -p \"JSON.parse(require('fs').readFileSync('mac.out','utf8')).address\") && agent-browser --session pc click \"#settings-button\" && sleep 1": {
+   "count": 1,
+   "ms": 5288,
+   "maxMs": 5288,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/twohubs\" && MAC=$(node -p \"JSON.parse(require('fs').readFileSync('mac.out','utf8')).url\") && agent-browser --session mac open \"$MAC\" >/dev/null && sleep 4 && agent": {
+   "count": 1,
+   "ms": 10899,
+   "maxMs": 10899,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/twohubs\" && agent-browser --session mac click \"#settings-button\" && sleep 1 && agent-browser --session mac click \"#hubs-button\" && sleep 1 && agent-browser --sessi": {
+   "count": 1,
+   "ms": 7776,
+   "maxMs": 7776,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/twohubs\" && agent-browser --session pc click \"#hubs-close\" && agent-browser --session pc eval \"(()=>{const t=document.querySelector('textarea');t.focus();return t.": {
+   "count": 1,
+   "ms": 2928,
+   "maxMs": 2928,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/twohubs\" && mkdir -p old/pi-control-hub && node -e \"require('fs').writeFileSync('old/pi-control-hub/links.json', JSON.stringify({version:1,links:[{id:'s1',session:": {
+   "count": 1,
+   "ms": 20571,
+   "maxMs": 20571,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/twohubs\" && node -e \"require('fs').writeFileSync('old/pi-control-hub/links.json', JSON.stringify({version:2,shares:[],pairs:[],dropped:[{hub:'https://mac.tail.ts.n": {
+   "count": 1,
+   "ms": 8947,
+   "maxMs": 8947,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/twohubs\" && OLD=$(node -p \"JSON.parse(require('fs').readFileSync('old.out','utf8')).url\") && BASE=${OLD%%/\\?*} && curl -s \"$BASE/\" | grep -o \"src=\\\"[^\\\"]*app[^\\\"]*": {
+   "count": 1,
+   "ms": 504,
+   "maxMs": 504,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/twohubs\" && OLD=$(node -p \"JSON.parse(require('fs').readFileSync('old.out','utf8')).url\") && PORT=$(echo \"$OLD\" | sed -E \"s#.*:([0-9]+)/.*#\\1#\") && KEY=${OLD##*tok": {
+   "count": 1,
+   "ms": 20321,
+   "maxMs": 20321,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/twohubs\" && agent-browser --session pc click \"#settings-button\" >/dev/null && sleep 1 && agent-browser --session pc click \"#hubs-button\" >/dev/null && sleep 1 && a": {
+   "count": 1,
+   "ms": 3878,
+   "maxMs": 3878,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/twohubs\" && agent-browser --session pc click \"@e3\" >/dev/null && sleep 2 && agent-browser --session pc get text \"#hub-list\" && MAC=$(node -p \"JSON.parse(require('f": {
+   "count": 1,
+   "ms": 2596,
+   "maxMs": 2596,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/twohubs\" && for f in pc mac old; do U=$(node -p \"JSON.parse(require('fs').readFileSync('$f.out','utf8')).url\"); P=$(echo \"$U\" | sed -E \"s#.*:([0-9]+)/.*#\\1#\"); PID": {
+   "count": 1,
+   "ms": 95606,
+   "maxMs": 95606,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short && git add hub/src/api.ts hub/src/hub.ts hub/web/app.ts hub/web/index.html hub/web/styles.css hub/scripts/test-api.mjs CHANGELOG.md \"docs/plans/2026-11-17-shared-projects-": {
+   "count": 1,
+   "ms": 252,
+   "maxMs": 252,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1,40p extensions/hub-command.ts | cut -c1-250; wc -l hub/src/cli.ts; grep -n \"case \\\"\\|argv\\[\\|function hubRequest\\|async function call\\|/api/\" hub/src/cli.ts | head -50": {
+   "count": 1,
+   "ms": 107,
+   "maxMs": 107,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rn \"name: \\\"project_commands\\\"\" extensions | head -3; grep -n \"\\\"extensions\\\"\\|\\\"pi\\\"\" -A12 package.json | head -30": {
+   "count": 1,
+   "ms": 108,
+   "maxMs": 108,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for l in 336 817 1828 1890 1892; do git blame -L $l,$l --date=short hub/web/app.ts | cut -c1-60; done": {
+   "count": 1,
+   "ms": 604,
+   "maxMs": 604,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"119s/live: host.live.has(record.id) }))/live: host.live.has(record.id), sessionFile: record.sessionFile }))/\" hub/src/hub.ts && sed -i \"180a\\\\ \\\"POST /api/peer\\\": data => links.peer(": {
+   "count": 1,
+   "ms": 195,
+   "maxMs": 195,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"export async function hubCli\\|export function hubCli\" -A12 extensions/hub-command.ts | head -20; sed -n 296,330p extensions/hub-command.ts": {
+   "count": 1,
+   "ms": 225,
+   "maxMs": 225,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/projectCommandsTool, scheduleTool, sessionDialogTool,/peerTools, projectCommandsTool, scheduleTool, sessionDialogTool,/\" extensions/work-models.ts && sed -i \"s/^\\tif (process.env.P": {
+   "count": 1,
+   "ms": 216,
+   "maxMs": 216,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1,40p hub/scripts/test-hub.mjs | cut -c1-250; grep -n \"cli(\\[\" hub/scripts/test-hub.mjs | head -5; grep -n \"linkRequest\\|startHub(\" hub/scripts/test-*.mjs | head": {
+   "count": 1,
+   "ms": 118,
+   "maxMs": 118,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1,60p hub/scripts/test-remote.mjs | cut -c1-260; sed -n 150,200p hub/scripts/test-remote.mjs | cut -c1-300": {
+   "count": 1,
+   "ms": 104,
+   "maxMs": 104,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 120 node hub/scripts/test-link.mjs 2>&1 | tail -25": {
+   "count": 1,
+   "ms": 12072,
+   "maxMs": 12072,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i 's|if (!out.add(entry.isDirectory() ? `${entry.name}/` : entry.name)) break;|if (!out.add(`${entry.name}${entry.isDirectory() ? \"/\" : entry.isSymbolicLink() ? \"@\" : \"\"}`)) break;|' hu": {
+   "count": 1,
+   "ms": 12273,
+   "maxMs": 12273,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 120 node hub/scripts/test-link.mjs 2>&1 | tail -20": {
+   "count": 2,
+   "ms": 24505,
+   "maxMs": 12313,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i 's|\"-e\", pattern, \"--\", inside \\|\\| \".\"\\];|\"--path-separator\", \"/\", \"-e\", pattern, ...(inside ? [\"--\", inside] : [])];|' hub/src/peer-read.ts && grep -n \"path-separator\" hub/src/peer-": {
+   "count": 1,
+   "ms": 155,
+   "maxMs": 155,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i 's|assert.deepEqual(\\[found.length, found\\[0\\].startsWith(\"big.txt:\"), found.at(-1)\\], \\[2001, true,|assert.deepEqual([found.length > 1000 \\&\\& Buffer.byteLength(found.join(\"\\\\n\")) <=": {
+   "count": 1,
+   "ms": 161,
+   "maxMs": 161,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 120 node hub/scripts/test-link.mjs 2>&1 | tail -15": {
+   "count": 2,
+   "ms": 24370,
+   "maxMs": 12251,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i 's/readLog().length, ripgrep() ? 13 : 7,/readLog().length, ripgrep() ? 11 : 7,/' hub/scripts/test-link.mjs && timeout 120 node hub/scripts/test-link.mjs 2>&1 | tail -8": {
+   "count": 1,
+   "ms": 12311,
+   "maxMs": 12311,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 200,215p hub/scripts/test-remote.mjs | cut -c1-220; grep -n \"const id\\b\\|let id\\b\\|id = \" hub/scripts/test-remote.mjs | head -3; grep -n \"^import\\|execFile\" hub/scripts/test-remote.mj": {
+   "count": 1,
+   "ms": 118,
+   "maxMs": 118,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 180 node hub/scripts/test-remote.mjs 2>&1 | tail -20": {
+   "count": 1,
+   "ms": 61841,
+   "maxMs": 61841,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 200 node hub/scripts/test-api.mjs 2>&1 | tail -2; timeout 60 node scripts/test-work-tool-loader.mjs 2>&1 | tail -3; timeout 120 node hub/scripts/test-hub.mjs 2>&1 | tail -2": {
+   "count": 1,
+   "ms": 53388,
+   "maxMs": 53388,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1,20p CHANGELOG.md | cut -c1-200; git status --short": {
+   "count": 1,
+   "ms": 115,
+   "maxMs": 115,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add hub/src/peer-read.ts && git add -u && git reset -q docs/plans/2026-11-17-shared-projects-between-paired-hubs-with-remote-read-tools-a-4d2fa07b-plan3.md && git commit -qm \"Hub: peer_l": {
+   "count": 1,
+   "ms": 293,
+   "maxMs": 293,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add docs/plans/2026-11-17-shared-projects-between-paired-hubs-with-remote-read-tools-a-4d2fa07b-plan3.md && (git ls-files --error-unmatch docs/plans/logs/4d2fa07b.md >/dev/null 2>&1 || l": {
+   "count": 1,
+   "ms": 128,
+   "maxMs": 128,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add docs/plans/logs/4d2fa07b.md && git commit -qm \"Plan3 4d2fa07b S3 done\" && git log --oneline -2 && git status --short": {
+   "count": 1,
+   "ms": 203,
+   "maxMs": 203,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1,70p hub/src/link.ts; sed -n 405,460p hub/src/link.ts": {
+   "count": 1,
+   "ms": 145,
+   "maxMs": 145,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short && git diff --stat": {
+   "count": 1,
+   "ms": 116,
+   "maxMs": 116,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 340,372p hub/src/link.ts; echo ----; sed -n 490,530p hub/src/link.ts; echo ----; grep -n \"^\\treturn {\" hub/src/link.ts; sed -n \"$(grep -n '^\\treturn {' hub/src/link.ts | tail -1 | cut": {
+   "count": 1,
+   "ms": 121,
+   "maxMs": 121,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && git diff hub/src/link.ts | grep -n \"COMM =\\|^[-+]// 3\\|^[-+]//\" | head; git log --oneline -6; git log origin/master --oneline -1; git show origin/master:hub/src/link.ts | grep -n \"COMM = \"": {
+   "count": 1,
+   "ms": 180,
+   "maxMs": 180,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' import re p=\"hub/src/hub.ts\"; s=open(p,encoding=\"utf-8\").read() s=s.replace('import { createLinks, FILE_BODY, PING_BODY, type LinkRequest } from \"./link.ts\";','import { crea": {
+   "count": 1,
+   "ms": 130,
+   "maxMs": 130,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"peer\" hub/src/cli.ts | head -20; grep -n \"peer\\|PI_HUB_SESSION\" extensions/hub-command.ts | head -40; grep -n \"peer_\" extensions/tool-loader.ts; grep -n \"\\\"/api/peer\\\"\\|api/peer\" hu": {
+   "count": 1,
+   "ms": 114,
+   "maxMs": 114,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 315,325p hub/src/cli.ts; sed -n 330,353p extensions/hub-command.ts; sed -n 1,30p extensions/tool-loader.ts | cut -c1-150": {
+   "count": 1,
+   "ms": 115,
+   "maxMs": 115,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' p=\"hub/src/cli.ts\"; s=open(p,encoding=\"utf-8\").read() old='const result = await call(\"/api/peer\", { ...args, op: rest[0], session: process.env.PI_HUB_SESSION });' new='const": {
+   "count": 1,
+   "ms": 155,
+   "maxMs": 155,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in hub/scripts/test-link.mjs hub/scripts/test-remote.mjs hub/scripts/test-api.mjs scripts/test-work-tool-loader.mjs; do echo \"== $t\"; timeout 300 node \"$t\" 2>&1 | tail -15; done": {
+   "count": 1,
+   "ms": 32970,
+   "maxMs": 32970,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 195,225p hub/scripts/test-link.mjs | cut -c1-400; echo ----; sed -n 180,190p hub/scripts/test-remote.mjs | cut -c1-300; grep -n \"request\\b\\|const request\\|createLinks(\" hub/scripts/te": {
+   "count": 1,
+   "ms": 184,
+   "maxMs": 184,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 50,70p hub/scripts/test-link.mjs | cut -c1-300; sed -n 95,100p hub/scripts/test-link.mjs | cut -c1-400; sed -n 225,245p hub/scripts/test-link.mjs | cut -c1-400; sed -n 280,300p hub/sc": {
+   "count": 1,
+   "ms": 182,
+   "maxMs": 182,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1,20p hub/scripts/test-link.mjs | cut -c1-250; grep -n \"5 MB\\|slow\\.\\|peerRead =\\|const readLog\\|FILE_BODY\\|megabytes\" hub/scripts/test-link.mjs hub/scripts/test-remote.mjs; sed -n 24": {
+   "count": 1,
+   "ms": 118,
+   "maxMs": 118,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' p=\"hub/scripts/test-link.mjs\"; s=open(p,encoding=\"utf-8\").read() def rep(a,b): global s assert a in s, a[:80]; s=s.replace(a,b,1) rep('import path from \"node:path\";\\n','impo": {
+   "count": 1,
+   "ms": 7753,
+   "maxMs": 7753,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' p=\"hub/scripts/test-link.mjs\"; s=open(p,encoding=\"utf-8\").read() a='file(`@${path.join(pcProj, \"big.bin\")}`)]'; assert a in s s=s.replace(a,'file(`@${path.join(pcProj, \"big.": {
+   "count": 1,
+   "ms": 15161,
+   "maxMs": 15161,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 300 node hub/scripts/test-link.mjs 2>&1 | tail -20": {
+   "count": 1,
+   "ms": 12571,
+   "maxMs": 12571,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' p=\"hub/src/link.ts\"; s=open(p,encoding=\"utf-8\").read() a='await logged(caller, `fetch ${folder} ${shown}${at}${'; assert a in s s=s.replace(a,'await logged(caller, `fetch ${": {
+   "count": 1,
+   "ms": 12556,
+   "maxMs": 12556,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' p=\"hub/scripts/test-link.mjs\"; s=open(p,encoding=\"utf-8\").read() a='blob\\\\.bin from 1000000$/, \"the resumed request is logged with its offset\");'; assert a in s s=s.replace(": {
+   "count": 1,
+   "ms": 12639,
+   "maxMs": 12639,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 10,60p hub/scripts/test-remote.mjs | cut -c1-260; echo ----; sed -n 186,215p hub/scripts/test-remote.mjs | cut -c1-330": {
+   "count": 1,
+   "ms": 135,
+   "maxMs": 135,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' p=\"hub/scripts/test-remote.mjs\"; s=open(p,encoding=\"utf-8\").read() def rep(a,b): global s assert a in s, a[:80]; s=s.replace(a,b,1) rep('import fs from \"node:fs\";\\n','import": {
+   "count": 1,
+   "ms": 62403,
+   "maxMs": 62403,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in hub/scripts/test-api.mjs hub/scripts/test-hub.mjs scripts/test-work-tool-loader.mjs; do echo \"== $t\"; timeout 600 node \"$t\" 2>&1 | tail -4; done": {
+   "count": 1,
+   "ms": 51682,
+   "maxMs": 51682,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' p=\"hub/scripts/test-link.mjs\"; s=open(p,encoding=\"utf-8\").read() a=''' assert.deepEqual(fs.readdirSync(macPartials), [], \"the finished partial moved; a partial idle for 24 h": {
+   "count": 1,
+   "ms": 12561,
+   "maxMs": 12561,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rm -f hub/src/link-middle.tmp hub/scripts/test-link.tail; git status --short; git add -u && git add hub/src/link-transfer.ts && git commit -q -m \"Hub: 200 MB binary transfers between paired ": {
+   "count": 1,
+   "ms": 305,
+   "maxMs": 305,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -u && git commit -q -m \"Plan3 4d2fa07b S4 done; S5 blocked on a release\" && git log --oneline -2 && git status --short": {
+   "count": 1,
+   "ms": 222,
+   "maxMs": 222,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short && git branch --show-current && git log origin/master..HEAD --oneline && grep -n \"\\\"version\\\"\" package.json && git ls-files | grep -i \"lock\" | head; git diff origin/master": {
+   "count": 1,
+   "ms": 292,
+   "maxMs": 292,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff origin/master --stat | cat; grep -n \"\\\"version\\\"\" package-lock.json | head -2; ls hub/package.json 2>/dev/null; ls hub/scripts | grep -i \"test-\" | tr \"\\n\" \" \"": {
+   "count": 1,
+   "ms": 211,
+   "maxMs": 211,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"\\\"version\\\"\" hub/package.json; git diff origin/master -- extensions/work-models.ts | head -20; ls scripts | grep -i \"work-models\\|test-work-model\"; grep -ln \"hubs\\|Paired hubs\\|hub-": {
+   "count": 1,
+   "ms": 175,
+   "maxMs": 175,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"3s/\\\"version\\\": \\\"1.0.7\\\"/\\\"version\\\": \\\"1.1.0\\\"/\" package.json && sed -i \"3s/\\\"version\\\": \\\"1.0.7\\\"/\\\"version\\\": \\\"1.1.0\\\"/;9s/\\\"version\\\": \\\"1.0.7\\\"/\\\"version\\\": \\\"1.1.0\\\"/\" packag": {
+   "count": 1,
+   "ms": 179,
+   "maxMs": 179,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 5,15p CHANGELOG.md | cut -c1-200; ls docs/changelog | tail -5; grep -n \"hubs-dialog\\|openHubs\\|Paired hubs\\|function.*[Hh]ubs\" hub/web/app.ts | head": {
+   "count": 1,
+   "ms": 144,
+   "maxMs": 144,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1,40p hub/scripts/changelog-shot.mjs | cut -c1-220; sed -n 1943,1990p hub/web/app.ts | cut -c1-200": {
+   "count": 1,
+   "ms": 114,
+   "maxMs": 114,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 240 node hub/scripts/changelog-shot.mjs \"#hubs\" docs/changelog/1.1.0-paired-hubs.png \"const real = window.fetch; window.fetch = (url, init) => /api\\/hubs$/.test(String(url)) && !init": {
+   "count": 1,
+   "ms": 62067,
+   "maxMs": 62067,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' p=\"CHANGELOG.md\"; lines=open(p,encoding=\"utf-8\").read().split(\"\\n\") i=next(n for n,l in enumerate(lines) if l.startswith(\"- Paired hubs share whole projects\")) lines.insert(": {
+   "count": 1,
+   "ms": 119,
+   "maxMs": 119,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"14s/^ !/!/\" CHANGELOG.md && sed -n 13,15p CHANGELOG.md | cut -c1-120; for t in hub/scripts/test-link.mjs hub/scripts/test-remote.mjs hub/scripts/test-api.mjs hub/scripts/test-hub.mjs": {
+   "count": 1,
+   "ms": 166281,
+   "maxMs": 166281,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 600 node hub/scripts/test-browser.mjs 2>&1 | grep -v \"^\\s*at \" | tail -25": {
+   "count": 1,
+   "ms": 121442,
+   "maxMs": 121442,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"missing replay control\\|New replay fixture\" hub/scripts/test-browser.mjs | head; git log -3 --format=\"%h %ad %s\" --date=short -- hub/scripts/test-browser.mjs": {
+   "count": 1,
+   "ms": 115,
+   "maxMs": 115,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 600 node hub/scripts/test-browser.mjs 2>&1 | grep -v \"^\\s*at \" | tail -4": {
+   "count": 1,
+   "ms": 68852,
+   "maxMs": 68852,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 600 node hub/scripts/test-browser.mjs > \"$TEMP/tb.log\" 2>&1; echo \"exit $?\"; grep -n \"Error\\|assert\\|code:\" \"$TEMP/tb.log\" | head -15": {
+   "count": 1,
+   "ms": 48846,
+   "maxMs": 48846,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && W=\"$TEMP/cew-base\" && rm -rf \"$W\" && git worktree add -q --detach \"$W\" origin/master && cmd //c mklink //J \"$(cygpath -w \"$W/node_modules\")\" \"$(cygpath -w \"$PWD/node_modules\")\" >/dev/null &&": {
+   "count": 1,
+   "ms": 192857,
+   "maxMs": 192857,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git worktree remove --force \"$TEMP/cew-base\"; grep -n \"hubs-button\\|Paired hubs\\|hub-list\\|draft-recovery').hidden && !document\" hub/scripts/test-browser.mjs | head -5": {
+   "count": 1,
+   "ms": 191,
+   "maxMs": 191,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git worktree prune && git add -u && git add docs/changelog/1.1.0-paired-hubs.png && git status --short && git commit -q -m \"Release 1.1.0: paired hubs share projects, peer read/fetch tools, ": {
+   "count": 1,
+   "ms": 2722,
+   "maxMs": 2722,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -u && git commit -q -m \"Plan3 4d2fa07b: S5 waits on the Mac hub\" && git status -sb | head -1": {
+   "count": 1,
+   "ms": 467,
+   "maxMs": 467,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/src/cli.ts status 2>&1 | head -20; node hub/src/cli.ts peer ls 2>&1 | head -40": {
+   "count": 1,
+   "ms": 2847,
+   "maxMs": 2847,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -on \"verb === \\\"[a-z-]*\\\"\" hub/src/cli.ts | cut -d'\"' -f2 | tr \"\\n\" \" \"; echo; curl -s \"http://127.0.0.1:52227/api/version\" | head -c 300; echo; grep -rn \"\\\"version\\\"\" \"$APPDATA/npm/nod": {
+   "count": 1,
+   "ms": 247,
+   "maxMs": 247,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/src/cli.ts peer ls 2>&1 | head -5": {
+   "count": 1,
+   "ms": 436,
+   "maxMs": 436,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/src/cli.ts peer ls 2>&1 | head -40": {
+   "count": 1,
+   "ms": 554,
+   "maxMs": 554,
+   "failures": 0
+  },
+  "bash\u0000cd \"./.pi/inbox\" && python -c \"import zipfile,sys; z=zipfile.ZipFile(sys.argv[1]); print('apk zip ok' if z.testzip() is None else 'BAD'); print(len(z.namelist()),'entries')\" 2026-11-18T06-07-44-256Z-d": {
+   "count": 1,
+   "ms": 437,
+   "maxMs": 437,
+   "failures": 0
+  },
+  "bash\u0000f=\"C:/Users/Flex/AppData/Local/Temp/hub-200mb-test.bin\" && head -c 208666624 /dev/urandom > \"$f\" && ls -l \"$f\" | awk \"{print \\$5}\" && sha256sum \"$f\" | cut -c1-64": {
+   "count": 1,
+   "ms": 714,
+   "maxMs": 714,
+   "failures": 0
+  },
+  "bash\u0000sleep 45; cd \".\" && node hub/src/cli.ts peer ls --json \"{\\\"hub\\\":\\\"Flexs-MacBook-Pro.local\\\",\\\"project\\\":\\\"belot\\\",\\\"path\\\":\\\".pi/inbox\\\"}\" 2>&1 | tail -5": {
+   "count": 1,
+   "ms": 45683,
+   "maxMs": 45683,
+   "failures": 0
+  },
+  "bash\u0000cd \"./.pi/inbox\" && sha256sum 2026-11-18T06-09-31-241Z-*-hub-200mb-test.bin | cut -c1-64 && rm -f 2026-11-18T06-*-hub-200mb-test.bin 2026-11-18T06-07-44-256Z-d9cbe0ca-app-debug.apk 2026-11-18T06-08-00": {
+   "count": 1,
+   "ms": 582,
+   "maxMs": 582,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -A docs/plans/done docs/plans/2026-11-17-shared-projects-between-paired-hubs-with-remote-read-tools-a-4d2fa07b-plan3.md && git add -u && git commit -q -m \"Plan3 4d2fa07b: S5 live Mac": {
+   "count": 1,
+   "ms": 237,
+   "maxMs": 237,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub/web\" && sed -n 41,95p index.html | cut -c1-260; grep -n \"hubs-button\\|devices-button\\|id=\\\"hubs\\\"\" index.html | cut -c1-260; sed -n 1905,1980p app.ts | cut -c1-260": {
+   "count": 1,
+   "ms": 173,
+   "maxMs": 173,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub/web\" && sed -n 2866,2880p app.ts | cut -c1-300; grep -n \"group-head\" styles.css | head -5; grep -n \"\\\"GET /api/hubs\\\"\\|\\\"/api/hubs\\\"\\|api/hubs\\\"\" ../src/*.ts | head": {
+   "count": 1,
+   "ms": 118,
+   "maxMs": 118,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rn \"hubs-button\\|hub-list\\|#hubs\\b\" hub/scripts hub/web --include=*.mjs --include=*.ts --include=*.css | grep -v \"^hub/web/app.ts:19[0-9][0-9]\" | head; grep -n \"^\\.hub-list\\|^#hub-list": {
+   "count": 1,
+   "ms": 634,
+   "maxMs": 634,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/scripts/changelog-shot.mjs \"#settings-menu\" \"C:/Users/Flex/AppData/Local/Temp/hubs-settings.png\" \"const f=window.fetch;window.fetch=(u,o)=>String(u).endsWith('api/hubs')?Promise.res": {
+   "count": 1,
+   "ms": 62591,
+   "maxMs": 62591,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/scripts/changelog-shot.mjs \"#hubs-group\" \"C:/Users/Flex/AppData/Local/Temp/hubs-settings.png\" \"const f=window.fetch;window.fetch=(u,o)=>String(u).endsWith('api/hubs')?Promise.resolv": {
+   "count": 2,
+   "ms": 125873,
+   "maxMs": 63011,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"localOnly\\|LOCAL_ONLY\\|local-only\\|localKey\\|x-hub-key\" hub/src/hub.ts | cut -c1-260 | head -20; grep -n \"^const token\\|let token\\|const auth\\b\\|auth =\" hub/web/app.ts | cut -c1-260": {
+   "count": 1,
+   "ms": 106,
+   "maxMs": 106,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 338,346p hub/src/hub.ts | cut -c1-300; sed -n 405,460p hub/src/hub.ts | cut -c1-240; grep -n \"\\\"POST /api/hubs\\|\\\"GET /api/hubs\" hub/src/hub.ts | cut -c1-200": {
+   "count": 1,
+   "ms": 136,
+   "maxMs": 136,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && grep -n \"\\[hidden\\]\" web/styles.css | head -3; grep -n \"pageApi\\|api/hubs\\|/api/\\\" + \\|\\\"hubs\\\"\" scripts/test-hub.mjs scripts/test-remote.mjs scripts/test-api.mjs | head -8": {
+   "count": 1,
+   "ms": 154,
+   "maxMs": 154,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/scripts/test-remote.mjs 2>&1 | tail -4": {
+   "count": 1,
+   "ms": 988,
+   "maxMs": 988,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/scripts/test-remote.mjs 2>&1 | grep -v \"^ at\" | tail -12": {
+   "count": 1,
+   "ms": 882,
+   "maxMs": 882,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"212s/{ cookie })).body.local/{ cookie })).json().local/\" hub/scripts/test-remote.mjs && sed -n 212p hub/scripts/test-remote.mjs && node hub/scripts/test-remote.mjs 2>&1 | grep -v \"^ ": {
+   "count": 1,
+   "ms": 62465,
+   "maxMs": 62465,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/scripts/changelog-shot.mjs \"#hubs\" \"C:/Users/Flex/AppData/Local/Temp/hubs-remote.png\" \"const f=window.fetch;window.fetch=(u,o)=>String(u).endsWith('api/hubs')?Promise.resolve(new Re": {
+   "count": 1,
+   "ms": 108827,
+   "maxMs": 108827,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -u && git commit -q -m \"Hub: Paired hubs settings section; shares can be ticked from a paired device's page\" && git status -sb | head -1": {
+   "count": 1,
+   "ms": 225,
+   "maxMs": 225,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"3s/\\\"version\\\": \\\"1.1.0\\\"/\\\"version\\\": \\\"1.1.1\\\"/\" package.json && sed -i \"3s/\\\"version\\\": \\\"1.1.0\\\"/\\\"version\\\": \\\"1.1.1\\\"/;9s/\\\"version\\\": \\\"1.1.0\\\"/\\\"version\\\": \\\"1.1.1\\\"/\" packag": {
+   "count": 1,
+   "ms": 214,
+   "maxMs": 214,
+   "failures": 0
+  },
+  "\u0000(other)": {
+   "count": 110,
+   "ms": 8424,
+   "maxMs": 104,
+   "failures": 8
+  },
+  "bash\u0000cd \".\" && git add -u && git commit -q -m \"Release 1.1.1: Paired hubs settings section, shares set from a paired device\" && git push origin master 2>&1 | tail -1 && git status -sb | head -1": {
+   "count": 1,
+   "ms": 2524,
+   "maxMs": 2524,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rn \"plan3_create\" --include=*.ts --include=*.mjs --include=*.json . 2>/dev/null | grep -v node_modules | head; echo ---; grep -rln \"tool_addition\\|tool_removal\" extensions hub/src scri": {
+   "count": 1,
+   "ms": 49003,
+   "maxMs": 49003,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/sessions\" && ls -t | grep -i ingest | head -3; d=$(ls -t | grep -i ingest | head -1); ls -t \"$d\" | head -3; f=\"$d/$(ls -t \"$d\" | head -1)\"; echo \"$f\"; wc -l \"$f\"; grep -c \"": {
+   "count": 1,
+   "ms": 204,
+   "maxMs": 204,
+   "failures": 1
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/sessions/--C--SOFT-git-yt-ingest--\" && f=$(ls -t -- *.jsonl | head -1); echo \"$f\"; wc -l -- \"$f\"; grep -n \"plan3_create\" -- \"$f\" | cut -c1-300 | head; echo; node -e \" const": {
+   "count": 1,
+   "ms": 230,
+   "maxMs": 230,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/sessions/--C--SOFT-git-yt-ingest--\" && f=$(ls -t -- *.jsonl | head -1); node -e \" const l=require('fs').readFileSync(process.argv[1],'utf8').trim().split('\\n').map(JSON.par": {
+   "count": 2,
+   "ms": 318,
+   "maxMs": 168,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rn \"on(\\\"context\\\"\\|\\\"context\\\", \" extensions/*.ts | head; grep -rn \"toolsAdded\\|toolsRemoved\" extensions/*.ts | head -20": {
+   "count": 1,
+   "ms": 130,
+   "maxMs": 130,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1340,1400p extensions/work-models.ts; grep -rn \"role === \\\"system\\\"\\|role !== \\\"system\\\"\" extensions/*.ts | head -20": {
+   "count": 1,
+   "ms": 121,
+   "maxMs": 121,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1400,1440p extensions/work-models.ts; grep -n \"foldSystem\\|function fold\\|mergeSystem\" extensions/work-models.ts | head": {
+   "count": 1,
+   "ms": 156,
+   "maxMs": 156,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"registerContextHandlers(\" extensions/*.ts; sed -n 1530,1560p extensions/work-models.ts; grep -n \"getCurrentSystemMessage\" extensions/work-models.ts | head -3": {
+   "count": 1,
+   "ms": 129,
+   "maxMs": 129,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-ai/dist\" && grep -rln \"function getCurrentSystemMessage\" . | head -2; f=$(grep -rln \"function getCurrentSystemMessage": {
+   "count": 1,
+   "ms": 574,
+   "maxMs": 574,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && grep -rn \"before_provider_request\" extensions/*.ts | head -3; grep -n \"\\-\\-session\\b\\|\\-\\-extension\\|\\-\\-print\\|\\-\\-fork\\|\\-\\-session-dir\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/nod": {
+   "count": 1,
+   "ms": 108,
+   "maxMs": 108,
+   "failures": 0
+  },
+  "bash\u0000pi --help 2>&1 | grep -i -E \"session|extension|print|fork|no-\" | head -20": {
+   "count": 1,
+   "ms": 1174,
+   "maxMs": 1174,
+   "failures": 0
+  },
+  "bash\u0000T=\"C:/Users/Flex/AppData/Local/Temp/ytdump\"; rm -rf \"$T\"; mkdir -p \"$T/sessions\"; cat > \"$T/dump.ts\" <<'EOF' import { writeFileSync } from \"node:fs\"; export default function (pi: any) { pi.on(\"before_": {
+   "count": 1,
+   "ms": 2111,
+   "maxMs": 2111,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-ai/dist/api\" && grep -n \"toClaudeCodeName\\|mcp__pi__\\|function convertTools\" anthropic-messages.js | head -20; cd \"C:": {
+   "count": 1,
+   "ms": 112,
+   "maxMs": 112,
+   "failures": 0
+  },
+  "bash\u0000T=\"C:/Users/Flex/AppData/Local/Temp/ytrepro\"; rm -rf \"$T\"; mkdir -p \"$T/s\"; cat > \"$T/x.ts\" <<'EOF' import { Type } from \"typebox\"; export default function (pi: any) { for (const name of [\"alpha_tool\"": {
+   "count": 1,
+   "ms": 2064,
+   "maxMs": 2064,
+   "failures": 0
+  },
+  "bash\u0000T=\"C:/Users/Flex/AppData/Local/Temp/ytrepro\"; rm -rf \"$T/s\"; mkdir -p \"$T/s\"; cd \"$T\" && for s in 1 2 3; do echo \"== stage $s\"; STAGE=$s timeout 120 pi --no-extensions --no-skills -e \"$T/x.ts\" --sessi": {
+   "count": 1,
+   "ms": 1927,
+   "maxMs": 1927,
+   "failures": 0
+  },
+  "bash\u0000ls \"C:/Users/Flex/.pi/agent/install/releases/\"; cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent\" && grep -n -i \"tool_removal\\|tool_reference\\|inline-too": {
+   "count": 1,
+   "ms": 120,
+   "maxMs": 120,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works\" && ls; grep -rn -i \"tool_removal\\|tool removal\\|inline-tools\\|tool_reference_unresolved\\|toolRemoved\" */CHANGELOG.md 2>": {
+   "count": 1,
+   "ms": 1220,
+   "maxMs": 1220,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/sessions\" && cat > \"C:/Users/Flex/AppData/Local/Temp/scan.cjs\" <<'EOF' const fs=require('fs'),path=require('path');const root=process.argv[2];const out={ok:0,err:0,errs:[],": {
+   "count": 1,
+   "ms": 4538,
+   "maxMs": 4538,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist\" && grep -rln \"context_with_system\" . | grep -v \"\\.map$\" | head; f=$(grep -rln \"context_with_system": {
+   "count": 1,
+   "ms": 345,
+   "maxMs": 345,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/sessions\" && grep -rhoE \"\\\"type\\\":\\\"anthropic_thread[a-z_]*\\\"\" --include=*.jsonl . | sort | uniq -c; grep -rlE \"anthropic_thread\" --include=*.jsonl . | head -3; cd \"C:/User": {
+   "count": 1,
+   "ms": 31850,
+   "maxMs": 31850,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/sessions\" && node \"C:/Users/Flex/AppData/Local/Temp/scan.cjs\" .": {
+   "count": 1,
+   "ms": 4328,
+   "maxMs": 4328,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/sessions/--C--SOFT-git-yt-ingest--\" && f=$(ls -t -- *.jsonl | head -1); echo \"$f\"; node -e \" const l=require('fs').readFileSync(process.argv[1],'utf8').trim().split('\\n').m": {
+   "count": 1,
+   "ms": 214,
+   "maxMs": 214,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 3925,3953p extensions/work-models.ts; grep -rn \"mcp__pi__\" --include=*.ts --include=*.js extensions hub/src \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-work": {
+   "count": 1,
+   "ms": 120,
+   "maxMs": 120,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/sessions\" && cat > \"C:/Users/Flex/AppData/Local/Temp/scan2.cjs\" <<'EOF' const fs=require('fs'),path=require('path');const files=[]; (function walk(d){for(const f of fs.read": {
+   "count": 1,
+   "ms": 4259,
+   "maxMs": 4259,
+   "failures": 0
+  },
+  "bash\u0000pi auth --help 2>&1 | head -15; pi auth status 2>&1 | head -10": {
+   "count": 1,
+   "ms": 664,
+   "maxMs": 664,
+   "failures": 0
+  },
+  "bash\u0000pi auth check --provider anthropic 2>&1 | head -10": {
+   "count": 1,
+   "ms": 391,
+   "maxMs": 391,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp\" && timeout 120 pi --no-session --model anthropic/claude-opus-5-5 --thinking off -p \"Reply with just: ok\" 2>&1 | tail -2; timeout 60 pi --no-session --no-extension": {
+   "count": 1,
+   "ms": 4163,
+   "maxMs": 4163,
+   "failures": 0
+  },
+  "bash\u0000T=\"C:/Users/Flex/AppData/Local/Temp/ytrepro\"; rm -rf \"$T/s\"; mkdir -p \"$T/s\"; cd \"$T\" && for s in 1 2 3; do echo \"== stage $s\"; STAGE=$s timeout 180 pi -e \"$T/x.ts\" --session-dir \"$T/s\" --session-id \"": {
+   "count": 1,
+   "ms": 12104,
+   "maxMs": 12104,
+   "failures": 0
+  },
+  "bash\u0000T=\"C:/Users/Flex/AppData/Local/Temp/ytrepro\"; cat > \"$T/x.ts\" <<'EOF' import { Type } from \"typebox\"; import { writeFileSync } from \"node:fs\"; export default function (pi: any) { for (const name of [\"": {
+   "count": 1,
+   "ms": 3286,
+   "maxMs": 3286,
+   "failures": 0
+  },
+  "bash\u0000T=\"C:/Users/Flex/AppData/Local/Temp/ytrepro\"; cd \"$T\" && sed -i \"s|if (v === \\\"prefix-ref\\\"|if (v === \\\"nocache\\\" \\&\\& b.type === \\\"tool_removal\\\") delete b.cache_control;\\n\\t\\t\\tif (v === \\\"prefix-re": {
+   "count": 1,
+   "ms": 5286,
+   "maxMs": 5286,
+   "failures": 0
+  },
+  "bash\u0000T=\"C:/Users/Flex/AppData/Local/Temp/ytrepro\"; cd \"$T\" && sed -i \"s|\\t\\treturn p;|\\t\\tif (v === \\\"swap\\\" \\|\\| v === \\\"merge\\\") for (let i = 0; i < p.messages.length - 1; i++) { const a = p.messages[i],": {
+   "count": 1,
+   "ms": 5378,
+   "maxMs": 5378,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/ytrepro\" && node -e \"const p=require('./sent.json');console.log(Object.keys(p));console.log((p.tools||[]).map(t=>t.name).join(' '));console.log(JSON.stringify(p.me": {
+   "count": 1,
+   "ms": 1265,
+   "maxMs": 1265,
+   "failures": 0
+  },
+  "bash\u0000R=\"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules\"; grep -rln \"mcp__pi__\\|tool_removal\" \"$R/@earendil-works\" --include=*.js 2>/dev/null | head;": {
+   "count": 1,
+   "ms": 1151,
+   "maxMs": 1151,
+   "failures": 0
+  },
+  "bash\u0000T=\"C:/Users/Flex/AppData/Local/Temp/ytrepro\"; cd \"$T\" && rm -rf s2 && for v in none prefix-def prefix-ref nocache; do id=$(node -e \"console.log(crypto.randomUUID())\"); echo \"== $v\"; for st in 1 2 3; d": {
+   "count": 1,
+   "ms": 45932,
+   "maxMs": 45932,
+   "failures": 0
+  },
+  "bash\u0000T=\"C:/Users/Flex/AppData/Local/Temp/ytrepro\"; cd \"$T\" && id=$(node -e \"console.log(crypto.randomUUID())\"); STAGE=1 timeout 180 pi -e \"$T/x.ts\" --session-dir \"$T/s3\" --session-id \"$id\" --model anthropi": {
+   "count": 1,
+   "ms": 15066,
+   "maxMs": 15066,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rln \"before_provider_request\" extensions | head; ls extensions | head -80; git status --short | head": {
+   "count": 1,
+   "ms": 211,
+   "maxMs": 211,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls tests 2>/dev/null | grep -i \"work-models\" | head; grep -n \"\\\"test\\|selfcheck\" package.json | head -20": {
+   "count": 1,
+   "ms": 111,
+   "maxMs": 111,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-anthropic-inline-tools.mjs && T=\"C:/Users/Flex/AppData/Local/Temp/ytrepro\" && id=$(node -e \"console.log(crypto.randomUUID())\") && for st in 1 2 3; do STAGE=$st timeout 180 ": {
+   "count": 1,
+   "ms": 186401,
+   "maxMs": 186401,
+   "failures": 0
+  },
+  "bash\u0000f=$(ls \"C:/Users/Flex/.pi/agent/sessions/--C--SOFT-git-yt-ingest--/\"*01a1cc2b*.jsonl | head -1); echo \"$f\"; cd \"C:/SOFT/git/yt-ingest\" && timeout 300 pi --fork \"$f\" --session-dir \"C:/Users/Flex/AppDat": {
+   "count": 1,
+   "ms": 89660,
+   "maxMs": 89660,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && grep -rln \"Checked models come first\" --exclude-dir=node_modules --exclude-dir=dist . | head": {
+   "count": 1,
+   "ms": 30220,
+   "maxMs": 30220,
+   "failures": 1
+  },
+  "bash\u0000D=\"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist\"; f=$(grep -rl \"setEnabledModels\" \"$D\" --include=*.js | head -3); echo \"$f\"; for x in $f; do grep -o": {
+   "count": 1,
+   "ms": 665,
+   "maxMs": 665,
+   "failures": 0
+  },
+  "bash\u0000cd /c/SOFT/git && grep -l \"enabledModels\" */.pi/settings.json 2>/dev/null; node -e \"const s=require('C:/Users/Flex/.pi/agent/settings.json');console.log(s.enabledModels)\"": {
+   "count": 1,
+   "ms": 251,
+   "maxMs": 251,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && cat > \"$TEMP/scoped-probe.mts\" <<'EOF' import { piModels, piRuntime } from \"./hub/src/pi-sdk.ts\"; const m = piModels(); console.log(JSON.stringify(await m.scoped(\".\"))); const rt = await": {
+   "count": 1,
+   "ms": 132,
+   "maxMs": 132,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -i \"s|\\\"./hub/src/pi-sdk.ts\\\"|\\\"file:///./hub/src/pi-sdk.ts\\\"|\" \"$TEMP/scoped-probe.mts\" && node \"$TEMP/scoped-probe.mts\" 2>&1 | tail -5": {
+   "count": 1,
+   "ms": 1218,
+   "maxMs": 1218,
+   "failures": 0
+  },
+  "bash\u0000D=\"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist\"; grep -n \"refreshModelCatalogs\" \"$D/index.d.ts\" \"$D/index.js\" 2>/dev/null | head; grep -rn \"export.": {
+   "count": 1,
+   "ms": 245,
+   "maxMs": 245,
+   "failures": 0
+  },
+  "bash\u0000D=\"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist\"; cat \"$D/modes/interactive/model-catalog-refresh.js\" 2>/dev/null | head -40; sed -n \"1,40p\" \"$D/cor": {
+   "count": 1,
+   "ms": 125,
+   "maxMs": 125,
+   "failures": 0
+  },
+  "bash\u0000cat > \"$TEMP/rt-probe.mts\" <<'EOF' import { piSdk } from \"file:///./hub/src/pi-sdk.ts\"; const sdk = await piSdk(); const dir = \"C:/Users/Flex/.pi/agent\"; const t = Date.now(); const rt = await sdk.Mod": {
+   "count": 1,
+   "ms": 1162,
+   "maxMs": 1162,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && grep -rn \"piRuntime\" src | grep -v \"^src/pi-sdk.ts:3[56]\"": {
+   "count": 1,
+   "ms": 107,
+   "maxMs": 107,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && grep -n \"const next\" src/pi-sdk.ts; ls scripts | grep -i \"sdk\\|model\\|scoped\"; git -C .. grep -ln \"setScoped\\|piRuntime\" -- hub/scripts": {
+   "count": 1,
+   "ms": 104,
+   "maxMs": 104,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short hub/src; sed -n \"312p\" hub/src/usage.ts | cut -c120-260; grep -n \"setScoped\\|scoped\" hub/scripts/test-api.mjs | head": {
+   "count": 1,
+   "ms": 162,
+   "maxMs": 162,
+   "failures": 0
+  },
+  "bash\u0000A=\"C:/Users/Flex/.pi/agent\"; T=\"$TEMP/fakeagent\"; rm -rf \"$T\"; mkdir -p \"$T/install\"; cp \"$A/settings.json\" \"$A/auth.json\" \"$T/\"; [ -f \"$A/models.json\" ] && cp \"$A/models.json\" \"$T/\"; cp \"$A/install/c": {
+   "count": 1,
+   "ms": 395,
+   "maxMs": 395,
+   "failures": 0
+  },
+  "bash\u0000T=\"$TEMP/fakeagent\"; ls -la \"$T/install/\"; rm -rf \"$T/install/releases\"; MSYS=winsymlinks:nativestrict ln -s \"C:/Users/Flex/.pi/agent/install/releases\" \"$T/install/releases\" 2>&1; ls \"$T/install/relea": {
+   "count": 1,
+   "ms": 131,
+   "maxMs": 131,
+   "failures": 0
+  },
+  "bash\u0000T=\"$TEMP/fakeagent\"; cp \"C:/Users/Flex/.pi/agent/models-store.json\" \"$T/\"; FAKE=\"$T\" node \"$TEMP/scoped-probe2.mts\" 2>&1 | tail -5": {
+   "count": 1,
+   "ms": 1233,
+   "maxMs": 1233,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && grep -n \"\\\"scripts\\\"\" -A10 package.json; timeout 300 node --test scripts/test-api.mjs 2>&1 | tail -8": {
+   "count": 1,
+   "ms": 32526,
+   "maxMs": 32526,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && grep -n \"model-button\" scripts/test-browser.mjs | head; grep -n \"parked\" scripts/test-browser.mjs | head -10; sed -n \"1,30p\" scripts/test-browser.mjs | grep -n \"agent-browser\\|chrom\\|pla": {
+   "count": 1,
+   "ms": 127,
+   "maxMs": 127,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && git diff --stat -- src/usage.ts; timeout 200 npx --no-install tsc --noEmit -p tsconfig.json 2>&1 | grep -i \"usage.ts\\|pi-sdk.ts\" | head -5; git stash -q && timeout 200 npx --no-install t": {
+   "count": 1,
+   "ms": 8253,
+   "maxMs": 8253,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && timeout 200 npx --no-install tsc --noEmit -p tsconfig.json 2>&1 | grep -c \"error\"; timeout 200 npx --no-install tsc --noEmit -p tsconfig.json 2>&1 | grep \"app.ts\\|pi-sdk\" | head": {
+   "count": 1,
+   "ms": 9460,
+   "maxMs": 9460,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && timeout 900 node --test scripts/test-browser.mjs 2>&1 | grep -E \"^# (pass|fail)|not ok|AssertionError|model button\" | head -10": {
+   "count": 1,
+   "ms": 74355,
+   "maxMs": 74355,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && git diff -U0 web/app.ts | grep \"^@@\"; sed -n \"1838p\" web/app.ts | cut -c1-200": {
+   "count": 1,
+   "ms": 164,
+   "maxMs": 164,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && timeout 900 node --test scripts/test-browser.mjs > \"$TEMP/tb.log\" 2>&1; echo \"exit $?\"; tail -25 \"$TEMP/tb.log\"": {
+   "count": 1,
+   "ms": 76193,
+   "maxMs": 76193,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && timeout 900 node --test scripts/test-browser.mjs > \"$TEMP/tb.log\" 2>&1; echo \"exit $?\"; grep -E \"Error|error\\\":|ℹ (pass|fail)\" \"$TEMP/tb.log\" | head -8": {
+   "count": 1,
+   "ms": 77281,
+   "maxMs": 77281,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && timeout 900 node --test scripts/test-browser.mjs > \"$TEMP/tb.log\" 2>&1; echo \"exit $?\"; grep -E \"AssertionError|error\\\":|ℹ (pass|fail)\" \"$TEMP/tb.log\" | head -8": {
+   "count": 1,
+   "ms": 224791,
+   "maxMs": 224791,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && python - <<'EOF' p=\"scripts/test-browser.mjs\"; s=open(p,encoding=\"utf8\").read() old=\"\"\"options: [...Array(9).keys()].map(n => ({ title: \"build \" + n, description\"\"\" new=\"\"\"options: [...A": {
+   "count": 1,
+   "ms": 144,
+   "maxMs": 144,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && timeout 900 node --test scripts/test-browser.mjs > \"$TEMP/tb.log\" 2>&1; echo \"exit $?\"; grep -E \"AssertionError|ℹ (pass|fail)\" \"$TEMP/tb.log\" | head -4": {
+   "count": 1,
+   "ms": 32932,
+   "maxMs": 32932,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && grep -n \"First export'\\] \\[data-inspect\\]\" scripts/test-browser.mjs | head -3; grep -m2 \"stdout:\" \"$TEMP/tb.log\" | cut -c1-300; git status --short web": {
+   "count": 1,
+   "ms": 133,
+   "maxMs": 133,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && timeout 900 node --test scripts/test-browser.mjs > \"$TEMP/tb.log\" 2>&1; echo \"exit $?\"; grep -E \"AssertionError|is outside|ℹ (pass|fail)\" \"$TEMP/tb.log\" | head -4 | cut -c1-250": {
+   "count": 1,
+   "ms": 58092,
+   "maxMs": 58092,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git log --oneline -3; git status --short | head; tasklist | grep -ic \"agent-browser\\|chrome\"": {
+   "count": 1,
+   "ms": 428,
+   "maxMs": 428,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub/web\" && python - <<'EOF' p=\"app.css\" import glob for p in glob.glob(\"*.css\"): s=open(p,encoding=\"utf8\").read() a=\".prompt-option > span { flex: 1 1 0; min-width: 0;\" if a in s: s=s.replace(a": {
+   "count": 1,
+   "ms": 170,
+   "maxMs": 170,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && for i in 1 2; do timeout 900 node --test scripts/test-browser.mjs > \"$TEMP/tb.log\" 2>&1; r=$?; echo \"exit $r\"; [ $r = 0 ] && break; grep -E \"AssertionError|error\\\":\" \"$TEMP/tb.log\" | hea": {
+   "count": 1,
+   "ms": 223148,
+   "maxMs": 223148,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n \"1848p\" web/app.ts | cut -c1-200; git diff --stat -- web/app.ts; git log -1 --format=%h -- web/app.ts": {
+   "count": 1,
+   "ms": 156,
+   "maxMs": 156,
+   "failures": 0
+  }
+ },
+ "steps": {
+  "S1": {
+   "ms": 652841,
+   "testMs": 76747,
+   "replies": 28,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 28
+   },
+   "failures": 1
+  },
+  "S2": {
+   "ms": 514737,
+   "testMs": 95606,
+   "replies": 57,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 57
+   },
+   "failures": 3
+  },
+  "S3": {
+   "ms": 574686,
+   "testMs": 176272,
+   "replies": 54,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 54
+   },
+   "failures": 2
+  },
+  "S4": {
+   "ms": 907732,
+   "testMs": 220601,
+   "replies": 52,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 52
+   },
+   "failures": 7
+  },
+  "S5": {
+   "ms": 206768,
+   "testMs": 1296,
+   "replies": 22,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 22
+   },
+   "failures": 2
+  },
+  "(none)": {
+   "ms": 3704058,
+   "testMs": 1575552,
+   "replies": 215,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 215
+   },
+   "failures": 10,
+   "commands": {
+    "bash\u0000cd \"./hub/web\" && grep -n \"option-desc\\|ask-option\\|\\.choice\" *.css | head -30": {
+     "count": 1,
+     "ms": 62,
+     "maxMs": 62,
+     "failures": 0
+    },
+    "bash\u0000cd \"./hub/web\" && grep -n \"description\" app.ts | grep -i \"ask\\|option\\|dialog\\|label\" | head -20": {
+     "count": 1,
+     "ms": 67,
+     "maxMs": 67,
+     "failures": 0
+    },
+    "bash\u0000cd \"./hub/web\" && grep -rn \"\\.description\" *.ts | grep -v \"^app.ts:1379\" | head -20; grep -n \"Send answer\" *.ts | head": {
+     "count": 1,
+     "ms": 96,
+     "maxMs": 96,
+     "failures": 0
+    },
+    "bash\u0000cd \"./hub/web\" && grep -n \"prompt-option\\|prompt-description\" *.css; cd .. && grep -n \"prompt-description\\|inline\" scripts/test-browser.mjs | grep -i \"prompt\\|inline\" | head": {
+     "count": 1,
+     "ms": 98,
+     "maxMs": 98,
+     "failures": 0
+    },
+    "bash\u0000cd \"./hub\" && sed -n \"1015,1032p\" scripts/test-browser.mjs | cut -c1-400": {
+     "count": 1,
+     "ms": 65,
+     "maxMs": 65,
+     "failures": 0
+    },
+    "bash\u0000cd \"./hub\" && python - <<'EOF' p=\"scripts/test-browser.mjs\"; s=open(p,encoding=\"utf8\").read() old=\"\"\"options: [...Array(9).keys()].map(n => ({ title: \"build \" + n, description\"\"\" new=\"\"\"options: [...A": {
+     "count": 1,
+     "ms": 144,
+     "maxMs": 144,
+     "failures": 0
+    },
+    "bash\u0000cd \"./hub\" && timeout 900 node --test scripts/test-browser.mjs > \"$TEMP/tb.log\" 2>&1; echo \"exit $?\"; grep -E \"AssertionError|ℹ (pass|fail)\" \"$TEMP/tb.log\" | head -4": {
+     "count": 1,
+     "ms": 32932,
+     "maxMs": 32932,
+     "failures": 0
+    },
+    "bash\u0000grep -n -m3 \"Error\\|error\\\"\" \"$TEMP/tb.log\" | cut -c1-300": {
+     "count": 1,
+     "ms": 74,
+     "maxMs": 74,
+     "failures": 0
+    },
+    "bash\u0000cd \"./hub\" && grep -n \"First export'\\] \\[data-inspect\\]\" scripts/test-browser.mjs | head -3; grep -m2 \"stdout:\" \"$TEMP/tb.log\" | cut -c1-300; git status --short web": {
+     "count": 1,
+     "ms": 133,
+     "maxMs": 133,
+     "failures": 0
+    },
+    "bash\u0000cd \"./hub\" && timeout 900 node --test scripts/test-browser.mjs > \"$TEMP/tb.log\" 2>&1; echo \"exit $?\"; grep -E \"AssertionError|is outside|ℹ (pass|fail)\" \"$TEMP/tb.log\" | head -4 | cut -c1-250": {
+     "count": 1,
+     "ms": 58092,
+     "maxMs": 58092,
+     "failures": 0
+    },
+    "bash\u0000head -30 \"$TEMP/tb.log\" | cut -c1-300": {
+     "count": 1,
+     "ms": 74,
+     "maxMs": 74,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && git log --oneline -3; git status --short | head; tasklist | grep -ic \"agent-browser\\|chrome\"": {
+     "count": 1,
+     "ms": 428,
+     "maxMs": 428,
+     "failures": 0
+    },
+    "bash\u0000cd \"./hub/web\" && python - <<'EOF' p=\"app.css\" import glob for p in glob.glob(\"*.css\"): s=open(p,encoding=\"utf8\").read() a=\".prompt-option > span { flex: 1 1 0; min-width: 0;\" if a in s: s=s.replace(a": {
+     "count": 1,
+     "ms": 170,
+     "maxMs": 170,
+     "failures": 0
+    },
+    "bash\u0000cd \"./hub\" && for i in 1 2; do timeout 900 node --test scripts/test-browser.mjs > \"$TEMP/tb.log\" 2>&1; r=$?; echo \"exit $r\"; [ $r = 0 ] && break; grep -E \"AssertionError|error\\\":\" \"$TEMP/tb.log\" | hea": {
+     "count": 1,
+     "ms": 223148,
+     "maxMs": 223148,
+     "failures": 0
+    },
+    "bash\u0000cd \"./hub\" && sed -n \"1848p\" web/app.ts | cut -c1-200; git diff --stat -- web/app.ts; git log -1 --format=%h -- web/app.ts": {
+     "count": 1,
+     "ms": 156,
+     "maxMs": 156,
+     "failures": 0
+    }
+   }
+  }
+ },
+ "spans": [
+  {
+   "start": "2026-11-17T21:30:12.225Z",
+   "ms": 770970
+  },
+  {
+   "start": "2026-11-17T21:43:03.218Z",
+   "ms": 2411076
+  },
+  {
+   "start": "2026-11-17T22:23:51.473Z",
+   "ms": 827449
+  },
+  {
+   "start": "2026-11-17T22:37:38.964Z",
+   "ms": 145442
+  },
+  {
+   "start": "2026-11-17T22:40:04.433Z",
+   "ms": 8667
+  },
+  {
+   "start": "2026-11-18T06:06:56.523Z",
+   "ms": 188686
+  },
+  {
+   "start": "2026-11-18T06:12:13.286Z",
+   "ms": 745824
+  },
+  {
+   "start": "2026-11-18T06:25:39.754Z",
+   "ms": 18704
+  },
+  {
+   "start": "2026-11-19T09:32:21.379Z",
+   "ms": 358891
+  },
+  {
+   "start": "2026-11-19T09:40:22.824Z",
+   "ms": 663987
+  },
+  {
+   "start": "2026-11-19T12:34:30.068Z",
+   "ms": 85263
+  },
+  {
+   "start": "2026-11-19T12:35:55.373Z",
+   "ms": 795156
+  },
+  {
+   "start": "2026-11-20T17:03:28.086Z",
+   "ms": 626645
+  }
+ ],
+ "hints": []
+}

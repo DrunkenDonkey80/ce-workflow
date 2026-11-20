@@ -2,7 +2,7 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 1.1.2 — 2026-11-20
 
 ### Added
 
@@ -10,7 +10,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - Retro advice meant for the project, a script or ce-workflow itself (from step and finish retros) is saved as one Markdown file per suggestion in the project's `.ce-workflow/local/requests/`. Repeated suggestions are saved only once. Each file quotes the stats line it is based on with secrets, full paths and your user name removed, and the folder is git-ignored. Nothing is sent anywhere; forward a file yourself if you want it acted on.
 - Hub "Requests (N)" button: shows how many saved retro requests wait in this project (on the ce-workflow page also the ce-workflow ones from your other local projects). Clicking it moves them to `requests/done/` and starts a `/plan3` that analyzes them. Hidden when there are none.
 
-![The Requests button next to Env var](docs/changelog/retro-requests.png)
+![The Requests button next to Env var](docs/changelog/1.1.2-retro-requests.png)
 - Completing a Plan3 plan that has accepted ideas (video, repo and skills reviews) now returns the list of those ideas and asks for a final report with one line per idea, flagging any result that differs from the idea's title, requirement or your comment, or any condition you approved that was not followed.
 - AGENTS.md audit: at most every 5 days, and only when an AGENTS.md or CLAUDE.md loaded in the project changed since the last audit, Astra reviews them in the background against the whole blank-session prompt (duplicates, rules other parts already ensure, shouting, stale references, wordiness). Its proposals come up in an ask_user dialog with the reason and the before/after text; only the ones you pick are written. `/wo agents_audit` runs it now, whether due or not.
 - `/wo context_report` starts a throwaway Pi in the current project and shows what a blank session sends with every request, split by owner (ce-workflow, Pi core, each package, skill and instructions file). It includes each tool's schema and prompt text and how often it is called per 1,000 turns. Its ideas cover only ce-workflow's own parts; other owners are listed but not judged. It never calls the model. The report appears in the terminal transcript and as a chat row on the hub page; it is not sent to the model.
@@ -43,6 +43,8 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ### Fixed
 
 - Hub: in a question on a phone, an option with a long title and a short note no longer squeezes the title into a narrow column; the note moves under the title.
+
+![A long option title beside its radio, note underneath](docs/changelog/1.1.2-long-option-title.png)
 - Hub: clicking the model button on a parked session wakes it, so the menu lists all its models instead of only the scoped ones.
 - Hub: Set scoped models now ticks and unticks models newer than Pi's built-in list (e.g. GPT-6.2 Astra). Before, it saved them without showing a tick, a click could not remove them, and clicks left duplicate entries in Pi's settings.
 - Sessions on a Claude subscription no longer fail every turn with `400 tool_reference_unresolved` after a tool was added mid-session and later removed (for example `plan3_create`). Run `/reload` in a stuck session to recover it.

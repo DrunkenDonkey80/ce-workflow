@@ -1,0 +1,1508 @@
+{
+ "version": 1,
+ "activeMs": 16817033,
+ "runs": 14,
+ "waitingMs": 7475874,
+ "toolWallMs": 4773567,
+ "compactions": {
+  "count": 3,
+  "ms": 143000
+ },
+ "models": {
+  "anthropic/claude-opus-5-5:high": {
+   "replies": 593,
+   "thinkingMs": 2188268,
+   "actingMs": 1155409,
+   "input": 1432,
+   "output": 320631,
+   "cacheRead": 55001695,
+   "cacheWrite": 2079059,
+   "cost": 27.813981999999985,
+   "errors": 0
+  }
+ },
+ "tools": {
+  "research_exit": {
+   "count": 1,
+   "ms": 1,
+   "maxMs": 1,
+   "failures": 0
+  },
+  "plan3": {
+   "count": 29,
+   "ms": 2862,
+   "maxMs": 262,
+   "failures": 0
+  },
+  "bash": {
+   "count": 450,
+   "ms": 4055964,
+   "maxMs": 1140323,
+   "failures": 20
+  },
+  "read": {
+   "count": 62,
+   "ms": 764,
+   "maxMs": 126,
+   "failures": 0
+  },
+  "write": {
+   "count": 12,
+   "ms": 98,
+   "maxMs": 25,
+   "failures": 0
+  },
+  "edit": {
+   "count": 71,
+   "ms": 795,
+   "maxMs": 89,
+   "failures": 3
+  },
+  "compaction_note": {
+   "count": 9,
+   "ms": 0,
+   "maxMs": 0,
+   "failures": 2
+  },
+  "test_sensitivity": {
+   "count": 19,
+   "ms": 305152,
+   "maxMs": 124173,
+   "failures": 5
+  },
+  "lens_diagnostics": {
+   "count": 6,
+   "ms": 33579,
+   "maxMs": 15032,
+   "failures": 0
+  },
+  "codemode": {
+   "count": 4,
+   "ms": 58370,
+   "maxMs": 23669,
+   "failures": 0
+  },
+  "peer_ls": {
+   "count": 1,
+   "ms": 570,
+   "maxMs": 570,
+   "failures": 0
+  },
+  "peer_grep": {
+   "count": 12,
+   "ms": 31993,
+   "maxMs": 7219,
+   "failures": 4
+  },
+  "peer_read": {
+   "count": 6,
+   "ms": 2684,
+   "maxMs": 452,
+   "failures": 2
+  },
+  "tools_enable": {
+   "count": 1,
+   "ms": 2,
+   "maxMs": 2,
+   "failures": 0
+  },
+  "project_commands": {
+   "count": 2,
+   "ms": 1129,
+   "maxMs": 673,
+   "failures": 0
+  }
+ },
+ "categories": {
+  "shell": {
+   "count": 381,
+   "ms": 2547860,
+   "maxMs": 1140323,
+   "failures": 17
+  },
+  "test": {
+   "count": 67,
+   "ms": 1502347,
+   "maxMs": 608652,
+   "failures": 3
+  },
+  "build": {
+   "count": 2,
+   "ms": 5757,
+   "maxMs": 5477,
+   "failures": 0
+  }
+ },
+ "commands": {
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const f='scripts/test-work-plan3-night.mjs';let s=fs.readFileSync(f,'utf8'); s=s.replace('const guardCtx = { cwd };','const repo = path.join(os.homedir(), \\\"": {
+   "count": 1,
+   "ms": 1069,
+   "maxMs": 1069,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB node \"scripts/test-work-plan3.mjs\" 2>&1 | tail -5; env -u PI_HUB node \"scripts/test-work-compaction-notifications.mjs\" 2>&1 | tail -3": {
+   "count": 1,
+   "ms": 11639,
+   "maxMs": 11639,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB node \"scripts/test-work-compaction-notifications.mjs\" 2>&1 | grep -v \"^ at \" | tail -25": {
+   "count": 1,
+   "ms": 1174,
+   "maxMs": 1174,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB node \"scripts/test-work-compaction-notifications.mjs\" 2>&1 | grep -m3 \"test-work-compaction-notifications.mjs:\"; git stash list | head -2": {
+   "count": 1,
+   "ms": 1263,
+   "maxMs": 1263,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB -u PI_HUB_SESSION node \"scripts/test-work-compaction-notifications.mjs\" 2>&1 | grep -v \"^ at \" | tail -12": {
+   "count": 1,
+   "ms": 1283,
+   "maxMs": 1283,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env | grep \"^PI_\" | cut -d= -f1; env -u PI_HUB -u PI_HUB_SESSION node \"scripts/test-work-compaction-notifications.mjs\" 2>&1 | grep -m2 \"compaction-notifications.mjs:\"": {
+   "count": 1,
+   "ms": 1421,
+   "maxMs": 1421,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && T=\"$(mktemp -d)\" && git archive HEAD | tar -x -C \"$T\" && cmd //c mklink /J \"$(cygpath -w \"$T/node_modules\")\" \"$(cygpath -w \"$PWD/node_modules\")\" >/dev/null && cd \"$T\" && env -u PI_HUB -u PI_": {
+   "count": 1,
+   "ms": 866,
+   "maxMs": 866,
+   "failures": 0
+  },
+  "bash\u0000cd \"/tmp/tmp.2jPDk0DbkL\" && powershell -NoProfile -Command \"New-Item -ItemType Junction -Path 'node_modules' -Target '.\\node_modules' | Out-Null\" && env -u PI_HUB -u PI_HUB_SESSION node \"scripts/test-": {
+   "count": 1,
+   "ms": 1430,
+   "maxMs": 1430,
+   "failures": 0
+  },
+  "bash\u0000cd \"/tmp/tmp.2jPDk0DbkL\" && env -i PATH=\"$PATH\" SYSTEMROOT=\"$SYSTEMROOT\" TEMP=\"$TEMP\" TMP=\"$TMP\" USERPROFILE=\"$USERPROFILE\" APPDATA=\"$APPDATA\" LOCALAPPDATA=\"$LOCALAPPDATA\" HOME=\"$HOME\" node \"scripts/t": {
+   "count": 1,
+   "ms": 1189,
+   "maxMs": 1189,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && T=\"/tmp/tmp.2jPDk0DbkL\" && cp scripts/test-work-plan3-night.mjs scripts/test-work-plan3.mjs \"$T/scripts/\" && cd \"$T\" && (env -u PI_HUB -u PI_HUB_SESSION node scripts/test-work-plan3-night.mj": {
+   "count": 1,
+   "ms": 1371,
+   "maxMs": 1371,
+   "failures": 0
+  },
+  "bash\u0000rm -rf \"/tmp/tmp.2jPDk0DbkL\"; cd \".\" && sed -n \"1,12p\" CHANGELOG.md": {
+   "count": 1,
+   "ms": 166,
+   "maxMs": 166,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short && git add extensions/command-guard.ts extensions/work-models.ts extensions/plan3-night.ts extensions/plan3.ts scripts/test-work-plan3-night.mjs scripts/test-work-plan3.mj": {
+   "count": 1,
+   "ms": 248,
+   "maxMs": 248,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rn \"cancelled the question\" --include=*.mjs --include=*.ts --include=*.js . 2>/dev/null | grep -v node_modules | head; grep -n \"^const \\|^export const \" extensions/ask-user/index.ts | ": {
+   "count": 1,
+   "ms": 38873,
+   "maxMs": 38873,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"retaining sources\\|Merge genuine\\|EVERY launched advisor\" scripts/test-work-plan3.mjs | head -5": {
+   "count": 1,
+   "ms": 325,
+   "maxMs": 325,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');let f='scripts/test-work-plan3.mjs';let s=fs.readFileSync(f,'utf8'); const a='\\tassert.match(messages.at(-1).message, /Wait for EVERY launched advisor/);'; i": {
+   "count": 1,
+   "ms": 11969,
+   "maxMs": 11969,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB -u PI_HUB_SESSION node scripts/test-work-ask-user.mjs 2>&1 | grep -v \"^ at \" | tail -15": {
+   "count": 1,
+   "ms": 1061,
+   "maxMs": 1061,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const f='scripts/test-work-ask-user.mjs';let s=fs.readFileSync(f,'utf8'); s=s.replace('\\nassert.match(result.content[0].text, /Do not ask it again/, \\\"a canc": {
+   "count": 1,
+   "ms": 1112,
+   "maxMs": 1112,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add extensions/ask-user/index.ts extensions/plan3.ts extensions/work-models.ts skills/two-axis-review/SKILL.md utility-agents/diff-reviewer.md scripts/test-work-ask-user.mjs scripts/test": {
+   "count": 1,
+   "ms": 251,
+   "maxMs": 251,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-compare-benchmark-runs.mjs && T=\"$(mktemp -d)\" && mkdir \"$T/scripts\" && git show HEAD:scripts/compare-benchmark-runs.mjs > \"$T/scripts/compare-benchmark-runs.mjs\" && cp scr": {
+   "count": 1,
+   "ms": 306,
+   "maxMs": 306,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short && git log --oneline -3 && git diff --stat": {
+   "count": 1,
+   "ms": 186,
+   "maxMs": 186,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB -u PI_HUB_SESSION node scripts/test-benchmark-compaction-model.mjs 2>&1 | tail -20": {
+   "count": 1,
+   "ms": 8464,
+   "maxMs": 8464,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB -u PI_HUB_SESSION node scripts/test-benchmark-compaction-model.mjs && env -u PI_HUB -u PI_HUB_SESSION node scripts/test-compare-benchmark-runs.mjs && node --check scripts/verif": {
+   "count": 1,
+   "ms": 8685,
+   "maxMs": 8685,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add CHANGELOG.md scripts/benchmark-reasoning-strip-live.mjs scripts/compare-benchmark-runs.mjs scripts/test-compare-benchmark-runs.mjs scripts/test-benchmark-compaction-model.mjs scripts": {
+   "count": 1,
+   "ms": 223,
+   "maxMs": 223,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB -u PI_HUB_SESSION node scripts/benchmark-reasoning-strip-live.mjs --matrix compaction-model --repetitions 1 --output \"./.pi/compaction-model-benchmark/pilot\" > \"./.pi/compactio": {
+   "count": 1,
+   "ms": 431,
+   "maxMs": 431,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB -u PI_HUB_SESSION node scripts/test-benchmark-compaction-model.mjs && rm -rf \".pi/compaction-model-benchmark/pilot\" && env -u PI_HUB -u PI_HUB_SESSION node scripts/benchmark-re": {
+   "count": 3,
+   "ms": 807082,
+   "maxMs": 608652,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rn \"gpt-6.1-terra\\|gpt-5.6-terra\\|gpt-6-luna\" extensions/*.ts | head -5; node \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist/bundle/c": {
+   "count": 1,
+   "ms": 1095,
+   "maxMs": 1095,
+   "failures": 0
+  },
+  "bash\u0000cd \"./.pi/compaction-model-benchmark/pilot/rep-1-1-L-luna-ultrafull\" && ls; node -e \"const fs=require('fs');const f=fs.readdirSync('sessions')[0];const l=fs.readFileSync('sessions/'+f,'utf8').split('\\": {
+   "count": 1,
+   "ms": 181,
+   "maxMs": 181,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist/\" && grep -rl \"session too small\" . | head; f=$(grep -rl \"session too small\" bundle/chunks | head -": {
+   "count": 1,
+   "ms": 3381,
+   "maxMs": 3381,
+   "failures": 0
+  },
+  "bash\u0000cd \"./.pi/compaction-model-benchmark/pilot/rep-1-1-L-luna-ultrafull\" && cat > \"C:/Users/Flex/AppData/Local/Temp/prep.mjs\" <<'EOF' import fs from \"node:fs\"; const base = \"file:///C:/Users/Flex/.pi/agen": {
+   "count": 1,
+   "ms": 284,
+   "maxMs": 284,
+   "failures": 0
+  },
+  "bash\u0000cd \"./.pi/compaction-model-benchmark/pilot/rep-1-1-L-luna-ultrafull\" && sed -i \"s/\\[0, 200, 2000, 20000\\]/[500, 1000, 1500]/\" \"C:/Users/Flex/AppData/Local/Temp/prep.mjs\" && node \"C:/Users/Flex/AppData": {
+   "count": 1,
+   "ms": 284,
+   "maxMs": 284,
+   "failures": 0
+  },
+  "bash\u0000cd \"./.pi/compaction-model-benchmark/pilot\" && for d in rep-*; do node -e \"const fs=require('fs');const d=process.argv[1];const f=fs.readdirSync(d+'/sessions')[0];for(const e of fs.readFileSync(d+'/se": {
+   "count": 1,
+   "ms": 225,
+   "maxMs": 225,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add scripts/benchmark-reasoning-strip-live.mjs \"docs/plans/2026-11-17-mine-the-32-newly-reviewed-videos-for-orchestration-quality--f75ccea6-plan3.md\" docs/plans/logs/f75ccea6.md && git c": {
+   "count": 1,
+   "ms": 202,
+   "maxMs": 202,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB -u PI_HUB_SESSION node scripts/benchmark-reasoning-strip-live.mjs --matrix compaction-model --repetitions 6 --model anthropic/claude-opus-5-5 --output \"./.pi/compaction-model-b": {
+   "count": 1,
+   "ms": 1140323,
+   "maxMs": 1140323,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add \"docs/plans/2026-11-17-mine-the-32-newly-reviewed-videos-for-orchestration-quality--f75ccea6-plan3.md\" docs/plans/logs/f75ccea6.md && git commit -qm \"Plan3 f75ccea6 E2: Luna vs Terra": {
+   "count": 1,
+   "ms": 203,
+   "maxMs": 203,
+   "failures": 0
+  },
+  "bash\u0000ls -t \"C:/Users/Flex/AppData/Local/Temp\" | grep -i \"census\\|tool-use\\|tooluse\" | head; find \"C:/Users/Flex/AppData/Local/Temp\" -maxdepth 2 -name \"*census*\" 2>/dev/null | head": {
+   "count": 1,
+   "ms": 12631,
+   "maxMs": 12631,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/pi-research-CTpN87\" && ls -la; wc -l census.mjs; cat census.mjs": {
+   "count": 1,
+   "ms": 169,
+   "maxMs": 169,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"plan3-run\" extensions/*.ts | head -8; sed -n 30,55p extensions/tool-loader.ts; head -c 1500 docs/plans/logs/f75ccea6.stats.json; echo; ls C:/SOFT/git/*/docs/plans/logs/*.stats.json ": {
+   "count": 1,
+   "ms": 1774,
+   "maxMs": 1774,
+   "failures": 0
+  },
+  "bash\u0000grep -o \"pi_lens_activate_tools.\\{0,1600\\}\" \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-lens/dist/index.js\" | grep -o \"details:[^}]*}\" | head -5": {
+   "count": 1,
+   "ms": 809,
+   "maxMs": 809,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/sessions\" && grep -rh \"\\\"toolName\\\":\\\"\\(mcp__pi__\\)\\?pi_lens_activate_tools\\\"\" . 2>/dev/null | head -2 | node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{fo": {
+   "count": 1,
+   "ms": 38539,
+   "maxMs": 38539,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB -u PI_HUB_SESSION node scripts/test-tool-usage-census.mjs": {
+   "count": 2,
+   "ms": 306,
+   "maxMs": 212,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB -u PI_HUB_SESSION node scripts/tool-usage-census.mjs --dump-tool-defs \"C:/Users/Flex/AppData/Local/Temp/pi-research-CTpN87/tool-defs.json\" 2>&1 | tail -5 && node -e \"const d=re": {
+   "count": 1,
+   "ms": 7928,
+   "maxMs": 7928,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && T=\"C:/Users/Flex/AppData/Local/Temp/pi-research-CTpN87\" && env -u PI_HUB -u PI_HUB_SESSION node scripts/tool-usage-census.mjs --peer \"$T/peer\" --peer-map \"$T/peermap.json\" --tool-defs \"$T/to": {
+   "count": 1,
+   "ms": 15193,
+   "maxMs": 15193,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add CHANGELOG.md scripts/tool-usage-census.mjs scripts/test-tool-usage-census.mjs scripts/verify-package.mjs \"docs/plans/2026-11-17-mine-the-32-newly-reviewed-videos-for-orchestration-qu": {
+   "count": 1,
+   "ms": 230,
+   "maxMs": 230,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add \"docs/plans/2026-11-17-mine-the-32-newly-reviewed-videos-for-orchestration-quality--f75ccea6-plan3.md\" docs/plans/logs/f75ccea6.md && git commit -qm \"Plan3 f75ccea6 E3: mark done\" &&": {
+   "count": 1,
+   "ms": 217,
+   "maxMs": 217,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in camera_capture camera_watch camera_recover camera_stop goal_blocked goal_complete goal_wait plan3_diagram browser_search browser_fetch jev_triage session_dialog web_enable effective": {
+   "count": 1,
+   "ms": 801,
+   "maxMs": 801,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rln \"goal_complete\" extensions/ ~/.pi/agent/npm/node_modules/*/ --include=*.ts --include=*.js 2>/dev/null | grep -v node_modules/.*node_modules | head; grep -rn \"exposure\" extensions/*": {
+   "count": 1,
+   "ms": 5884,
+   "maxMs": 5884,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 176,186p extensions/browser-search.ts; sed -n 436,442p extensions/browser-fetch.ts; sed -n 1899,1902p extensions/plan3.ts | cut -c1-150; sed -n 20,24p extensions/work-camera-tools.ts ": {
+   "count": 1,
+   "ms": 178,
+   "maxMs": 178,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat > /tmp/e7-test-append.mjs <<'EOF' // E7: near-unused tools (<1 call per 1,000 turns, census E3) start undeclared and are listed by tools_enable. { const { activateNamedTools } = await im": {
+   "count": 1,
+   "ms": 186,
+   "maxMs": 186,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node - <<'EOF' const fs = require(\"fs\"); const edit = (file, pairs) => { let s = fs.readFileSync(file, \"utf8\"); for (const [a, b] of pairs) { if (!s.includes(a)) throw new Error(file + \": \" ": {
+   "count": 1,
+   "ms": 196,
+   "maxMs": 196,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node - <<'EOF' const fs = require(\"fs\"); let s = fs.readFileSync(\"extensions/hub-command.ts\", \"utf8\"); const rep = (a, b) => { if (!s.includes(a)) throw new Error(a); s = s.replaceAll(a, b);": {
+   "count": 1,
+   "ms": 1174,
+   "maxMs": 1174,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s#^import { toolsEnableTool } from \\\"./tool-loader.ts\\\";#import { activateNamedTools, toolsEnableTool } from \\\"./tool-loader.ts\\\";#\" extensions/work-models.ts && grep -n \"tool-loader": {
+   "count": 1,
+   "ms": 209,
+   "maxMs": 209,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"activateNamedTools =\" extensions/tool-loader.ts": {
+   "count": 1,
+   "ms": 399,
+   "maxMs": 399,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i '43s#`\\\\b${name}\\\\b`#`\\\\\\\\b${name}\\\\\\\\b`#' extensions/tool-loader.ts && sed -n 43p extensions/tool-loader.ts && env -u PI_HUB -u PI_HUB_SESSION node scripts/test-work-tool-loader.mjs ": {
+   "count": 1,
+   "ms": 173,
+   "maxMs": 173,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 43p extensions/tool-loader.ts && env -u PI_HUB -u PI_HUB_SESSION node scripts/test-work-tool-loader.mjs 2>&1 | head -12": {
+   "count": 1,
+   "ms": 166,
+   "maxMs": 166,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB -u PI_HUB_SESSION node scripts/test-work-camera.mjs 2>&1 | tail -6": {
+   "count": 1,
+   "ms": 8547,
+   "maxMs": 8547,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in test-jev-tools test-work-ask-remote test-work-browser-fetch test-work-design test-work-dialogs test-work-native-smoke test-work-plan3; do echo \"== $t\"; env -u PI_HUB -u PI_HUB_SESSI": {
+   "count": 1,
+   "ms": 442934,
+   "maxMs": 442934,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 88,96p scripts/test-jev-tools.mjs; sed -n 1,40p /tmp/test-work-native-smoke.log | cut -c1-250; git stash -q && env -u PI_HUB -u PI_HUB_SESSION node scripts/test-work-native-smoke.mjs ": {
+   "count": 1,
+   "ms": 7349,
+   "maxMs": 7349,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"loaderOffer\\|syncCameraTools(\" extensions/work-models.ts": {
+   "count": 1,
+   "ms": 1283,
+   "maxMs": 1283,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');let s=fs.readFileSync('scripts/test-work-camera.mjs','utf8'); s=s.replace('const offered = () => loaders.at(-1);\\n\\tsyncCameraTools(api, dir);','const offere": {
+   "count": 1,
+   "ms": 14720,
+   "maxMs": 14720,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in test-work-native-smoke test-work-tool-loader; do env -u PI_HUB -u PI_HUB_SESSION node scripts/$t.mjs > /tmp/$t.log 2>&1; echo \"$t exit $?\"; tail -2 /tmp/$t.log | cut -c1-200; done": {
+   "count": 1,
+   "ms": 7108,
+   "maxMs": 7108,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && T=\"C:/Users/Flex/AppData/Local/Temp/pi-research-CTpN87\" && env -u PI_HUB -u PI_HUB_SESSION timeout 120 node scripts/tool-usage-census.mjs --dump-tool-defs \"$T/tool-defs-e7.json\" 2>&1 | tail ": {
+   "count": 1,
+   "ms": 6820,
+   "maxMs": 6820,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-lens\" && cat package.json | head -40 && ls dist | head; rg -n -uu \"activate_tools\" --max-count 3 . | head": {
+   "count": 1,
+   "ms": 225,
+   "maxMs": 225,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-lens\" && rg -l -uu \"setActiveTools\" --glob \"!node_modules/**\" . | head; ls dist | wc -l; ls dist/*.js | head -3": {
+   "count": 1,
+   "ms": 2112,
+   "maxMs": 2112,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-lens/dist\" && rg -n -uu \"situational: true|situational:\" index.js | cut -c1-200 | head -20; rg -n -uu \"function isToolEnabled\" -A12 index.js | cut -c1-2": {
+   "count": 1,
+   "ms": 164,
+   "maxMs": 164,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short && git diff --stat && rg -n \"browser_search|jev_triage|DEFERRED|deferred\" extensions/tool-loader.ts | head -40": {
+   "count": 1,
+   "ms": 189,
+   "maxMs": 189,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in test-work-tool-loader test-work-camera; do env -u PI_HUB -u PI_HUB_SESSION node \"scripts/$t.mjs\" 2>&1 | tail -4; done": {
+   "count": 1,
+   "ms": 6691,
+   "maxMs": 6691,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env | rg \"^PI_(MODEL|PROVIDER)\" ; pi --help 2>&1 | rg -i \"session-dir|--model|--print|no-session\" | head": {
+   "count": 1,
+   "ms": 1468,
+   "maxMs": 1468,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && D=\"$TEMP/e7-live\" && rm -rf \"$D\" && env -u PI_HUB -u PI_HUB_SESSION timeout 180 pi -p --session-dir \"$D\" \"Reply with just: ok\" 2>&1 | tail -3; f=$(ls \"$D\"/*.jsonl 2>/dev/null | head -1); [ -": {
+   "count": 1,
+   "ms": 118608,
+   "maxMs": 118608,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB -u PI_HUB_SESSION node \"scripts/test-work-native-smoke.mjs\" 2>&1 | tail -3": {
+   "count": 1,
+   "ms": 7977,
+   "maxMs": 7977,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -u && git status --short && git commit -q -m \"E7: near-unused tools start undeclared, tools_enable offers them (incl. pi-lens trio)\" && git log --oneline -1": {
+   "count": 1,
+   "ms": 249,
+   "maxMs": 249,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff -U0 extensions/work-models.ts | rg \"^@@\"; rg -n \"savedEntries =|const savedEntries\" scripts/test-work-plan3.mjs | head -3; rg -n \"await run\\(\\\"plan3\\\", \\\"finish|\\\"Not yet\\\"|later\" s": {
+   "count": 1,
+   "ms": 204,
+   "maxMs": 204,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB -u PI_HUB_SESSION node scripts/test-work-plan3.mjs 2>&1 | tail -25": {
+   "count": 1,
+   "ms": 9881,
+   "maxMs": 9881,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in test-work-tool-loader test-work-camera; do env -u PI_HUB -u PI_HUB_SESSION node \"scripts/$t.mjs\" 2>&1 | tail -2; done; env -u PI_HUB -u PI_HUB_SESSION node scripts/test-work-native-": {
+   "count": 1,
+   "ms": 14191,
+   "maxMs": 14191,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB -u PI_HUB_SESSION node scripts/test-work-plan3-night.mjs 2>&1 | tail -2": {
+   "count": 1,
+   "ms": 1051,
+   "maxMs": 1051,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -u && git status --short && git commit -q -m \"E4/E5: per-phase Plan3 tool profiles (D-10), tools_enable offers every dropped tool\" && git log --oneline -1": {
+   "count": 1,
+   "ms": 270,
+   "maxMs": 270,
+   "failures": 0
+  },
+  "\u0000(other)": {
+   "count": 247,
+   "ms": 25386,
+   "maxMs": 164,
+   "failures": 12
+  },
+  "bash\u0000cd \".\" && rg -l -i \"systemPrompt.*length|system prompt size|promptBytes|systemPromptBytes\" scripts extensions | head; env | rg \"^PI_\" | rg -v \"KEY|TOKEN\"": {
+   "count": 1,
+   "ms": 2129,
+   "maxMs": 2129,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git log -3 --format=\"%h %ci %s\" && ls -t \"C:/Users/Flex/.pi/agent/sessions/--C--SOFT-git-ce-workflow--\" | head -8": {
+   "count": 1,
+   "ms": 289,
+   "maxMs": 289,
+   "failures": 0
+  },
+  "bash\u0000mkdir -p \"$TEMP/sp-measure\" && cat > \"$TEMP/sp-measure/measure.ts\" <<'EOF' import { writeFileSync } from \"node:fs\"; export default function (pi: any) { pi.on(\"before_provider_request\", (event: any) =>": {
+   "count": 1,
+   "ms": 2637,
+   "maxMs": 2637,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex\" && for d in \".claude\" \".pi\" \".claude-mem\" \".config\" \"AppData/Roaming/npm/node_modules\" \".bun/install/global/node_modules\"; do [ -e \"$d\" ] && echo \"== $d\" && rg -l -i --hidden -g \"!*": {
+   "count": 1,
+   "ms": 36177,
+   "maxMs": 36177,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git\" && rg -l -i --hidden -g \"AGENTS.md\" -g \"CLAUDE.md\" -g \"GEMINI.md\" -g \"*.mdc\" -g \"!**/node_modules/**\" \"claude-mem\" . 2>/dev/null | head -50; echo \"== settings\"; rg -n -i \"claude-mem|t": {
+   "count": 1,
+   "ms": 16367,
+   "maxMs": 16367,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git\" && wc -c \"C:/Users/Flex/.pi/agent/AGENTS.md\" \"AGENTS.md\" \"ce-workflow/AGENTS.md\"; sed -n \"60,85p\" \"C:/Users/Flex/.claude/settings.json\"; rg -n \"claude-mem|thedotmack\" \"C:/Users/Flex/.": {
+   "count": 1,
+   "ms": 721,
+   "maxMs": 721,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n -l \"Test sensitivity \\(every project\\)|Verify it yourself \\(every session\\)|Clear reports \\(every session\\)\" extensions skills ../ \"C:/Users/Flex/.pi/agent\" -g \"!**/sessions/**\" -g \"!*": {
+   "count": 1,
+   "ms": 25179,
+   "maxMs": 25179,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex\" && rg -l -i --hidden -g \"!plugins/marketplaces/thedotmack/**\" -g \"!*.jsonl\" -g \"!projects/**\" \"claude-mem\" \".claude\" \".codex\" \".gemini\" \".cursor\" \"AppData/Roaming/Code/User\" 2>/dev/": {
+   "count": 1,
+   "ms": 11114,
+   "maxMs": 11114,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT\" && rg -l -i --hidden -g \"AGENTS.md\" -g \"CLAUDE.md\" -g \"GEMINI.md\" -g \"*.mdc\" -g \"copilot-instructions.md\" -g \"!**/node_modules/**\" \"claude-mem\" . \"C:/Users/Flex/pi-local\" \"C:/Users/Flex/D": {
+   "count": 1,
+   "ms": 1375,
+   "maxMs": 1375,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git\" && rm \"SpaceMind/docs/ui/SpaceMind_Atelier/AGENTS.md\" && node -e \" const fs=require('fs');for(const f of ['SpaceMind/AGENTS.md','LPGSlim/LPGSlim-baseline-test/AGENTS.md','LPGSlim/LPGS": {
+   "count": 1,
+   "ms": 623,
+   "maxMs": 623,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.claude\" && cp settings.json \"$TEMP/claude-settings.bak.json\" && cp plugins/known_marketplaces.json \"$TEMP/known_marketplaces.bak.json\" && node -e \" const fs=require('fs'); const a=J": {
+   "count": 1,
+   "ms": 463,
+   "maxMs": 463,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/docs\" && rg -n -i \"disable-model-invocation|\\\"skills\\\"|skill.*(filter|exclude|disable|hide)|-skill|!skil": {
+   "count": 1,
+   "ms": 207,
+   "maxMs": 207,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const s=require('fs').readFileSync('AGENTS.md','utf8');const parts=s.split(/\\n(?=## |<!-- BEGIN)/);for(const p of parts)console.log(String(p.length).padStart(5),p.split('\\n')[0].sl": {
+   "count": 1,
+   "ms": 177,
+   "maxMs": 177,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"syncPlanTools|planToolsFull|PLAN_CREATE|createFromTool\" extensions/plan3.ts && node \"scripts/test-work-plan3.mjs\" 2>&1 | tail -5": {
+   "count": 1,
+   "ms": 9413,
+   "maxMs": 9413,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"function createPlan|function createFromTool|^const PLAN_CREATE\" extensions/plan3.ts; npx tsc --noEmit --allowJs --skipLibCheck --target es2022 --module nodenext --moduleResolution nod": {
+   "count": 1,
+   "ms": 3057,
+   "maxMs": 3057,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node \"scripts/test-work-plan3.mjs\" 2>&1 | tail -5": {
+   "count": 1,
+   "ms": 9800,
+   "maxMs": 9800,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"1436,1446p\" scripts/test-work-goal.mjs; node \"scripts/test-work-goal.mjs\" 2>&1 | tail -3; ls \"C:/Users/Flex/AppData/Local/Temp/\" | rg -i \"sp|measure\" | head": {
+   "count": 1,
+   "ms": 258,
+   "maxMs": 258,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in test-work-native-smoke test-work-plan3-night test-work-plan3-types test-work-plan3-web test-tool-loader; do [ -f \"scripts/$t.mjs\" ] && (node \"scripts/$t.mjs\" > \"/tmp/$t.log\" 2>&1; e": {
+   "count": 1,
+   "ms": 8527,
+   "maxMs": 8527,
+   "failures": 0
+  },
+  "bash\u0000ls -t \"C:/Users/Flex/AppData/Local/Temp/\" | rg -i \"\\.(ts|cjs|mjs)$\" | head; ls \"C:/Users/Flex/AppData/Local/Temp/skf.cjs\" && head -c 1500 \"C:/Users/Flex/AppData/Local/Temp/skf.cjs\"": {
+   "count": 1,
+   "ms": 677,
+   "maxMs": 677,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && export SP_OUT=\"C:/Users/Flex/AppData/Local/Temp/sp-out.json\"; rm -f \"$SP_OUT\"; env -u PI_HUB -u PI_HUB_SESSION pi -p --no-session -e \"C:/Users/Flex/AppData/Local/Temp/sp-measure.ts\" \"hi\" 2>&": {
+   "count": 1,
+   "ms": 2517,
+   "maxMs": 2517,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && export SP_OUT=\"C:/Users/Flex/AppData/Local/Temp/sp-out2.json\"; rm -f \"$SP_OUT\"; env -u PI_HUB -u PI_HUB_SESSION pi -p --no-session -e \"C:/Users/Flex/AppData/Local/Temp/sp-measure.ts\" \"show t": {
+   "count": 1,
+   "ms": 2370,
+   "maxMs": 2370,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -u && git add \"docs/agent-rules.md\" && git commit -q -m \"Plan3: small plan3_create without a plan; move niche AGENTS.md rules to docs/agent-rules.md\" && git status --short && git log": {
+   "count": 1,
+   "ms": 270,
+   "maxMs": 270,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat > \"C:/Users/Flex/AppData/Local/Temp/sp-measure2.ts\" <<\"EOF\" import { writeFileSync } from \"node:fs\"; export default function (pi) { pi.on(\"before_provider_request\", (event) => { const p ": {
+   "count": 1,
+   "ms": 2500,
+   "maxMs": 2500,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node \"scripts/tool-usage-census.mjs\" --help 2>&1 | head -20": {
+   "count": 1,
+   "ms": 6257,
+   "maxMs": 6257,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for n in goal_complete research_note research_exit knowledge compaction_note test_sensitivity tools_enable ask_user codemode; do echo \"$n: $(rg -l \"name: \\\"$n\\\"\" extensions ~/.pi/agent/npm/n": {
+   "count": 1,
+   "ms": 730,
+   "maxMs": 730,
+   "failures": 0
+  },
+  "bash\u0000rg -l \"goal_complete\" \"C:/Users/Flex/.pi/agent\" --glob \"!*.jsonl\" --glob \"!sessions/**\" 2>/dev/null | head; rg -l \"goal_complete\" \".\" --glob \"!docs/**\" --glob \"!*.jsonl\" | head": {
+   "count": 1,
+   "ms": 2060,
+   "maxMs": 2060,
+   "failures": 0
+  },
+  "bash\u0000rg -l \"goal_blocked\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works\" 2>/dev/null | head -5": {
+   "count": 1,
+   "ms": 220,
+   "maxMs": 220,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"displayMode|singleSelectLayout|contextExpanded|overlayToggleKey|commentToggleKey\" --glob \"!extensions/ask-user/index.ts\" --glob \"!docs/**\" --glob \"!*.md\" . | rg -v node_modules | head": {
+   "count": 1,
+   "ms": 197,
+   "maxMs": 197,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat > \"C:/Users/Flex/AppData/Local/Temp/tlpatch.mjs\" <<\"EOF\" import { readFileSync, writeFileSync } from \"node:fs\"; const f = \"extensions/tool-loader.ts\"; let s = readFileSync(f, \"utf8\"); co": {
+   "count": 1,
+   "ms": 164,
+   "maxMs": 164,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -c \"Enabled tools work\" extensions/tool-loader.ts; sed -n \"3686,3692p\" extensions/work-models.ts; rg -n \"^import .*tool-loader\" extensions/work-models.ts; rg -n \"\\bpersistResearchContext\\": {
+   "count": 1,
+   "ms": 219,
+   "maxMs": 219,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in test-work-tool-loader test-work-ask-user test-work-plan3 test-jev-tools test-work-camera test-work-native-smoke test-work-compaction-notifications test-tool-usage-census; do [ -f \"s": {
+   "count": 1,
+   "ms": 9168,
+   "maxMs": 9168,
+   "failures": 0
+  },
+  "bash\u0000cd /tmp && for t in test-work-tool-loader test-work-camera test-jev-tools test-work-compaction-notifications; do echo \"== $t\"; rg -n \"Error|assert|expected|actual|\\+|\\- \" \"$t.log\" | head -14; done": {
+   "count": 1,
+   "ms": 287,
+   "maxMs": 287,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"75,86p\" scripts/test-work-camera.mjs; sed -n \"220,228p\" scripts/test-work-compaction-notifications.mjs; git stash -q && node scripts/test-jev-tools.mjs > /tmp/jev0.log 2>&1; echo \"je": {
+   "count": 1,
+   "ms": 1320,
+   "maxMs": 1320,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-tool-loader.mjs 2>&1 | tail -4; node scripts/test-work-compaction-notifications.mjs 2>&1 | tail -3": {
+   "count": 1,
+   "ms": 1366,
+   "maxMs": 1366,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-compaction-notifications.mjs 2>&1 | rg -n \"Error|actual|expected|at file\" | head -8": {
+   "count": 1,
+   "ms": 1171,
+   "maxMs": 1171,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && echo \"PI_HUB_SESSION=$PI_HUB_SESSION\"; env -u PI_HUB -u PI_HUB_SESSION node scripts/test-work-compaction-notifications.mjs 2>&1 | tail -2": {
+   "count": 1,
+   "ms": 1236,
+   "maxMs": 1236,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB -u PI_HUB_SESSION node scripts/test-work-compaction-notifications.mjs 2>&1 | rg -n \"Error|actual|expected|at file|message\" | head -8": {
+   "count": 1,
+   "ms": 1206,
+   "maxMs": 1206,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB -u PI_HUB_SESSION node scripts/test-work-compaction-notifications.mjs 2>&1 | rg -n \"AssertionError\" | head -3": {
+   "count": 1,
+   "ms": 1290,
+   "maxMs": 1290,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git stash -q && env -u PI_HUB -u PI_HUB_SESSION node scripts/test-work-compaction-notifications.mjs > /tmp/cn0.log 2>&1; echo \"HEAD exit $?\"; git stash pop -q; rg -n \"AssertionError|at file\"": {
+   "count": 1,
+   "ms": 1445,
+   "maxMs": 1445,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB -u PI_HUB_SESSION node scripts/test-work-compaction-notifications.mjs 2>&1 | rg -n \"AssertionError|Error:\" | head -3; echo \"exit ${PIPESTATUS[0]}\"": {
+   "count": 1,
+   "ms": 1401,
+   "maxMs": 1401,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB -u PI_HUB_SESSION node scripts/test-work-compaction-notifications.mjs 2>&1 | sed -n \"5,30p\"": {
+   "count": 1,
+   "ms": 1271,
+   "maxMs": 1271,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git stash push -q -- extensions/ && env -u PI_HUB -u PI_HUB_SESSION node scripts/test-work-compaction-notifications.mjs > /tmp/cn1.log 2>&1; echo \"extensions at HEAD: $?\"; git stash pop -q; ": {
+   "count": 1,
+   "ms": 1631,
+   "maxMs": 1631,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && W=\"C:/Users/Flex/AppData/Local/Temp/cw-head\" && rm -rf \"$W\" && git worktree add -q \"$W\" HEAD && cp scripts/test-work-compaction-notifications.mjs \"$W/scripts/\" && cd \"$W\" && sed -i \"s/\\[\\\"pr": {
+   "count": 1,
+   "ms": 761,
+   "maxMs": 761,
+   "failures": 0
+  },
+  "bash\u0000W=\"C:/Users/Flex/AppData/Local/Temp/cw-head\"; cd \"$W\" && powershell -NoProfile -Command \"New-Item -ItemType Junction -Path 'C:\\Users\\Flex\\AppData\\Local\\Temp\\cw-head\\node_modules' -Target '.\\node_modul": {
+   "count": 1,
+   "ms": 1602,
+   "maxMs": 1602,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && powershell -NoProfile -Command \"(Get-Item 'C:\\Users\\Flex\\AppData\\Local\\Temp\\cw-head\\node_modules').Delete()\" && git worktree remove --force \"C:/Users/Flex/AppData/Local/Temp/cw-head\" && git ": {
+   "count": 1,
+   "ms": 365,
+   "maxMs": 365,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short && git diff --stat && rg -n \"setToolsActive|exposure: \\\"deferred\\\"\" extensions/work-models.ts extensions/tool-loader.ts | head -30": {
+   "count": 1,
+   "ms": 196,
+   "maxMs": 196,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in test-work-tool-loader test-work-ask-user test-work-plan3; do node \"scripts/$t.mjs\" > \"/tmp/$t.log\" 2>&1; echo \"$t exit $?\"; done; node scripts/test-work-compaction-notifications.mjs": {
+   "count": 1,
+   "ms": 11290,
+   "maxMs": 11290,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-compaction-notifications.mjs 2>&1 | rg -n -m3 -B2 -A8 \"AssertionError\"": {
+   "count": 1,
+   "ms": 1222,
+   "maxMs": 1222,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \"const f='scripts/test-work-compaction-notifications.mjs',fs=require('fs');let s=fs.readFileSync(f,'utf8');s=s.replace('.includes(tool.name) && \\\"deferred\\\"','.includes(tool.name) ||": {
+   "count": 1,
+   "ms": 1409,
+   "maxMs": 1409,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && SP_OUT=\"C:/Users/Flex/AppData/Local/Temp/sp-after.json\" env -u PI_HUB -u PI_HUB_SESSION pi -p --no-session -e \"C:/Users/Flex/AppData/Local/Temp/sp-measure2.ts\" \"hi\" > /dev/null 2>&1; node -e": {
+   "count": 1,
+   "ms": 2697,
+   "maxMs": 2697,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -u && git commit -q -m \"Blank-session tool diet: gate research tools, defer knowledge/Context7/pi-lens reports, trim ask_user and tools_enable schemas\" && git status --short && git l": {
+   "count": 1,
+   "ms": 240,
+   "maxMs": 240,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && SP_OUT=\"C:/Users/Flex/AppData/Local/Temp/sp-nogoal.json\" env -u PI_HUB -u PI_HUB_SESSION pi -p --no-session -e \"C:/Users/Flex/AppData/Local/Temp/sp-measure2.ts\" \"hi\" > /dev/null 2>&1; node -": {
+   "count": 1,
+   "ms": 2259,
+   "maxMs": 2259,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent\" && rg -n \"sourceInfo\" docs/*.md | head; rg -n \"interface SourceInfo\" -A12 dist/*.d.ts dist/**/*.d.ts 2>": {
+   "count": 1,
+   "ms": 205,
+   "maxMs": 205,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && SP_OUT=\"C:/Users/Flex/AppData/Local/Temp/ctx-probe.json\" env -u PI_HUB -u PI_HUB_SESSION pi -p --no-session -e \"C:/Users/Flex/AppData/Local/Temp/ctx-probe.ts\" \"hi\" > /dev/null 2>&1; node -e ": {
+   "count": 1,
+   "ms": 2319,
+   "maxMs": 2319,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"woSubcommands\" extensions | head -3; rg -n \"locked-writes|<self-verify|<reporting>|project-map>\" -g \"*.ts\" -g \"*.mjs\" -g \"*.md\" -l . \"C:/Users/Flex/.pi/agent\" 2>/dev/null | rg -v node": {
+   "count": 1,
+   "ms": 864,
+   "maxMs": 864,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"locked-writes|self-verify|project-map\" extensions/plan3.ts | head; rg -n \"\\\"locked-writes\\\"|locked-writes\" -g \"*.ts\" \"C:/Users/Flex/.pi/agent\" -l 2>/dev/null | head -5": {
+   "count": 1,
+   "ms": 656,
+   "maxMs": 656,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in tools rules docs project_context skills cwd ponytail project-map locked-writes test-sensitivity self-verify reporting; do echo \"$t: $(rg -l -F \"\\\"$t\\\"\" extensions --glob \"*.ts\" | tr": {
+   "count": 1,
+   "ms": 950,
+   "maxMs": 950,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && time node scripts/tool-usage-census.mjs --since 2026-11-13 --json > /tmp/c.json; node -e \"const r=require('/tmp/c.json');console.log(Object.keys(r.phases).map(k=>k+':'+r.phases[k].turns))\"": {
+   "count": 1,
+   "ms": 871,
+   "maxMs": 871,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && time node scripts/tool-usage-census.mjs --since 2026-11-13 --json > c.tmp.json; node -e \"const r=require('./c.tmp.json');console.log(Object.keys(r.phases).map(k=>k+':'+r.phases[k].turns))\"; ": {
+   "count": 1,
+   "ms": 862,
+   "maxMs": 862,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"sendMessage\\(\\{\" extensions/work-models.ts | head -8; node -e \"const p=require('./package.json');console.log(p.files, Object.keys(p.scripts||{}).filter(k=>/census|verify/.test(k)))\"; ": {
+   "count": 1,
+   "ms": 204,
+   "maxMs": 204,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && time node scripts/context-report.mjs --cwd \".\"": {
+   "count": 1,
+   "ms": 8586,
+   "maxMs": 8586,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat > /tmp/edit.mjs << \"EOF\" import { readFileSync, writeFileSync } from \"node:fs\"; const f = \"scripts/context-report.mjs\"; let s = readFileSync(f, \"utf8\"); const rep = (a, b) => { if (!s.in": {
+   "count": 1,
+   "ms": 7996,
+   "maxMs": 7996,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"^import .*\\bjoin\\b\" extensions/work-models.ts; node scripts/context-report.mjs | sed -n \"/## By owner/,/## Tool/p;/ponytail/p\"": {
+   "count": 1,
+   "ms": 8138,
+   "maxMs": 8138,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \"const fs=require('fs'),f='scripts/test-context-report.mjs';let s=fs.readFileSync(f,'utf8');s=s.replace('assert.ok(r.parts.some((p) => p.kind === \\\"tool prompt text\\\" && p.name === \\": {
+   "count": 1,
+   "ms": 255,
+   "maxMs": 255,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB -u PI_HUB_SESSION pi --mode json --no-session \"/wo context-report\" 2>&1 | rg -o \"\\\"customType\\\":\\\"work-context-report\\\"[^}]{0,200}|Context report failed[^\\\"]*|Measuring a blank": {
+   "count": 1,
+   "ms": 136587,
+   "maxMs": 136587,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB -u PI_HUB_SESSION timeout 120 pi --mode json --no-session \"/wo context-report\" > /tmp/wo.jsonl 2>&1; wc -l < /tmp/wo.jsonl; rg -o \"work-context-report|Every request starts with": {
+   "count": 1,
+   "ms": 120236,
+   "maxMs": 120236,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-wo-control.mjs 2>&1 | tail -3; node scripts/test-work-knowledge.mjs 2>&1 | tail -2": {
+   "count": 1,
+   "ms": 2187,
+   "maxMs": 2187,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-wo-control.mjs 2>&1 | rg -m1 -A8 \"AssertionError|Error\"; git stash -q && node scripts/test-work-wo-control.mjs > /dev/null 2>&1; echo \"HEAD exit $?\"; git stash pop -q ": {
+   "count": 1,
+   "ms": 2406,
+   "maxMs": 2406,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -u && git add scripts/context-report.mjs scripts/test-context-report.mjs && git commit -q -m \"/wo context-report: blank-session request split by owner, with ideas for ce-workflow's o": {
+   "count": 1,
+   "ms": 266,
+   "maxMs": 266,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent\"; grep -n \"prompt-template\" settings.json; ls npm/node_modules | grep -i \"prompt-template\"; ls \"npm/node_modules/pi-prompt-template-model\" 2>/dev/null; cat \"npm/node_module": {
+   "count": 1,
+   "ms": 239,
+   "maxMs": 239,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent\"; ls; find . -path ./npm -prune -o -path ./git -prune -o -name \"*.md\" -print 2>/dev/null | xargs grep -l -E \"^(model|chain|loop|subagent|fresh|restore):\" 2>/dev/null | head": {
+   "count": 1,
+   "ms": 1230,
+   "maxMs": 1230,
+   "failures": 1
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent\"; sed -n 185,200p settings.json; echo ---README; sed -n 1,60p npm/node_modules/pi-prompt-template-model/README.md; echo ---PROMPTS; ls prompts 2>/dev/null; grep -rl \"^model": {
+   "count": 1,
+   "ms": 30270,
+   "maxMs": 30270,
+   "failures": 1
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/prompts\"; for f in *.md; do echo \"== $f\"; head -8 \"$f\"; done; cd \".\"; echo ---CEREFS; rg -l \"prompt-template-model\" extensions scripts docs package.json 2>/dev/null | head;": {
+   "count": 1,
+   "ms": 5477,
+   "maxMs": 5477,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-prompt-template-model\"; rg -n \"registerCommand\\(|registerTool\\(|name: \\\"\" index.ts | head -20; cd \"C:/Users/Flex/.pi/agent/sessions\"; echo ---; rg -o --": {
+   "count": 1,
+   "ms": 491,
+   "maxMs": 491,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-prompt-template-model\"; rg -n \"registerCommand|registerTool|name:\" tool-manager.ts | head; cd \"C:/Users/Flex/.pi/agent/sessions\"; rg -o --no-filename --": {
+   "count": 1,
+   "ms": 362,
+   "maxMs": 362,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n -i \"audit|periodic|every [0-9]+ days|days since|last.?audit|reminder\" \"C:/Users/Flex/.pi/agent/project-maps/4a0ef82903ba0429/map.md\" | head -30; echo ---; rg -l -i \"session_start|on\\(\\\"s": {
+   "count": 1,
+   "ms": 191,
+   "maxMs": 191,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n 2935,2990p extensions/work-models.ts; echo ----; rg -n \"name: \\\"ask_user\\\"|name:\\\"ask_user\\\"\" extensions/*.ts; rg -n \"^export (async )?function\" extensions/ask-user*.ts extensions/work-": {
+   "count": 1,
+   "ms": 195,
+   "maxMs": 195,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n \"gpt-5.6-luna|gpt-6-astra|terra\" extensions/*.ts | head -20; echo ---; rg -ln \"ask_user\" extensions/*.ts | head; rg -n \"registerTool\\(\\{[^}]{0,40}ask_user|\\\"ask_user\\\"\" extensions/*.ts |": {
+   "count": 1,
+   "ms": 178,
+   "maxMs": 178,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent\"; rg -n \"getSystemPrompt|systemPrompt\" docs/extensions.md | head -20; cd \".\"; rg -n \"getSystemPrompt\\(\" ": {
+   "count": 1,
+   "ms": 258,
+   "maxMs": 258,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \"const p=require('./package.json');console.log(JSON.stringify(p.pi,null,1));console.log(Object.keys(p.scripts).filter(k=>/context|env|ask/.test(k)).map(k=>k+': '+p.scripts[k]).join('\\n": {
+   "count": 1,
+   "ms": 211,
+   "maxMs": 211,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; head -20 scripts/test-work-env.mjs; rg -n \"work-env|registerWorkEnv|handleEnvCommand\" extensions/work-models.ts | head; rg -n \"pi.on\\(\\\"session_start\\\"\" extensions/work-models.ts | head -3; rg": {
+   "count": 1,
+   "ms": 191,
+   "maxMs": 191,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n 1495,1515p extensions/plan3.ts; rg -n \"contextFiles\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist/core/system-prompt.d.ts\" 2>/dev/nu": {
+   "count": 1,
+   "ms": 210,
+   "maxMs": 210,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n \"^function contentText|const contentText\" -A6 extensions/work-models.ts | head -10; rg -n \"agent_end\" extensions/work-models.ts | head -3; ls \"C:/Users/Flex/.pi/agent/ce-workflow\"": {
+   "count": 1,
+   "ms": 174,
+   "maxMs": 174,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/test-agents-audit.mjs": {
+   "count": 2,
+   "ms": 333,
+   "maxMs": 184,
+   "failures": 1
+  },
+  "bash\u0000cd \".\"; node scripts/context-report.mjs --system > \"$TEMP/sys.json\" && node -e \"const j=require(process.env.TEMP+'/sys.json');console.log(j.system.length, j.tools.length, j.tools.map(t=>t.name).slice(": {
+   "count": 1,
+   "ms": 2225,
+   "maxMs": 2225,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; D=$(cygpath -m \"$TEMP\"); cat > \"$D/audit-probe.ts\" <<EOF import { writeFileSync, readFileSync } from \"node:fs\"; import { proposeRecommendations } from \"file:///./extensions/agents-audit.ts\"; e": {
+   "count": 1,
+   "ms": 143940,
+   "maxMs": 143940,
+   "failures": 1
+  },
+  "bash\u0000cd \".\"; D=$(cygpath -m \"$TEMP\"); sed -i \"s#import { proposeRecommendations }#import { proposeRecommendations, loadedFiles }#; s#pi.on(\\\"before_agent_start\\\", async (_e, ctx)#pi.on(\\\"session_start\\\", a": {
+   "count": 1,
+   "ms": 23263,
+   "maxMs": 23263,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; D=$(cygpath -m \"$TEMP\"); sed -i \"s#\\\"gpt-5.6-luna\\\"#\\\"gpt-6-astra\\\"#\" \"$D/audit-probe.ts\"; env -u PI_HUB -u PI_HUB_SESSION node \"$(node -e \"import('./scripts/tool-usage-census.mjs').then(m=>co": {
+   "count": 1,
+   "ms": 30062,
+   "maxMs": 30062,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -i \"s#ctx.modelRegistry?.find?.(\\\"openai-codex\\\", \\\"gpt-5.6-luna\\\");\\n\\t\\t\\tif (!model) throw new Error(\\\"the Luna model is unavailable\\\");##\" extensions/agents-audit.ts; node -e \" const f": {
+   "count": 1,
+   "ms": 334,
+   "maxMs": 334,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n \"test-context-report\" package.json scripts/*.mjs | head; env -u PI_HUB -u PI_HUB_SESSION node \"$(node -e \"import('./scripts/tool-usage-census.mjs').then(m=>console.log(m.piCli()))\")\" -p ": {
+   "count": 1,
+   "ms": 120277,
+   "maxMs": 120277,
+   "failures": 1
+  },
+  "bash\u0000cd \".\"; sed -n 108,118p scripts/verify-package.mjs; D=$(cygpath -m \"$TEMP\"); printf 'export default function (pi) { pi.on(\"session_start\", () => { console.error(\"LOADED-OK\"); process.exit(0); }); }\\n'": {
+   "count": 1,
+   "ms": 1320,
+   "maxMs": 1320,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \" const fs=require('fs');let f='scripts/verify-package.mjs',t=fs.readFileSync(f,'utf8');t=t.replace('\\t\\\"test-context-report.mjs\\\",\\n','\\t\\\"test-context-report.mjs\\\",\\n\\t\\\"test-agents-": {
+   "count": 1,
+   "ms": 339,
+   "maxMs": 339,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n \"context-report|context_report\" --glob \"!docs/plans/**\" -g \"!CHANGELOG.md\" . | head -40; echo ---; rg -n \"export|pi.on|function |ask|lastRun|due\" extensions/agents-audit.ts | head -60": {
+   "count": 1,
+   "ms": 176,
+   "maxMs": 176,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n 3810,3820p extensions/work-models.ts; rg -n \"^export default|registerCommand\\(\\\"wo\\\"\" extensions/work-models.ts; rg -n \"context-report\" README.md docs/*.md skills 2>/dev/null | head": {
+   "count": 1,
+   "ms": 167,
+   "maxMs": 167,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \" const fs=require('fs');let f='extensions/agents-audit.ts',t=fs.readFileSync(f,'utf8'); const a=t.indexOf('\\tpi.on(\\\"session_start\\\", (_event, ctx) => {');const b=t.indexOf('\\tpi.on(\\": {
+   "count": 1,
+   "ms": 280,
+   "maxMs": 280,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/test-agents-audit.mjs && node scripts/test-context-report.mjs; rg -n \"\\\"context-report\\\"|wo context-report\" --glob \"!docs/plans/**\" --glob \"!CHANGELOG.md\" . ; rg -l \"woSubcommands": {
+   "count": 1,
+   "ms": 1455,
+   "maxMs": 1455,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; S=\"$HOME/.pi/agent/ce-workflow/agents-audit.json\"; cp \"$S\" \"$S.bak\" 2>/dev/null; env -u PI_HUB -u PI_HUB_SESSION timeout 150 node \"$(node -e \"import('./scripts/tool-usage-census.mjs').then(m=>": {
+   "count": 1,
+   "ms": 145441,
+   "maxMs": 145441,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; S=\"$HOME/.pi/agent/ce-workflow/agents-audit.json\"; ls \"$S\" 2>&1; MSYS_NO_PATHCONV=1 env -u PI_HUB -u PI_HUB_SESSION timeout 150 node \"$(node -e \"import('./scripts/tool-usage-census.mjs').then(": {
+   "count": 1,
+   "ms": 145415,
+   "maxMs": 145415,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git add extensions/agents-audit.ts extensions/work-models.ts CHANGELOG.md; git commit -qm \"/wo agents_audit runs the audit now; /wo context-report renamed to context_report\" && git log --oneli": {
+   "count": 1,
+   "ms": 226,
+   "maxMs": 226,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n \"registerMessageRenderer\" extensions | head -20; rg -n \"sendMessage\\(\\{ ?customType\" extensions/work-models.ts | head -20; D=\"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/": {
+   "count": 1,
+   "ms": 301,
+   "maxMs": 301,
+   "failures": 0
+  },
+  "bash\u0000D=\"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/docs\"; sed -n 1639,1662p \"$D/extensions.md\"; rg -n -A14 \"### pi.appendEntry|### pi.registerEntryRenderer\"": {
+   "count": 1,
+   "ms": 206,
+   "maxMs": 206,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; timeout 120 node scripts/test-work-wo-control.mjs 2>&1 | tail -6": {
+   "count": 1,
+   "ms": 1800,
+   "maxMs": 1800,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; cat > \"scripts/_ctx-probe.mjs\" <<'EOF' import workModelsExtension from \"../extensions/work-models.ts\"; delete process.env.PI_HUB; const commands = {}, renderers = {}, entries = [], sent = []; ": {
+   "count": 1,
+   "ms": 9110,
+   "maxMs": 9110,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/test-context-report.mjs && git add extensions/work-models.ts && git commit -qm \"/wo context_report: show the report as a transcript entry (idle sendMessage was never displayed)\" &": {
+   "count": 1,
+   "ms": 274,
+   "maxMs": 274,
+   "failures": 0
+  },
+  "bash\u0000cd \"$HOME/.pi/agent/sessions\"; ls -t */*.jsonl 2>/dev/null | head -5; f=$(ls -t */*.jsonl | head -1); echo \"== $f\"; rg -n \"context.report|work-context\" \"$f\" | cut -c1-300 | tail -8": {
+   "count": 1,
+   "ms": 511,
+   "maxMs": 511,
+   "failures": 0
+  },
+  "bash\u0000cd \"$HOME/.pi/agent/sessions\"; for f in $(find . -name \"*.jsonl\" -mmin -30 -printf \"%T@ %p\\n\" | sort -rn | head -6 | cut -d\" \" -f2); do echo \"== $f\"; rg -n \"context_report|work-context-report\" \"$f\" | ": {
+   "count": 1,
+   "ms": 24317,
+   "maxMs": 24317,
+   "failures": 0
+  },
+  "bash\u0000P=\"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist\"; rg -o \"class CustomEntryComponent.{0,1500}\" \"$P\" -g \"*.js\" | head -c 1800; echo; rg -o \"getEntryRe": {
+   "count": 1,
+   "ms": 287,
+   "maxMs": 287,
+   "failures": 0
+  },
+  "bash\u0000env | rg \"^PI_HUB\" | cut -c1-80; cd \".\"; rg -n \"\\\"custom\\\"|customType\" extensions/hub-channel.ts | head -20; ls ../pi-control-hub 2>/dev/null | head": {
+   "count": 1,
+   "ms": 169,
+   "maxMs": 169,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/pi-control-hub\"; wc -l src/*.ts web/*.ts; rg -n \"customType|\\\"custom\\\"|custom_message|display\" src web/app.ts web/stream.ts | cut -c1-200 | head -30": {
+   "count": 1,
+   "ms": 497,
+   "maxMs": 497,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; ls; rg -ln \"custom_message|customType\" --glob \"!docs/**\" --glob \"!extensions/**\" --glob \"!scripts/test-*\" . | head": {
+   "count": 1,
+   "ms": 440,
+   "maxMs": 440,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -on \"publish\\((ctx\\.)?ui, \\\"[a-z-]+\\\"\" extensions | sort -t: -k3 -u | head -30; rg -n \"statusKey|HUB_PREFIX|pi-hub:\" hub/src/*.ts hub/web/app.ts | cut -c1-180 | head -30": {
+   "count": 1,
+   "ms": 919,
+   "maxMs": 919,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n 2780,2792p extensions/work-models.ts | cut -c1-300; sed -n 660,670p hub/src/api.ts | cut -c1-400; rg -n \"function postNotice\" -A12 hub/src/api.ts | cut -c1-300": {
+   "count": 1,
+   "ms": 206,
+   "maxMs": 206,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n \"postNotice\\s*=|function postNotice|const postNotice\" -A10 hub/src/*.ts | cut -c1-300; rg -n \"notice\" hub/web/app.ts | sed -n 1,30p | cut -c1-260": {
+   "count": 1,
+   "ms": 193,
+   "maxMs": 193,
+   "failures": 0
+  },
+  "bash\u0000which pi-hub; cat \"$(dirname \"$(which pi-hub)\")/pi-hub\" 2>/dev/null | tail -3; ls -la \"$APPDATA/npm/node_modules\" 2>/dev/null | rg -i hub; ps -ef 2>/dev/null | rg -i \"hub\" | head -5; wmic process wher": {
+   "count": 1,
+   "ms": 314,
+   "maxMs": 314,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\"; timeout 200 node --test scripts/test-view.mjs 2>&1 | tail -15": {
+   "count": 1,
+   "ms": 61131,
+   "maxMs": 61131,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \" const fs=require('fs');const f='CHANGELOG.md';let t=fs.readFileSync(f,'utf8'); t=t.replace('It never calls the model.\\n','It never calls the model. The report appears in the terminal": {
+   "count": 1,
+   "ms": 291,
+   "maxMs": 291,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n -i \"newly reviewed|reviewed videos|video_digest|videos\" --glob \"!docs/plans/**\" --glob \"!node_modules/**\" -l | head -30; rg -n \"Video Review\" -A12 docs/agent-rules.md | head -40; ls docs": {
+   "count": 1,
+   "ms": 488,
+   "maxMs": 488,
+   "failures": 1
+  },
+  "bash\u0000cd \".\"; head -30 scripts/work-video-status.mjs; rg -n -m3 \"digest|yt-ingest\" docs/plans/2026-11-17-mine-the-32-newly-reviewed-videos-for-orchestration-quality--f75ccea6-plan3.md | cut -c1-400; ls docs": {
+   "count": 1,
+   "ms": 170,
+   "maxMs": 170,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; ls docs/plans | rg f75ccea6; rg -n -o \"\\\"evidence\\\": \\\"[^\\\"]*\\\"\" docs/upstream/processed-videos.json | tail -3; rg -n \"digest\" docs/plans/*f75ccea6*plan3.md 2>/dev/null | head -5 | cut -c1-300": {
+   "count": 1,
+   "ms": 284,
+   "maxMs": 284,
+   "failures": 0
+  },
+  "bash\u0000cd ~/Downloads/video-digests && ls | wc -l && d=$(ls -t | head -1) && ls \"$d\" && head -40 \"$d/digest.md\" | cut -c1-200; cd \".\" && node scripts/work-video-status.mjs \"$HOME/Downloads/video-digests\" | r": {
+   "count": 1,
+   "ms": 335,
+   "maxMs": 335,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\"; rg -n -i \"context\" web/*.js 2>/dev/null | rg -i \"ask|markdown|render\" | head -8; ls web 2>/dev/null | head; rg -ln \"ask_user\" src web 2>/dev/null | head": {
+   "count": 1,
+   "ms": 188,
+   "maxMs": 188,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n \"function links\" -A12 hub/web/prompts.ts | cut -c1-220; rg -n \"context:\" extensions/plan3.ts | rg -i idea | cut -c1-300": {
+   "count": 1,
+   "ms": 199,
+   "maxMs": 199,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n \"export function ideaPopupContext\" -A10 extensions/plan3-ideas.ts | cut -c1-250; rg -n \"links = |links\\(target|function linkify\" hub/web/app.ts | head -4 | cut -c1-250": {
+   "count": 1,
+   "ms": 322,
+   "maxMs": 322,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\"; rg -n \"file-link\" web/*.ts | head -8 | cut -c1-300": {
+   "count": 1,
+   "ms": 113,
+   "maxMs": 113,
+   "failures": 0
+  }
+ },
+ "steps": {
+  "G1": {
+   "ms": 236787,
+   "testMs": 22920,
+   "replies": 43,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 43
+   },
+   "failures": 1
+  },
+  "G2": {
+   "ms": 108744,
+   "testMs": 14142,
+   "replies": 16,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 16
+   }
+  },
+  "B1": {
+   "ms": 235508,
+   "testMs": 17455,
+   "replies": 27,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 27
+   },
+   "failures": 1
+  },
+  "E1": {
+   "ms": 956732,
+   "testMs": 807082,
+   "replies": 29,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 29
+   }
+  },
+  "E2": {
+   "ms": 1164874,
+   "testMs": 0,
+   "replies": 4,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 4
+   }
+  },
+  "E3": {
+   "ms": 239138,
+   "testMs": 306,
+   "replies": 19,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 19
+   },
+   "failures": 1
+  },
+  "E7": {
+   "ms": 1179570,
+   "testMs": 488295,
+   "replies": 101,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 101
+   },
+   "failures": 2
+  },
+  "E4": {
+   "ms": 84005,
+   "testMs": 0,
+   "replies": 16,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 16
+   },
+   "failures": 1
+  },
+  "E5": {
+   "ms": 239960,
+   "testMs": 25123,
+   "replies": 27,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 27
+   },
+   "failures": 2
+  },
+  "E6": {
+   "ms": 4992,
+   "testMs": 0,
+   "replies": 1,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 1
+   }
+  },
+  "(none)": {
+   "ms": 3260408,
+   "testMs": 127024,
+   "replies": 310,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 310
+   },
+   "failures": 22
+  }
+ },
+ "spans": [
+  {
+   "start": "2026-11-18T08:07:56.901Z",
+   "ms": 11767181
+  },
+  {
+   "start": "2026-11-18T11:24:04.109Z",
+   "ms": 588699
+  },
+  {
+   "start": "2026-11-18T11:34:48.097Z",
+   "ms": 53170
+  },
+  {
+   "start": "2026-11-18T11:40:43.332Z",
+   "ms": 62484
+  },
+  {
+   "start": "2026-11-18T11:57:52.479Z",
+   "ms": 812001
+  },
+  {
+   "start": "2026-11-18T12:14:00.129Z",
+   "ms": 731960
+  },
+  {
+   "start": "2026-11-18T13:58:26.340Z",
+   "ms": 42446
+  },
+  {
+   "start": "2026-11-18T14:03:24.196Z",
+   "ms": 722824
+  },
+  {
+   "start": "2026-11-18T19:20:04.825Z",
+   "ms": 70727
+  },
+  {
+   "start": "2026-11-18T19:22:39.694Z",
+   "ms": 827364
+  },
+  {
+   "start": "2026-11-18T19:42:39.132Z",
+   "ms": 386493
+  },
+  {
+   "start": "2026-11-18T20:02:57.675Z",
+   "ms": 113808
+  },
+  {
+   "start": "2026-11-18T22:25:16.424Z",
+   "ms": 418842
+  },
+  {
+   "start": "2026-11-19T12:42:32.435Z",
+   "ms": 76034
+  }
+ ],
+ "hints": [
+  {
+   "at": "2026-11-18T09:47:45.679Z",
+   "step": "E2",
+   "shape": "env PI_HUB"
+  },
+  {
+   "at": "2026-11-18T14:14:30.884Z",
+   "shape": "env PI_HUB"
+  },
+  {
+   "at": "2026-11-18T19:48:55.454Z",
+   "shape": "S=$HOME/.pi/agent/ce-workflow/agents-audit.json"
+  }
+ ]
+}

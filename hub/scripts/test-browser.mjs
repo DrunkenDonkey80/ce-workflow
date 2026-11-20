@@ -1023,9 +1023,10 @@ try {
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open");
  assert.deepEqual(answers.at(-1).selections, ["Blue"]); assert.equal(answers.at(-1).comment, "Matches the boxes", "with an option chosen the text is the comment");
  // A long list gets a filter; a short description sits on the title's line, a long one under it.
- ask({ question: "Which builds?", options: [...Array(9).keys()].map(n => ({ title: "build " + n, description: n === 8 ? "line one\nline two" : "next version 1." + n })), allowMultiple: true, allowFreeform: false });
+ ask({ question: "Which builds?", options: [...Array(9).keys()].map(n => ({ title: "build " + n + (n ? "" : " | belot 1.0 (15) | bug | 2026-11-18 23:43 ".repeat(6)), description: n === 8 ? "line one\nline two" : "next version 1." + n })), allowMultiple: true, allowFreeform: false });
  await browser("wait", "--fn", "document.getElementById(\"prompt\").open");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#prompt-form .prompt-description')].map(d => d.classList.contains('inline'))"), [...Array(8).fill(true), false], "short descriptions inline");
+ assert(await evaluate("(() => { const row = document.querySelector('#prompt-form .prompt-option'), title = row.querySelector('span').getBoundingClientRect(), note = row.querySelector('.prompt-description').getBoundingClientRect(); return note.top >= title.bottom - 1 && title.width > row.getBoundingClientRect().width / 2; })()"), "a long title keeps its width; its short description moves under it");
  await browser("fill", "#prompt-form .prompt-filter", "1.3"); await browser("press", "Enter");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#prompt-form .prompt-option')].filter(r => r.offsetParent).map(r => r.querySelector('input').value)"), ["build 3"], "filter matches descriptions");
  assert.equal(await evaluate("document.getElementById('prompt').open"), true, "Enter in the filter does not send");

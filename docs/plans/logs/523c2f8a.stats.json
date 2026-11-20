@@ -1,0 +1,1095 @@
+{
+ "version": 1,
+ "activeMs": 2068092,
+ "runs": 2,
+ "waitingMs": 0,
+ "toolWallMs": 1993853,
+ "compactions": {
+  "count": 0,
+  "ms": 0
+ },
+ "models": {
+  "anthropic/claude-opus-5-5:high": {
+   "replies": 159,
+   "thinkingMs": 623719,
+   "actingMs": 383680,
+   "input": 402,
+   "output": 97811,
+   "cacheRead": 15730548,
+   "cacheWrite": 734534,
+   "cost": 8.7766076,
+   "errors": 0
+  }
+ },
+ "tools": {
+  "bash": {
+   "count": 127,
+   "ms": 1723600,
+   "maxMs": 185757,
+   "failures": 6
+  },
+  "read": {
+   "count": 29,
+   "ms": 499,
+   "maxMs": 45,
+   "failures": 7
+  },
+  "edit": {
+   "count": 24,
+   "ms": 186,
+   "maxMs": 22,
+   "failures": 0
+  },
+  "compaction_note": {
+   "count": 4,
+   "ms": 0,
+   "maxMs": 0,
+   "failures": 2
+  },
+  "plan3": {
+   "count": 8,
+   "ms": 781,
+   "maxMs": 128,
+   "failures": 0
+  },
+  "test_sensitivity": {
+   "count": 4,
+   "ms": 110271,
+   "maxMs": 81571,
+   "failures": 1
+  },
+  "codemode": {
+   "count": 4,
+   "ms": 122069,
+   "maxMs": 84868,
+   "failures": 0
+  },
+  "lens_diagnostic_mark": {
+   "count": 7,
+   "ms": 32614,
+   "maxMs": 7950,
+   "failures": 0
+  }
+ },
+ "categories": {
+  "shell": {
+   "count": 108,
+   "ms": 1252455,
+   "maxMs": 184136,
+   "failures": 6
+  },
+  "build": {
+   "count": 3,
+   "ms": 8656,
+   "maxMs": 3706,
+   "failures": 0
+  },
+  "test": {
+   "count": 16,
+   "ms": 462489,
+   "maxMs": 185757,
+   "failures": 0
+  }
+ },
+ "commands": {
+  "bash\u0000cd \".\" && git status --short | head -30 && git log --oneline -5 && grep -n \"Relevant files\" -A 12 \"docs/plans/2026-11-20-follow-ups-from-the-plan-finish-retro-5e4d224a-d-11-planning-523c2f8a-plan3.md\"": {
+   "count": 1,
+   "ms": 147,
+   "maxMs": 147,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && wc -l extensions/plan3-stats.ts scripts/test-work-plan3-stats.mjs && grep -n \"retro\\|Retro\\|onStep\\|createStats\\|recordCommand\\|stats\\b\" extensions/plan3.ts | head -80": {
+   "count": 1,
+   "ms": 115,
+   "maxMs": 115,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"appendLog\\|function markStep\\|const logFile\" extensions/plan3.ts | head; grep -rn \"workOrchestrator\\b\\|readSettings\\|settingsValue\\|getSetting\" extensions/plan3.ts | head; grep -n \"": {
+   "count": 1,
+   "ms": 129,
+   "maxMs": 129,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rln \"Settings\" extensions/*.ts | head -20; grep -rn \"toggle\\|on/off\\|\\\"On\\\"\\|enabled:\" extensions/work-settings*.ts 2>/dev/null | head -20; ls extensions | grep -i sett": {
+   "count": 1,
+   "ms": 161,
+   "maxMs": 161,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && grep -n \"Settings\\b\\|settingsItems\\|value: \\\"\" extensions/work-models.ts | head -60": {
+   "count": 1,
+   "ms": 67,
+   "maxMs": 67,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"async function openSettings\\|function settingsMenu\\|label: \\\"Plan\\|label: `Plan\\|Plan models\\|plan3\\b.*label\\|value: \\\"plan\" extensions/work-models.ts | head -30": {
+   "count": 1,
+   "ms": 38,
+   "maxMs": 38,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && grep -n \"Plan models\\|openSettings\\|value: \\\"plan\\|Quiet\\|ON\\b.*OFF\\|\\? \\\"on\\\" : \\\"off\\\"\\|(on)\\|: \\\"Off\\\"\" extensions/work-models.ts | head -40": {
+   "count": 1,
+   "ms": 62,
+   "maxMs": 62,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"function hasProjectOverride\\|function clearProjectOverride\" -A 22 extensions/work-models.ts | head -70": {
+   "count": 1,
+   "ms": 66,
+   "maxMs": 66,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -ln \"reviewAfterPlan\\|Review after plan\" scripts/*.mjs; grep -n \"test-work-plan3\\b\\|test-work-plan3-stats\\|test-work-models\\|test-work-settings\" package.json": {
+   "count": 1,
+   "ms": 952,
+   "maxMs": 952,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && sed -n \"1,80p\" scripts/test-work-plan3.mjs | cut -c1-260; grep -n \"sendMessage\\|PI_CODING_AGENT_DIR\\|hooks.get(\\\"agent_start\\|handlers.get(\\|const tool = \\|executingPlan\\|resume3\" scripts/te": {
+   "count": 1,
+   "ms": 109,
+   "maxMs": 109,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"const validPlan\" -A 6 scripts/test-work-plan3.mjs | cut -c1-300; grep -n \"^const MARKS\\|function appendToSection\" -A 8 extensions/plan3.ts | cut -c1-200; sed -n \"268,282p\" extension": {
+   "count": 1,
+   "ms": 140,
+   "maxMs": 140,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && T=\"$TEMP/rf02tsc\" && mkdir -p \"$T\" && git show HEAD:extensions/plan3-stats.ts > \"$T/plan3-stats.ts\" && (npx tsc --noEmit --target es2022 --module nodenext --skipLibCheck --allowImportingTsEx": {
+   "count": 1,
+   "ms": 3706,
+   "maxMs": 3706,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && T=\"$TEMP/rf02tsc\" && npx tsc --noEmit --target es2022 --module nodenext --skipLibCheck --allowImportingTsExtensions \"$T/plan3-stats.ts\" 2>&1 | grep \"error TS\" | sed -E \"s/^[^(]*\\([0-9]+,[0-9": {
+   "count": 1,
+   "ms": 3699,
+   "maxMs": 3699,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-stats.mjs 2>&1 | grep -v ExperimentalWarning | tail -15": {
+   "count": 1,
+   "ms": 190,
+   "maxMs": 190,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/^export const emptyStats = () => (/export const emptyStats = (): any => (/\" extensions/plan3-stats.ts && grep -n \"export const emptyStats\" extensions/plan3-stats.ts && npx tsc --no": {
+   "count": 1,
+   "ms": 1575,
+   "maxMs": 1575,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff -a extensions/plan3-stats.ts | grep -a \"emptyStats\" ; grep -a -n \"export const emptyStats\" extensions/plan3-stats.ts": {
+   "count": 1,
+   "ms": 89,
+   "maxMs": 89,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/^export const emptyStats = (): any => (/export const emptyStats = () => (/; s/^export function recordCommand(stats, /export function recordCommand(stats: any, /; s/^export function": {
+   "count": 1,
+   "ms": 1315,
+   "maxMs": 1315,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"16,17p\" extensions/plan3-stats.ts | cut -c1-200": {
+   "count": 1,
+   "ms": 70,
+   "maxMs": 70,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npx tsc --noEmit --target es2022 --module nodenext --skipLibCheck --allowImportingTsExtensions extensions/plan3-stats.ts 2>&1 | grep \"error TS\" | head": {
+   "count": 1,
+   "ms": 1251,
+   "maxMs": 1251,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff -a extensions/plan3-stats.ts | grep -a \"^[-+]export\"": {
+   "count": 1,
+   "ms": 137,
+   "maxMs": 137,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/^export function recordCommand(stats: any, /export function recordCommand(stats, /; s/^export function statsItems(stats: any) {/export function statsItems(stats) {/\" extensions/pla": {
+   "count": 1,
+   "ms": 1520,
+   "maxMs": 1520,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls \"$(node -e \"console.log(require('os').tmpdir())\")\" >/dev/null; timeout 600 node scripts/test-work-plan3.mjs 2>&1 | grep -v ExperimentalWarning | tail -15": {
+   "count": 1,
+   "ms": 12366,
+   "maxMs": 12366,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff --stat && git diff -a extensions/plan3.ts extensions/work-models.ts | grep -a \"^[-+]\" | grep -av \"^+++\\|^---\" | cut -c1-220": {
+   "count": 1,
+   "ms": 143,
+   "maxMs": 143,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n -m3 -A6 \"^## Unreleased\" CHANGELOG.md": {
+   "count": 1,
+   "ms": 53,
+   "maxMs": 53,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add CHANGELOG.md extensions/plan3-stats.ts extensions/plan3.ts extensions/work-models.ts scripts/test-work-plan3-stats.mjs scripts/test-work-plan3.mjs \"docs/plans/2026-11-20-follow-ups-f": {
+   "count": 1,
+   "ms": 332,
+   "maxMs": 332,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"finishRetro\\|retroText\\|askRetro\\|function parseRetro\\|commandShape\\|redact\" extensions/plan3-stats.ts extensions/plan3.ts | cut -c1-200": {
+   "count": 1,
+   "ms": 70,
+   "maxMs": 70,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -an \"RETRO_SCOPES\\|function parseRetro\\|async function\\|function retroText\\|function commandShape\\|cites\\b\" extensions/plan3-stats.ts | cut -c1-200; grep -an \"\" extensions/plan3-stats.t": {
+   "count": 1,
+   "ms": 157,
+   "maxMs": 157,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat extensions/redact.ts; grep -an \"\" extensions/plan3-stats.ts | sed -n \"38,50p;326,360p\" | cut -c1-260; grep -n \"plan-retro\\|request\" .gitignore | head": {
+   "count": 1,
+   "ms": 160,
+   "maxMs": 160,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -an \"^import\" extensions/plan3-stats.ts; grep -n \"^import\" scripts/test-work-plan3-stats.mjs; grep -an \"parseRetro\\|scope: \\\"ce-workflow\\\"\" scripts/test-work-plan3-stats.mjs | cut -c1-2": {
+   "count": 1,
+   "ms": 96,
+   "maxMs": 96,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -an \"\" scripts/test-work-plan3-stats.mjs | sed -n \"150,175p\" | cut -c1-300": {
+   "count": 1,
+   "ms": 92,
+   "maxMs": 92,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const f='extensions/plan3-stats.ts';let s=fs.readFileSync(f,'latin1'); const a='\\tconst ok = (r: Retro) => typeof r?.advice === \\\"string\\\" && typeof r?.cites": {
+   "count": 1,
+   "ms": 118,
+   "maxMs": 118,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat >> extensions/plan3-stats.ts <<'EOF' // RF-03 / D-03, D-07: request text leaves this machine only when the user forwards it, so strip secrets, // full paths (keep the last segment) and t": {
+   "count": 1,
+   "ms": 399,
+   "maxMs": 399,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -an \"new RegExp(user\" extensions/plan3-stats.ts": {
+   "count": 1,
+   "ms": 45,
+   "maxMs": 45,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -an \"<path>/\\|new RegExp(user\" extensions/plan3-stats.ts": {
+   "count": 1,
+   "ms": 57,
+   "maxMs": 57,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -an \"<path>/\" extensions/plan3-stats.ts; T=\"$TEMP/rf02tsc\"; git show HEAD:extensions/plan3-stats.ts > \"$T/plan3-stats.ts\"; cp extensions/redact.ts \"$T/redact.ts\"; (cd \"$T\" && npx tsc --": {
+   "count": 1,
+   "ms": 2818,
+   "maxMs": 2818,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const f='scripts/test-work-plan3-stats.mjs';let s=fs.readFileSync(f,'utf8'); s=s.replace('[{ ...rec(\\\"S1: 5m\\\"), scope: \\\"ce-workflow\\\" }]','[{ ...rec(\\\"S1: ": {
+   "count": 1,
+   "ms": 139,
+   "maxMs": 139,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-stats.mjs 2>&1 | grep -v ExperimentalWarning | tail -12; echo \"exit=${PIPESTATUS[0]}\"": {
+   "count": 1,
+   "ms": 232,
+   "maxMs": 232,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const f='scripts/test-work-plan3-stats.mjs';let s=fs.readFileSync(f,'utf8'); s=s.replace('cites: \\\"node C:/Users/jdoe/repo/scripts/t.mjs MODEL TEXT\\\"','cites": {
+   "count": 1,
+   "ms": 349,
+   "maxMs": 349,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const f='extensions/plan3.ts';let s=fs.readFileSync(f,'utf8'); const r=(a,b)=>{if(!s.includes(a))throw new Error(a);s=s.replace(a,b);}; r('statsItems, stepRe": {
+   "count": 1,
+   "ms": 118,
+   "maxMs": 118,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"const directory\\|cwd:\" scripts/test-work-plan3.mjs | head -5": {
+   "count": 1,
+   "ms": 62,
+   "maxMs": 62,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"^import.*fs/promises\" scripts/test-work-plan3.mjs": {
+   "count": 1,
+   "ms": 101,
+   "maxMs": 101,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 600 node scripts/test-work-plan3.mjs 2>&1 | grep -v ExperimentalWarning | tail -12; echo \"exit=${PIPESTATUS[0]}\"": {
+   "count": 2,
+   "ms": 7444,
+   "maxMs": 4442,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"1110,1124p\" scripts/test-work-plan3.mjs | cut -c1-240": {
+   "count": 1,
+   "ms": 190,
+   "maxMs": 190,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 600 node scripts/test-work-plan3.mjs 2>&1 | grep -v ExperimentalWarning | tail -8; echo \"exit=${PIPESTATUS[0]}\"; node scripts/test-work-plan3-stats.mjs 2>&1 | tail -1": {
+   "count": 1,
+   "ms": 12587,
+   "maxMs": 12587,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add CHANGELOG.md extensions/plan3-stats.ts extensions/plan3.ts scripts/test-work-plan3-stats.mjs scripts/test-work-plan3.mjs \"docs/plans/2026-11-20-follow-ups-from-the-plan-finish-retro-": {
+   "count": 1,
+   "ms": 457,
+   "maxMs": 457,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n -i \"catch.\\?up\" hub/web/app.ts hub/*.ts hub/server/*.ts 2>/dev/null | cut -c1-220 | head -40; ls hub": {
+   "count": 1,
+   "ms": 85,
+   "maxMs": 85,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"2690,2720p\" hub/web/app.ts; grep -rn \"hub-catchup\\|\\\"catchup\\\"\\|/catchup\\|catchup\" hub/src hub/web/index.html hub/web/*.css 2>/dev/null | cut -c1-220 | head -20": {
+   "count": 1,
+   "ms": 95,
+   "maxMs": 95,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"D-08\\|D-10\\|D-06\\b\" \"docs/plans/2026-11-20-follow-ups-from-the-plan-finish-retro-5e4d224a-d-11-planning-523c2f8a-plan3.md\" | cut -c1-900": {
+   "count": 1,
+   "ms": 66,
+   "maxMs": 66,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"360,400p\" hub/src/api.ts | cut -c1-260; grep -n \"function folder\\|const folder\\|case \\\"hub\\\"\\|case \\\"message\\\"\" hub/src/api.ts | head; ls hub/scripts; grep -n \"\\\"test\" hub/package.js": {
+   "count": 1,
+   "ms": 137,
+   "maxMs": 137,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"400,470p\" hub/src/api.ts | cut -c1-260; grep -n \"groups()\" hub/src/*.ts | head -5; grep -n \"catchup\" hub/scripts/test-api.mjs | head": {
+   "count": 1,
+   "ms": 128,
+   "maxMs": 128,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rn \"catch-up\\\"\" extensions/*.ts | head -5; grep -n \"isCeWorkflow\\|ceWorkflowCheckout\\|function ownCheckout\\|const own\\b\\|own =\" extensions/work-catch-up.ts extensions/work-orchestrator": {
+   "count": 1,
+   "ms": 107,
+   "maxMs": 107,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"function maintenanceCheckout\" -A6 extensions/work-models.ts; grep -n \"hub-catchup\" hub/web/index.html | cut -c1-400; grep -n \"catchup\\|\\\"commands\\\"\" hub/scripts/test-browser.mjs hub": {
+   "count": 1,
+   "ms": 104,
+   "maxMs": 104,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rn \"maintenanceCheckout\" extensions/*.ts | head -3; grep -rn \"function maintenanceCheckout\\|maintenanceCheckout =\" extensions/ | head; sed -n \"1,80p\" hub/scripts/test-api.mjs | cut -c1": {
+   "count": 1,
+   "ms": 119,
+   "maxMs": 119,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"own\\b\" hub/src/api.ts | head -8; grep -n \"^import\" hub/src/api.ts | cut -c1-160": {
+   "count": 1,
+   "ms": 85,
+   "maxMs": 85,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"255,262p\" hub/src/api.ts | cut -c1-200; grep -n \"sameCheckout\\|WORKFLOW_REPO_DIR =\" extensions/*.ts | head -4": {
+   "count": 1,
+   "ms": 85,
+   "maxMs": 85,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"project-commands\\|id=\\\"commands\\|cmd-bar\\|command-bar\" hub/web/index.html hub/web/app.ts | head -12": {
+   "count": 1,
+   "ms": 81,
+   "maxMs": 81,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"git-pull\\\"\\|\\.git\\b.*ahead\\|renderGit\\|function gitButtons\\|group.git\" hub/web/app.ts | head -12; sed -n \"100,140p\" hub/src/api.ts | cut -c1-220": {
+   "count": 1,
+   "ms": 94,
+   "maxMs": 94,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"130,150p\" hub/web/app.ts | cut -c1-260; grep -n \"type Status\\b\\|interface Status\" hub/web/app.ts": {
+   "count": 1,
+   "ms": 73,
+   "maxMs": 73,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && grep -n \"git?: \\|git: GitState\\|commands?: \" hub/web/*.ts | head -5": {
+   "count": 1,
+   "ms": 64,
+   "maxMs": 64,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const f='extensions/plan3-stats.ts';let s=fs.readFileSync(f,'latin1'); s=s.replace('import { access, mkdir, readFile, writeFile } from \\\"node:fs/promises\\\";'": {
+   "count": 1,
+   "ms": 139,
+   "maxMs": 139,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const f='hub/src/api.ts';let s=fs.readFileSync(f,'utf8'); const r=(a,b)=>{if(!s.includes(a))throw new Error(a);s=s.replace(a,b);}; r('import { mkdirSync, rea": {
+   "count": 1,
+   "ms": 121,
+   "maxMs": 121,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"^async function post\\|const post = \\|function post(\" hub/web/*.ts | head; grep -n \"env-var\\\").addEventListener\" hub/web/app.ts": {
+   "count": 1,
+   "ms": 84,
+   "maxMs": 84,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'); let f='hub/web/index.html',s=fs.readFileSync(f,'utf8'); const a='<button id=\\\"env-var\\\" class=\\\"mode-chip\\\"'; if(!s.includes(a))throw a; s=s.replace(a,'<but": {
+   "count": 1,
+   "ms": 131,
+   "maxMs": 131,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff hub/web/styles.css; git diff hub/web/app.ts | grep \"^[-+]\" | cut -c1-200; grep -n \"how post builds\\|target\" hub/web/app.ts | sed -n \"1,3p\"; sed -n \"443,452p\" hub/web/app.ts | cut -c": {
+   "count": 1,
+   "ms": 182,
+   "maxMs": 182,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat hub/package.json | head -30; grep -n \"\\\"commands\\\"\\|status\\b.*git\" hub/scripts/test-api.mjs | head -5; grep -n \"case \\\"/api/message\\\"\\|/api/message\" hub/scripts/fake-pi.mjs | head -3": {
+   "count": 1,
+   "ms": 137,
+   "maxMs": 137,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"276,300p\" hub/scripts/test-api.mjs | cut -c1-260; grep -n \"messages\\|/api/message\" hub/scripts/fake-pi.mjs | head -8; grep -n \"\\\"message\\\"\" hub/scripts/test-api.mjs | head -5": {
+   "count": 1,
+   "ms": 135,
+   "maxMs": 135,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"405,416p\" hub/scripts/test-api.mjs | cut -c1-260": {
+   "count": 1,
+   "ms": 80,
+   "maxMs": 80,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git show HEAD:hub/web/app.ts > \"$TEMP/app-head.ts\" && for p in \"as unknown as\" \"innerHTML\" \"!.* === \"; do echo \"$p: head=$(grep -c \"$p\" \"$TEMP/app-head.ts\") now=$(grep -c \"$p\" hub/web/app.ts": {
+   "count": 1,
+   "ms": 173,
+   "maxMs": 173,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"registry.add(\" hub/scripts/test-api.mjs | head -5; grep -n \"catchup\" hub/scripts/*.mjs | head": {
+   "count": 1,
+   "ms": 209,
+   "maxMs": 209,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"134,145p\" hub/scripts/test-api.mjs | cut -c1-200; grep -n \"registry.remove\\|remove(\" hub/scripts/test-api.mjs | head -3": {
+   "count": 1,
+   "ms": 180,
+   "maxMs": 180,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const f='hub/scripts/test-api.mjs';let s=fs.readFileSync(f,'utf8'); const a='modes: { research: \\\"off\\\", night: \\\"off\\\" }, git: null, commands: [],';if(!s.in": {
+   "count": 1,
+   "ms": 28288,
+   "maxMs": 28288,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff -U0 hub/web/app.ts | grep \"^@@\"; sed -n \"1848p;84p\" hub/web/app.ts | cut -c1-160": {
+   "count": 1,
+   "ms": 120,
+   "maxMs": 120,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"typecheck\" package.json; git stash list | head -0; npx tsc -p hub/tsconfig.json --noEmit 2>&1 | grep -E \"api.ts|app.ts|plan3-stats\" | head; echo done": {
+   "count": 1,
+   "ms": 4050,
+   "maxMs": 4050,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n -A12 -i \"changelog screenshots\" docs/agent-rules.md | cut -c1-400; node hub/scripts/changelog-shot.mjs --help 2>&1 | head -30": {
+   "count": 1,
+   "ms": 137,
+   "maxMs": 137,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls -t docs/changelog | head -5; grep -n \"docs/changelog\" CHANGELOG.md | head -3; grep -n \"\\\"version\\\"\" package.json": {
+   "count": 1,
+   "ms": 89,
+   "maxMs": 89,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 300 node hub/scripts/changelog-shot.mjs \"#git-actions\" docs/changelog/retro-requests.png \"document.getElementById('retro-requests').hidden=false;document.getElementById('retro-reques": {
+   "count": 1,
+   "ms": 62232,
+   "maxMs": 62232,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"folder\\|mkdtemp\\|setup\\|evaluate\" hub/scripts/changelog-shot.mjs | head -20": {
+   "count": 1,
+   "ms": 80,
+   "maxMs": 80,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 300 node hub/scripts/changelog-shot.mjs \"#git-actions\" docs/changelog/retro-requests.png \"const b=document.getElementById('retro-requests');const show=()=>{if(b.hidden)b.hidden=false": {
+   "count": 1,
+   "ms": 63812,
+   "maxMs": 63812,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rn \"index.html\" hub/src/*.ts | head -5; sed -n \"60,80p\" hub/scripts/changelog-shot.mjs | cut -c1-200": {
+   "count": 1,
+   "ms": 82,
+   "maxMs": 82,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rn \"\\\"web\\\"\\|web/\\|app.js\\|esbuild\" hub/src/server.ts hub/src/hub.ts 2>/dev/null | head -8; ls hub/web | head -20": {
+   "count": 1,
+   "ms": 99,
+   "maxMs": 99,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 300 node hub/scripts/changelog-shot.mjs \"#retro-requests\" \"$TEMP/rr.png\" \"const b=document.getElementById('retro-requests');window.__rr=[!!b,b&&b.outerHTML.slice(0,80)];\" 2>&1 | grep": {
+   "count": 1,
+   "ms": 62386,
+   "maxMs": 62386,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 300 node hub/scripts/changelog-shot.mjs \"#git-actions\" \"docs/changelog/tmp-rr.png\" \"document.getElementById('env-var').textContent='XX'; const b=document.getElementById('retro-reques": {
+   "count": 1,
+   "ms": 63257,
+   "maxMs": 63257,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sleep 2; ls -la docs/changelog | head -5; ls -la docs/changelog/tmp-rr.png docs/changelog/retro-requests.png 2>&1": {
+   "count": 1,
+   "ms": 2146,
+   "maxMs": 2146,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -o \"id=\\\"retro-requests\\\"[^>]*>\" hub/web/index.html | cut -c1-80; grep -n \"index.html\\|\\\"/\\\"\" hub/src/hub.ts | head -5; rm docs/changelog/tmp-rr.png": {
+   "count": 1,
+   "ms": 111,
+   "maxMs": 111,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 300 node hub/scripts/changelog-shot.mjs \"#git-actions\" \"docs/changelog/tmp-rr.png\" \"const b=document.getElementById('retro-requests'); b.hidden=false; b.textContent='R3'; await new P": {
+   "count": 1,
+   "ms": 62887,
+   "maxMs": 62887,
+   "failures": 0
+  },
+  "bash\u0000sleep 3; ls -la \"./docs/changelog/tmp-rr.png\"": {
+   "count": 1,
+   "ms": 3090,
+   "maxMs": 3090,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -o \".\\{120\\}id=\\\"retro-requests\\\"\" hub/web/index.html; grep -o \"</button><button id=\\\"env-var\\\".\\{60\\}\" hub/web/index.html | head -2; rm docs/changelog/tmp-rr.png": {
+   "count": 1,
+   "ms": 89,
+   "maxMs": 89,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 300 node hub/scripts/changelog-shot.mjs \"#git-actions\" docs/changelog/retro-requests.png \"const b=document.getElementById('retro-requests'), c=b.cloneNode(true); c.id='retro-requests": {
+   "count": 1,
+   "ms": 65306,
+   "maxMs": 65306,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"1,30p\" CHANGELOG.md | cut -c1-220": {
+   "count": 1,
+   "ms": 71,
+   "maxMs": 71,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/scripts/test-api.mjs 2>&1 | grep -v -i \"warning\" | tail -3; echo \"exit=${PIPESTATUS[0]}\"; git status --short | head -30": {
+   "count": 1,
+   "ms": 26763,
+   "maxMs": 26763,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff --stat hub/scripts/test-browser.mjs hub/web/styles.css; git diff hub/scripts/test-browser.mjs | head -30": {
+   "count": 1,
+   "ms": 116,
+   "maxMs": 116,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-stats.mjs 2>&1 | tail -2; echo \"stats exit=${PIPESTATUS[0]}\"; node scripts/test-work-plan3.mjs 2>&1 | tail -2; echo \"plan3 exit=${PIPESTATUS[0]}\"": {
+   "count": 1,
+   "ms": 10441,
+   "maxMs": 10441,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short --untracked-files=all | grep -v \"stats.json\\|^?? nul\"": {
+   "count": 1,
+   "ms": 107,
+   "maxMs": 107,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add CHANGELOG.md \"docs/plans/2026-11-20-follow-ups-from-the-plan-finish-retro-5e4d224a-d-11-planning-523c2f8a-plan3.md\" \"docs/plans/done/2026-11-20-follow-ups-from-the-plan-finish-retro-": {
+   "count": 1,
+   "ms": 307,
+   "maxMs": 307,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git log --since=\"2026-11-18\" --format=\"%h %ad %s\" --date=format:\"%m-%d %H:%M\" | head -60; ls docs/plans/*.md 2>/dev/null; ls docs/plans/done | grep \"2026-11-1[89]\\|2026-11-2\"": {
+   "count": 1,
+   "ms": 131,
+   "maxMs": 131,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short; git diff --stat; git branch --show-current; git rev-list --count origin/master..HEAD; git ls-files docs/plans/logs | grep stats.json; git diff hub/web/styles.css; grep -n": {
+   "count": 1,
+   "ms": 362,
+   "maxMs": 362,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && head -30 hub/scripts/test-browser.mjs | grep -n \"argv\\|grep\\|only\" ; grep -n \"\\\"test:browser\\|test-browser\" package.json hub/package.json 2>/dev/null | head": {
+   "count": 1,
+   "ms": 82,
+   "maxMs": 82,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 1500 node hub/scripts/test-browser.mjs > \"$TEMP/tb.log\" 2>&1; echo \"exit=$?\"; grep -v -i \"warning\\|timer .* ended\" \"$TEMP/tb.log\" | tail -8": {
+   "count": 1,
+   "ms": 47217,
+   "maxMs": 47217,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"test-browser.mjs:\" \"$TEMP/tb.log\" | head -3; grep -n \"draft-recovery').hidden && !document\" hub/scripts/test-browser.mjs | head; git log -1 --format=%h -- hub/scripts/test-browser.m": {
+   "count": 1,
+   "ms": 117,
+   "maxMs": 117,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 1500 node hub/scripts/test-browser.mjs > \"$TEMP/tb2.log\" 2>&1; echo \"exit=$?\"; grep -v -i \"warning\\|timer .* ended\" \"$TEMP/tb2.log\" | tail -4": {
+   "count": 1,
+   "ms": 47467,
+   "maxMs": 47467,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"Error\\|assert\\|cmd:\" \"$TEMP/tb2.log\" | grep -v -i warning | head -8": {
+   "count": 1,
+   "ms": 75,
+   "maxMs": 75,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"300,313p\" hub/scripts/test-browser.mjs | cut -c1-400; git diff 4e5dce93 HEAD -- hub/web/app.ts | head -60": {
+   "count": 1,
+   "ms": 100,
+   "maxMs": 100,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls -d node_modules hub/node_modules 2>&1; W=\"$TEMP/wt-pre\"; git worktree add -f \"$W\" 4e5dce93 >/dev/null 2>&1; cmd //c mklink /J \"$(cygpath -w \"$W/node_modules\")\" \"$(cygpath -w \"$PWD/node_mo": {
+   "count": 1,
+   "ms": 820,
+   "maxMs": 820,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/wt-pre\" && ls -d node_modules 2>&1; tail -5 \"$TEMP/tb3.log\"": {
+   "count": 1,
+   "ms": 64,
+   "maxMs": 64,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/wt-pre\" && powershell -NoProfile -Command \"New-Item -ItemType Junction -Path node_modules -Target '.\\node_modules' | Out-Null\" && ls -d node_modules && timeout 1500 node hub/scripts/test-bro": {
+   "count": 1,
+   "ms": 185757,
+   "maxMs": 185757,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/wt-pre\" && git checkout -q --detach a67e2bdd && timeout 1500 node hub/scripts/test-browser.mjs > \"$TEMP/tb4.log\" 2>&1; echo \"exit=$?\"; grep -n \"Error: Command failed\\|^ok\" \"$TEMP/tb4.log\" | ": {
+   "count": 1,
+   "ms": 184136,
+   "maxMs": 184136,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff -- hub/web/styles.css hub/scripts/test-browser.mjs > \"$TEMP/other.patch\" && cd \"$TEMP/wt-pre\" && git apply \"$TEMP/other.patch\" && git status --short && timeout 1500 node hub/scripts": {
+   "count": 1,
+   "ms": 183426,
+   "maxMs": 183426,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls .ce-workflow/local/requests 2>&1 | head; grep -n \"folder\\|cwd\" hub/scripts/test-browser.mjs | head -8 | cut -c1-200": {
+   "count": 1,
+   "ms": 96,
+   "maxMs": 96,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n -i \"long title\\|description moves\\|prompt-option\" CHANGELOG.md | head; grep -n \"^## \\|^### \" CHANGELOG.md | head -8; grep -n \"\\\"version\\\"\" package-lock.json | head -2; date +%Y-%m-%d": {
+   "count": 1,
+   "ms": 157,
+   "maxMs": 157,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"size=\\|--ask\" hub/scripts/changelog-shot.mjs | head -5 | cut -c1-200; timeout 300 node hub/scripts/changelog-shot.mjs \"#prompt-form .prompt-option\" docs/changelog/1.1.2-long-option-": {
+   "count": 1,
+   "ms": 64228,
+   "maxMs": 64228,
+   "failures": 0
+  },
+  "bash\u0000sleep 3; ls -la \"./docs/changelog/1.1.2-long-option-title.png\"": {
+   "count": 1,
+   "ms": 3091,
+   "maxMs": 3091,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 300 node hub/scripts/changelog-shot.mjs \"#prompt-form .prompt-option\" docs/changelog/1.1.2-long-option-title.png \"\" --pad=6 --size=390x800 \"--ask={\\\"question\\\":\\\"Which build?\\\",\\\"opt": {
+   "count": 1,
+   "ms": 66293,
+   "maxMs": 66293,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 300 node hub/scripts/changelog-shot.mjs \"#prompt-form .prompt-option\" \"$TEMP/m.png\" \"const row=document.querySelector('#prompt-form .prompt-option'); document.title=JSON.stringify([.": {
+   "count": 1,
+   "ms": 66314,
+   "maxMs": 66314,
+   "failures": 0
+  },
+  "bash\u0000sleep 3; ls -la \"./docs/changelog/zz-m.png\" \"$TEMP/m.png\"": {
+   "count": 1,
+   "ms": 3093,
+   "maxMs": 3093,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rm docs/changelog/zz-m.png && sed -i \"s/max-width: calc(100% - 24px); \\/\\* stays beside the radio \\*\\//max-width: calc(100% - 32px); \\/* stays beside the radio and its default margins *\\//\" ": {
+   "count": 1,
+   "ms": 67430,
+   "maxMs": 67430,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 300 node hub/scripts/changelog-shot.mjs \"#prompt-form .prompt-option\" \"$TEMP/m.png\" \"const row=document.querySelector('#prompt-form .prompt-option'); row.querySelector('.prompt-descr": {
+   "count": 1,
+   "ms": 68380,
+   "maxMs": 68380,
+   "failures": 0
+  },
+  "bash\u0000sleep 4; ls -la \"./docs/changelog/zz-m.png\"": {
+   "count": 1,
+   "ms": 4080,
+   "maxMs": 4080,
+   "failures": 0
+  },
+  "bash\u0000cd \"./docs/changelog\" && rm zz-m.png && cp 1.1.2-long-option-title.png zz-check.png && sleep 3 && ls zz-check.png": {
+   "count": 1,
+   "ms": 3134,
+   "maxMs": 3134,
+   "failures": 0
+  },
+  "bash\u0000sleep 5; ls -la \"./docs/changelog/zz-check.png\"": {
+   "count": 1,
+   "ms": 5079,
+   "maxMs": 5079,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rm docs/changelog/zz-check.png && git diff -- hub/web/styles.css hub/scripts/test-browser.mjs > \"$TEMP/other.patch\" && cd \"$TEMP/wt-pre\" && git checkout -q -- . && git apply \"$TEMP/other.pat": {
+   "count": 1,
+   "ms": 47259,
+   "maxMs": 47259,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/wt-pre\" && timeout 1500 node hub/scripts/test-browser.mjs > \"$TEMP/tb7.log\" 2>&1; echo \"exit=$?\"; grep -n \"Error: Command failed\\|^ok\\|AssertionError\" \"$TEMP/tb7.log\" | cut -c1-200 | head -3": {
+   "count": 1,
+   "ms": 47682,
+   "maxMs": 47682,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/wt-pre\" && sed -i \"s/ max-width: calc(100% - 32px); \\/\\* stays beside the radio and its default margins \\*\\///\" hub/web/styles.css && grep -c \"100% - 32px\" hub/web/styles.css; timeout 1500 n": {
+   "count": 1,
+   "ms": 56309,
+   "maxMs": 56309,
+   "failures": 0
+  },
+  "bash\u0000grep -v -i \"warning\\|timer .* ended\" \"$TEMP/tb8.log\" | head -12 | cut -c1-250": {
+   "count": 1,
+   "ms": 85,
+   "maxMs": 85,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/wt-pre\" && git checkout -q -- . && git apply \"$TEMP/other.patch\" && grep -c \"100% - 32px\" hub/web/styles.css; S=$(date +%s); timeout 1500 node hub/scripts/test-browser.mjs > \"$TEMP/tb9.log\" ": {
+   "count": 1,
+   "ms": 57032,
+   "maxMs": 57032,
+   "failures": 0
+  },
+  "bash\u0000tasklist | grep -i -c \"chrome-headless\\|chrome.exe\"; tasklist | grep -i \"agent-browser\" | head; wmic process where \"name='node.exe'\" get commandline 2>/dev/null | grep -i \"test-\\|benchmark\" | cut -c1-": {
+   "count": 1,
+   "ms": 674,
+   "maxMs": 674,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git mv docs/changelog/retro-requests.png docs/changelog/1.1.2-retro-requests.png && sed -i \"s#docs/changelog/retro-requests.png#docs/changelog/1.1.2-retro-requests.png#; s/^## Unreleased$/##": {
+   "count": 1,
+   "ms": 347,
+   "maxMs": 347,
+   "failures": 0
+  }
+ },
+ "steps": {
+  "RF-02": {
+   "ms": 407291,
+   "testMs": 190,
+   "replies": 41,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 41
+   },
+   "failures": 5
+  },
+  "RF-03": {
+   "ms": 167650,
+   "testMs": 20751,
+   "replies": 23,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 23
+   },
+   "failures": 1
+  },
+  "RF-04": {
+   "ms": 835254,
+   "testMs": 55051,
+   "replies": 57,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 57
+   },
+   "failures": 6
+  },
+  "(none)": {
+   "ms": 1444372,
+   "testMs": 386497,
+   "replies": 38,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 38
+   },
+   "commands": {
+    "bash\u0000cd \".\" && git log --since=\"2026-11-18\" --format=\"%h %ad %s\" --date=format:\"%m-%d %H:%M\" | head -60; ls docs/plans/*.md 2>/dev/null; ls docs/plans/done | grep \"2026-11-1[89]\\|2026-11-2\"": {
+     "count": 1,
+     "ms": 131,
+     "maxMs": 131,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && git status --short; git diff --stat; git branch --show-current; git rev-list --count origin/master..HEAD; git ls-files docs/plans/logs | grep stats.json; git diff hub/web/styles.css; grep -n": {
+     "count": 1,
+     "ms": 362,
+     "maxMs": 362,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && head -30 hub/scripts/test-browser.mjs | grep -n \"argv\\|grep\\|only\" ; grep -n \"\\\"test:browser\\|test-browser\" package.json hub/package.json 2>/dev/null | head": {
+     "count": 1,
+     "ms": 82,
+     "maxMs": 82,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && timeout 1500 node hub/scripts/test-browser.mjs > \"$TEMP/tb.log\" 2>&1; echo \"exit=$?\"; grep -v -i \"warning\\|timer .* ended\" \"$TEMP/tb.log\" | tail -8": {
+     "count": 1,
+     "ms": 47217,
+     "maxMs": 47217,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && grep -n \"test-browser.mjs:\" \"$TEMP/tb.log\" | head -3; grep -n \"draft-recovery').hidden && !document\" hub/scripts/test-browser.mjs | head; git log -1 --format=%h -- hub/scripts/test-browser.m": {
+     "count": 1,
+     "ms": 117,
+     "maxMs": 117,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && timeout 1500 node hub/scripts/test-browser.mjs > \"$TEMP/tb2.log\" 2>&1; echo \"exit=$?\"; grep -v -i \"warning\\|timer .* ended\" \"$TEMP/tb2.log\" | tail -4": {
+     "count": 1,
+     "ms": 47467,
+     "maxMs": 47467,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && grep -n \"Error\\|assert\\|cmd:\" \"$TEMP/tb2.log\" | grep -v -i warning | head -8": {
+     "count": 1,
+     "ms": 75,
+     "maxMs": 75,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && sed -n \"300,313p\" hub/scripts/test-browser.mjs | cut -c1-400; git diff 4e5dce93 HEAD -- hub/web/app.ts | head -60": {
+     "count": 1,
+     "ms": 100,
+     "maxMs": 100,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && ls -d node_modules hub/node_modules 2>&1; W=\"$TEMP/wt-pre\"; git worktree add -f \"$W\" 4e5dce93 >/dev/null 2>&1; cmd //c mklink /J \"$(cygpath -w \"$W/node_modules\")\" \"$(cygpath -w \"$PWD/node_mo": {
+     "count": 1,
+     "ms": 820,
+     "maxMs": 820,
+     "failures": 0
+    },
+    "bash\u0000cd \"$TEMP/wt-pre\" && ls -d node_modules 2>&1; tail -5 \"$TEMP/tb3.log\"": {
+     "count": 1,
+     "ms": 64,
+     "maxMs": 64,
+     "failures": 0
+    },
+    "bash\u0000cd \"$TEMP/wt-pre\" && powershell -NoProfile -Command \"New-Item -ItemType Junction -Path node_modules -Target '.\\node_modules' | Out-Null\" && ls -d node_modules && timeout 1500 node hub/scripts/test-bro": {
+     "count": 1,
+     "ms": 185757,
+     "maxMs": 185757,
+     "failures": 0
+    },
+    "bash\u0000cd \"$TEMP/wt-pre\" && git checkout -q --detach a67e2bdd && timeout 1500 node hub/scripts/test-browser.mjs > \"$TEMP/tb4.log\" 2>&1; echo \"exit=$?\"; grep -n \"Error: Command failed\\|^ok\" \"$TEMP/tb4.log\" | ": {
+     "count": 1,
+     "ms": 184136,
+     "maxMs": 184136,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && git diff -- hub/web/styles.css hub/scripts/test-browser.mjs > \"$TEMP/other.patch\" && cd \"$TEMP/wt-pre\" && git apply \"$TEMP/other.patch\" && git status --short && timeout 1500 node hub/scripts": {
+     "count": 1,
+     "ms": 183426,
+     "maxMs": 183426,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && ls .ce-workflow/local/requests 2>&1 | head; grep -n \"folder\\|cwd\" hub/scripts/test-browser.mjs | head -8 | cut -c1-200": {
+     "count": 1,
+     "ms": 96,
+     "maxMs": 96,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && grep -n -i \"long title\\|description moves\\|prompt-option\" CHANGELOG.md | head; grep -n \"^## \\|^### \" CHANGELOG.md | head -8; grep -n \"\\\"version\\\"\" package-lock.json | head -2; date +%Y-%m-%d": {
+     "count": 1,
+     "ms": 157,
+     "maxMs": 157,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && grep -n \"size=\\|--ask\" hub/scripts/changelog-shot.mjs | head -5 | cut -c1-200; timeout 300 node hub/scripts/changelog-shot.mjs \"#prompt-form .prompt-option\" docs/changelog/1.1.2-long-option-": {
+     "count": 1,
+     "ms": 64228,
+     "maxMs": 64228,
+     "failures": 0
+    },
+    "bash\u0000sleep 3; ls -la \"./docs/changelog/1.1.2-long-option-title.png\"": {
+     "count": 1,
+     "ms": 3091,
+     "maxMs": 3091,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && timeout 300 node hub/scripts/changelog-shot.mjs \"#prompt-form .prompt-option\" docs/changelog/1.1.2-long-option-title.png \"\" --pad=6 --size=390x800 \"--ask={\\\"question\\\":\\\"Which build?\\\",\\\"opt": {
+     "count": 1,
+     "ms": 66293,
+     "maxMs": 66293,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && timeout 300 node hub/scripts/changelog-shot.mjs \"#prompt-form .prompt-option\" \"$TEMP/m.png\" \"const row=document.querySelector('#prompt-form .prompt-option'); document.title=JSON.stringify([.": {
+     "count": 1,
+     "ms": 66314,
+     "maxMs": 66314,
+     "failures": 0
+    },
+    "bash\u0000sleep 3; ls -la \"./docs/changelog/zz-m.png\" \"$TEMP/m.png\"": {
+     "count": 1,
+     "ms": 3093,
+     "maxMs": 3093,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && rm docs/changelog/zz-m.png && sed -i \"s/max-width: calc(100% - 24px); \\/\\* stays beside the radio \\*\\//max-width: calc(100% - 32px); \\/* stays beside the radio and its default margins *\\//\" ": {
+     "count": 1,
+     "ms": 67430,
+     "maxMs": 67430,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && timeout 300 node hub/scripts/changelog-shot.mjs \"#prompt-form .prompt-option\" \"$TEMP/m.png\" \"const row=document.querySelector('#prompt-form .prompt-option'); row.querySelector('.prompt-descr": {
+     "count": 1,
+     "ms": 68380,
+     "maxMs": 68380,
+     "failures": 0
+    },
+    "bash\u0000sleep 4; ls -la \"./docs/changelog/zz-m.png\"": {
+     "count": 1,
+     "ms": 4080,
+     "maxMs": 4080,
+     "failures": 0
+    },
+    "bash\u0000cd \"./docs/changelog\" && rm zz-m.png && cp 1.1.2-long-option-title.png zz-check.png && sleep 3 && ls zz-check.png": {
+     "count": 1,
+     "ms": 3134,
+     "maxMs": 3134,
+     "failures": 0
+    },
+    "bash\u0000sleep 5; ls -la \"./docs/changelog/zz-check.png\"": {
+     "count": 1,
+     "ms": 5079,
+     "maxMs": 5079,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && rm docs/changelog/zz-check.png && git diff -- hub/web/styles.css hub/scripts/test-browser.mjs > \"$TEMP/other.patch\" && cd \"$TEMP/wt-pre\" && git checkout -q -- . && git apply \"$TEMP/other.pat": {
+     "count": 1,
+     "ms": 47259,
+     "maxMs": 47259,
+     "failures": 0
+    },
+    "bash\u0000cd \"$TEMP/wt-pre\" && timeout 1500 node hub/scripts/test-browser.mjs > \"$TEMP/tb7.log\" 2>&1; echo \"exit=$?\"; grep -n \"Error: Command failed\\|^ok\\|AssertionError\" \"$TEMP/tb7.log\" | cut -c1-200 | head -3": {
+     "count": 1,
+     "ms": 47682,
+     "maxMs": 47682,
+     "failures": 0
+    },
+    "bash\u0000cd \"$TEMP/wt-pre\" && sed -i \"s/ max-width: calc(100% - 32px); \\/\\* stays beside the radio and its default margins \\*\\///\" hub/web/styles.css && grep -c \"100% - 32px\" hub/web/styles.css; timeout 1500 n": {
+     "count": 1,
+     "ms": 56309,
+     "maxMs": 56309,
+     "failures": 0
+    },
+    "bash\u0000grep -v -i \"warning\\|timer .* ended\" \"$TEMP/tb8.log\" | head -12 | cut -c1-250": {
+     "count": 1,
+     "ms": 85,
+     "maxMs": 85,
+     "failures": 0
+    },
+    "bash\u0000cd \"$TEMP/wt-pre\" && git checkout -q -- . && git apply \"$TEMP/other.patch\" && grep -c \"100% - 32px\" hub/web/styles.css; S=$(date +%s); timeout 1500 node hub/scripts/test-browser.mjs > \"$TEMP/tb9.log\" ": {
+     "count": 1,
+     "ms": 57032,
+     "maxMs": 57032,
+     "failures": 0
+    },
+    "bash\u0000tasklist | grep -i -c \"chrome-headless\\|chrome.exe\"; tasklist | grep -i \"agent-browser\" | head; wmic process where \"name='node.exe'\" get commandline 2>/dev/null | grep -i \"test-\\|benchmark\" | cut -c1-": {
+     "count": 1,
+     "ms": 674,
+     "maxMs": 674,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && git mv docs/changelog/retro-requests.png docs/changelog/1.1.2-retro-requests.png && sed -i \"s#docs/changelog/retro-requests.png#docs/changelog/1.1.2-retro-requests.png#; s/^## Unreleased$/##": {
+     "count": 1,
+     "ms": 347,
+     "maxMs": 347,
+     "failures": 0
+    }
+   },
+   "failures": 4
+  }
+ },
+ "spans": [
+  {
+   "start": "2026-11-20T16:52:35.835Z",
+   "ms": 2039702
+  },
+  {
+   "start": "2026-11-20T17:46:56.496Z",
+   "ms": 28390
+  }
+ ],
+ "hints": []
+}
