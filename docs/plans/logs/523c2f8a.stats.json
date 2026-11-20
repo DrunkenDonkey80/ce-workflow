@@ -1,30 +1,30 @@
 {
  "version": 1,
- "activeMs": 4746293,
- "runs": 4,
+ "activeMs": 4753879,
+ "runs": 5,
  "waitingMs": 32816,
- "toolWallMs": 2892892,
+ "toolWallMs": 2893446,
  "compactions": {
   "count": 0,
   "ms": 0
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
-   "replies": 210,
-   "thinkingMs": 824899,
-   "actingMs": 464686,
-   "input": 518,
-   "output": 121217,
-   "cacheRead": 21804521,
-   "cacheWrite": 789198,
-   "cost": 10.733306200000003,
+   "replies": 212,
+   "thinkingMs": 829627,
+   "actingMs": 466248,
+   "input": 524,
+   "output": 121574,
+   "cacheRead": 22092280,
+   "cacheWrite": 790532,
+   "cost": 10.804692000000003,
    "errors": 0
   }
  },
  "tools": {
   "bash": {
-   "count": 161,
-   "ms": 2586610,
+   "count": 162,
+   "ms": 2586886,
    "maxMs": 352183,
    "failures": 6
   },
@@ -85,8 +85,8 @@
  },
  "categories": {
   "shell": {
-   "count": 138,
-   "ms": 1262395,
+   "count": 139,
+   "ms": 1262671,
    "maxMs": 184136,
    "failures": 6
   },
@@ -1057,6 +1057,12 @@
    "ms": 199,
    "maxMs": 199,
    "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short && git add CHANGELOG.md hub/scripts/test-browser.mjs scripts/tool-usage-census.mjs docs/plans/logs/523c2f8a.stats.json && git commit -q -m \"Pi CLI lookup next to the runni": {
+   "count": 1,
+   "ms": 276,
+   "maxMs": 276,
+   "failures": 0
   }
  },
  "steps": {
@@ -1088,11 +1094,11 @@
    "failures": 6
   },
   "(none)": {
-   "ms": 2590216,
+   "ms": 2596782,
    "testMs": 1239567,
-   "replies": 89,
+   "replies": 91,
    "models": {
-    "anthropic/claude-opus-5-5:high": 89
+    "anthropic/claude-opus-5-5:high": 91
    },
    "commands": {
     "bash\u0000cd \".\" && git log --since=\"2026-11-18\" --format=\"%h %ad %s\" --date=format:\"%m-%d %H:%M\" | head -60; ls docs/plans/*.md 2>/dev/null; ls docs/plans/done | grep \"2026-11-1[89]\\|2026-11-2\"": {
@@ -1415,6 +1421,10 @@
   {
    "start": "2026-11-20T19:53:00.782Z",
    "ms": 1134434
+  },
+  {
+   "start": "2026-11-20T20:13:34.514Z",
+   "ms": 7586
   }
  ],
  "hints": [
