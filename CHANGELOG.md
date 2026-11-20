@@ -7,6 +7,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ### Fixed
 
 - The background-process guard no longer blocks commands that start parallel jobs and then `wait` for them all, such as four test suites run side by side.
+- `test_sensitivity` now says that its command runs from the copied project directory, and a red baseline points at the two usual causes: a path relative to a subfolder, or a missing `dependencyDirs` entry.
 
 ## 1.1.5 — 2026-11-20
 
