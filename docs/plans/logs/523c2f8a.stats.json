@@ -1,30 +1,30 @@
 {
  "version": 1,
- "activeMs": 5028908,
- "runs": 9,
+ "activeMs": 5349621,
+ "runs": 10,
  "waitingMs": 41360,
- "toolWallMs": 3021128,
+ "toolWallMs": 3024805,
  "compactions": {
   "count": 0,
   "ms": 0
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
-   "replies": 265,
-   "thinkingMs": 1016802,
-   "actingMs": 569369,
-   "input": 656,
-   "output": 146742,
-   "cacheRead": 28040576,
-   "cacheWrite": 907553,
-   "cost": 13.0833442,
+   "replies": 267,
+   "thinkingMs": 1024270,
+   "actingMs": 572894,
+   "input": 662,
+   "output": 147683,
+   "cacheRead": 28306388,
+   "cacheWrite": 910773,
+   "cost": 13.1714506,
    "errors": 0
   }
  },
  "tools": {
   "bash": {
-   "count": 203,
-   "ms": 2621328,
+   "count": 204,
+   "ms": 2621608,
    "maxMs": 352183,
    "failures": 8
   },
@@ -35,8 +35,8 @@
    "failures": 7
   },
   "edit": {
-   "count": 39,
-   "ms": 394,
+   "count": 40,
+   "ms": 401,
    "maxMs": 67,
    "failures": 0
   },
@@ -97,8 +97,8 @@
  },
  "categories": {
   "shell": {
-   "count": 176,
-   "ms": 1290087,
+   "count": 177,
+   "ms": 1290367,
    "maxMs": 184136,
    "failures": 8
   },
@@ -1299,9 +1299,9 @@
    "failures": 0
   },
   "\u0000(other)": {
-   "count": 2,
-   "ms": 83,
-   "maxMs": 45,
+   "count": 3,
+   "ms": 130,
+   "maxMs": 47,
    "failures": 1
   },
   "bash\u0000cd \".\" && timeout 600 node scripts/test-work-settings.mjs > \"$TEMP/ws.log\" 2>&1; echo \"settings exit=$?\"; grep -m3 -A3 \"Error\" \"$TEMP/ws.log\" | cut -c1-250; tail -1 \"$TEMP/ws.log\"": {
@@ -1310,10 +1310,10 @@
    "maxMs": 2040,
    "failures": 0
   },
-  "bash\u0000cd \".\" && sed -n \"1,8p\" CHANGELOG.md": {
+  "bash\u0000cd \".\" && git add CHANGELOG.md extensions/plan3-stats.ts extensions/plan3.ts extensions/work-models.ts scripts/test-work-plan3.mjs scripts/test-work-settings.mjs scripts/benchmark-compaction-recall-li": {
    "count": 1,
-   "ms": 47,
-   "maxMs": 47,
+   "ms": 280,
+   "maxMs": 280,
    "failures": 0
   }
  },
@@ -1346,11 +1346,11 @@
    "failures": 6
   },
   "(none)": {
-   "ms": 2982612,
+   "ms": 2993892,
    "testMs": 1246593,
-   "replies": 144,
+   "replies": 146,
    "models": {
-    "anthropic/claude-opus-5-5:high": 144
+    "anthropic/claude-opus-5-5:high": 146
    },
    "commands": {
     "bash\u0000cd \".\" && git log --since=\"2026-11-18\" --format=\"%h %ad %s\" --date=format:\"%m-%d %H:%M\" | head -60; ls docs/plans/*.md 2>/dev/null; ls docs/plans/done | grep \"2026-11-1[89]\\|2026-11-2\"": {
@@ -1693,6 +1693,10 @@
   {
    "start": "2026-11-20T20:23:24.169Z",
    "ms": 35073
+  },
+  {
+   "start": "2026-11-20T20:25:26.674Z",
+   "ms": 320713
   }
  ],
  "hints": [
