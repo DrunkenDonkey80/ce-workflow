@@ -1124,6 +1124,13 @@ export function mappingModelSettings(cwd, settings = readEffectiveSettings(cwd))
 	const value = settings.workOrchestrator?.mappingModel;
 	return typeof value === "string" && /^[^/\s:]+\/[^\s:]+:(off|minimal|low|medium|high|xhigh|max)$/.test(value) ? value : NONE_MODEL;
 }
+// Plan3 retro model label: unset is the default, "off" is None (plan3.ts retroModel reads the value).
+function retroLabel(value, names) {
+	if (value === "off") return "None";
+	if (typeof value !== "string") return "Default: Opus 5.5: medium";
+	const { model, level } = splitLevel(value);
+	return `${names.get(model) ?? model}${level ? `: ${level}` : ""}`;
+}
 // Mapping scope: off in subagent children (pi-subagents marks them) and with PI_WORK_PROJECT_MAP=off; a global model maps Git checkouts only, a project setting also maps a plain folder.
 export function projectMapScope(cwd) {
 	if (process.env.PI_SUBAGENT_CHILD === "1" || process.env.PI_WORK_PROJECT_MAP === "off") return; // children; live tests and benchmarks
@@ -4308,7 +4315,7 @@ function hasProjectOverride(settings, item) {
 	if (item.kind === "imageModel") return owns(block, "imageModel");
 	if (item.kind === "designModel") return owns(block, "designModel");
 	if (item.kind === "mappingModel") return owns(block, "mappingModel");
-	if (item.kind === "reviewAfterPlan" || item.kind === "reviewBeforeCommit" || item.kind === "stepRetros") return owns(block, item.kind);
+	if (item.kind === "reviewAfterPlan" || item.kind === "reviewBeforeCommit" || item.kind === "stepRetros" || item.kind === "retroModel") return owns(block, item.kind);
 	return false;
 }
 
@@ -4506,7 +4513,12 @@ async function workSettingsLoop(ctx, pi = undefined) {
 {
 				kind: "stepRetros", value: "stepRetros",
 				label: `Plan3 → Step retros: ${settings.workOrchestrator?.stepRetros === false ? "off" : "on"}`,
-				description: "Enter toggles. On: a step that repeated a command 3+ times, had 3+ failed tools or took over 30 min gets a background Opus 5.5 retro; off: no model calls. The finish retro always runs.",
+				description: "Enter toggles. On: a step that repeated a command 3+ times, had 3+ failed tools or took over 30 min gets a background retro (Retro model); off: no model calls. The finish retro still runs unless Retro model is None.",
+			},
+{
+				kind: "retroModel", value: "retroModel",
+				label: `Plan3 → Retro model: [${retroLabel(settings.workOrchestrator?.retroModel, names)}] ${SUBMENU_ARROW}`,
+				description: "Model and effort of the finish retro and step retros (default Opus 5.5: medium); None: no retros at all.",
 			},
 {
 				kind: "scopedModels", value: "scopedModels",
@@ -4694,6 +4706,27 @@ async function workSettingsLoop(ctx, pi = undefined) {
 			else settings.workOrchestrator.plan3.codingEffort = level;
 			writeScopedSettings(ctx.cwd, scope, settings);
 			ctx.ui.notify(`Plan3 coding effort: ${level}`, "info");
+			continue;
+		}
+		if (pick.kind === "retroModel") {
+			const stored = settings.workOrchestrator?.retroModel;
+			const current = stored === "off" ? { model: NONE_MODEL, level: undefined } : splitLevel(stored ?? INHERIT_MODEL);
+			const project = scope === "project";
+			const selected = await chooseModel(ctx, "Retro model", current.model, true, project,
+				project ? undefined : { label: "Default", description: "Opus 5.5: medium" }, { noneDescription: "No finish or step retros" });
+			if (selected === undefined) continue;
+			let value = selected === NONE_MODEL ? "off" : selected;
+			if (![INHERIT_MODEL, NONE_MODEL].includes(selected)) {
+				const level = await choose(ctx, "Retro model: choose effort", THINKING_LEVELS.map((item) => ({ value: item, label: item, description: "Effort of each retro call" })), current.level ?? "medium", { forceCustom: true });
+				if (level === undefined) continue;
+				value = `${selected}:${level}`;
+			}
+			settings = readScopedSettings(ctx.cwd, scope);
+			settings.workOrchestrator ??= {};
+			if (selected === INHERIT_MODEL) delete settings.workOrchestrator.retroModel;
+			else settings.workOrchestrator.retroModel = value;
+			writeScopedSettings(ctx.cwd, scope, settings);
+			ctx.ui.notify(`Plan3 retro model: ${retroLabel(settings.workOrchestrator.retroModel, new Map())}`, "info");
 			continue;
 		}
 		if (pick.kind === "stepRetros") {

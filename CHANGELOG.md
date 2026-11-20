@@ -2,6 +2,12 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Added
+
+- `/wo` Settings → **Plan3 → Retro model** picks the model and effort for the plan-finish retro and the step retros (default Opus 5.5, medium). None turns all retros off.
+
 ## 1.1.3 — 2026-11-20
 
 ### Fixed

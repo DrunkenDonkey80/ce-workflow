@@ -1,49 +1,49 @@
 {
  "version": 1,
- "activeMs": 4753879,
- "runs": 5,
- "waitingMs": 32816,
- "toolWallMs": 2893446,
+ "activeMs": 5028908,
+ "runs": 9,
+ "waitingMs": 41360,
+ "toolWallMs": 3021128,
  "compactions": {
   "count": 0,
   "ms": 0
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
-   "replies": 212,
-   "thinkingMs": 829627,
-   "actingMs": 466248,
-   "input": 524,
-   "output": 121574,
-   "cacheRead": 22092280,
-   "cacheWrite": 790532,
-   "cost": 10.804692000000003,
+   "replies": 265,
+   "thinkingMs": 1016802,
+   "actingMs": 569369,
+   "input": 656,
+   "output": 146742,
+   "cacheRead": 28040576,
+   "cacheWrite": 907553,
+   "cost": 13.0833442,
    "errors": 0
   }
  },
  "tools": {
   "bash": {
-   "count": 162,
-   "ms": 2586886,
+   "count": 203,
+   "ms": 2621328,
    "maxMs": 352183,
-   "failures": 6
+   "failures": 8
   },
   "read": {
-   "count": 35,
-   "ms": 615,
+   "count": 37,
+   "ms": 624,
    "maxMs": 53,
    "failures": 7
   },
   "edit": {
-   "count": 31,
-   "ms": 233,
-   "maxMs": 22,
+   "count": 39,
+   "ms": 394,
+   "maxMs": 67,
    "failures": 0
   },
   "compaction_note": {
-   "count": 5,
-   "ms": 0,
-   "maxMs": 0,
+   "count": 6,
+   "ms": 1,
+   "maxMs": 1,
    "failures": 2
   },
   "plan3": {
@@ -53,14 +53,14 @@
    "failures": 0
   },
   "test_sensitivity": {
-   "count": 4,
-   "ms": 110271,
+   "count": 5,
+   "ms": 137399,
    "maxMs": 81571,
    "failures": 1
   },
   "codemode": {
-   "count": 5,
-   "ms": 122135,
+   "count": 7,
+   "ms": 154278,
    "maxMs": 84868,
    "failures": 1
   },
@@ -81,14 +81,26 @@
    "ms": 418,
    "maxMs": 418,
    "failures": 0
+  },
+  "browser_search": {
+   "count": 2,
+   "ms": 3044,
+   "maxMs": 1650,
+   "failures": 0
+  },
+  "browser_fetch": {
+   "count": 5,
+   "ms": 53634,
+   "maxMs": 28241,
+   "failures": 1
   }
  },
  "categories": {
   "shell": {
-   "count": 139,
-   "ms": 1262671,
+   "count": 176,
+   "ms": 1290087,
    "maxMs": 184136,
-   "failures": 6
+   "failures": 8
   },
   "build": {
    "count": 3,
@@ -97,8 +109,8 @@
    "failures": 0
   },
   "test": {
-   "count": 20,
-   "ms": 1315559,
+   "count": 24,
+   "ms": 1322585,
    "maxMs": 352183,
    "failures": 0
   }
@@ -133,12 +145,6 @@
    "ms": 67,
    "maxMs": 67,
    "failures": 0
-  },
-  "bash\u0000cd \".\" && grep -n \"async function openSettings\\|function settingsMenu\\|label: \\\"Plan\\|label: `Plan\\|Plan models\\|plan3\\b.*label\\|value: \\\"plan\" extensions/work-models.ts | head -30": {
-   "count": 1,
-   "ms": 38,
-   "maxMs": 38,
-   "failures": 1
   },
   "bash\u0000cd \".\" && grep -n \"Plan models\\|openSettings\\|value: \\\"plan\\|Quiet\\|ON\\b.*OFF\\|\\? \\\"on\\\" : \\\"off\\\"\\|(on)\\|: \\\"Off\\\"\" extensions/work-models.ts | head -40": {
    "count": 1,
@@ -294,12 +300,6 @@
    "count": 1,
    "ms": 399,
    "maxMs": 399,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && grep -an \"new RegExp(user\" extensions/plan3-stats.ts": {
-   "count": 1,
-   "ms": 45,
-   "maxMs": 45,
    "failures": 0
   },
   "bash\u0000cd \".\" && grep -an \"<path>/\\|new RegExp(user\" extensions/plan3-stats.ts": {
@@ -1063,6 +1063,258 @@
    "ms": 276,
    "maxMs": 276,
    "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/^## Unreleased$/## 1.1.3 — 2026-11-20/\" CHANGELOG.md && sed -i \"0,/\\\"version\\\": \\\"1.1.2\\\"/s//\\\"version\\\": \\\"1.1.3\\\"/\" package.json && sed -i \"0,/\\\"version\\\": \\\"1.1.2\\\"/s//\\\"version": {
+   "count": 1,
+   "ms": 2804,
+   "maxMs": 2804,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && find . ~/.pi/agent -iname \"processed-videos.json\" -not -path \"*/node_modules/*\" 2>/dev/null | head -3; rg -il \"code ?mode|codemode\" --glob \"*.md\" --glob \"!node_modules\" . ~/.pi/agent/video-d": {
+   "count": 1,
+   "ms": 3934,
+   "maxMs": 3934,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \"const j=require('./docs/upstream/processed-videos.json');const v=j.videos||j;const a=Array.isArray(v)?v:Object.entries(v).map(([k,x])=>({id:k,...x}));console.log(a.length);console.l": {
+   "count": 1,
+   "ms": 136,
+   "maxMs": 136,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rn \"digest directory\\|yt-ingest\" docs/plans/done/2026-11-19-mine-20-new-video-digests-for-ce-workflow-ideas-f01355e6-plan3.md | head -5 | cut -c1-250; ls -d /c/SOFT/git/yt-ingest* ~/yt": {
+   "count": 1,
+   "ms": 95,
+   "maxMs": 95,
+   "failures": 1
+  },
+  "bash\u0000cd /c/SOFT/git/yt-ingest && rg -il \"code ?mode|codemode|code execution|programmatic tool\" --glob \"*.md\" . 2>/dev/null | head -20": {
+   "count": 1,
+   "ms": 91,
+   "maxMs": 91,
+   "failures": 0
+  },
+  "bash\u0000cd /c/SOFT/git/yt-ingest && ls; rg -il \"code ?mode|codemode|programmatic tool\" . 2>/dev/null | grep -v node_modules | head -20": {
+   "count": 1,
+   "ms": 150,
+   "maxMs": 150,
+   "failures": 0
+  },
+  "bash\u0000cd /c/SOFT/git/yt-ingest && grep -rn \"digest\\|out\\b\\|dir\" README.md | head -10 | cut -c1-200": {
+   "count": 1,
+   "ms": 95,
+   "maxMs": 95,
+   "failures": 0
+  },
+  "bash\u0000cd ~/Downloads/video-digests && rg -il \"code ?mode|codemode|programmatic tool|code execution\" --glob \"*.md\" . | head -20": {
+   "count": 1,
+   "ms": 152,
+   "maxMs": 152,
+   "failures": 0
+  },
+  "bash\u0000cd ~/Downloads/video-digests && for d in 2026-11-19-this-experimental* 2026-10-02-claude-mods* 2026-09-25-this-new-jev*; do echo \"=== $d\"; head -12 \"$d/digest.md\" | cut -c1-200; rg -n -i -C2 \"code ?mo": {
+   "count": 1,
+   "ms": 337,
+   "maxMs": 337,
+   "failures": 0
+  },
+  "bash\u0000cd ~/Downloads/video-digests/2026-11-19-this-experimental*/ && wc -l digest.md; rg -n -i \"persist|variable|state|process|sandbox|REPL|session|every tool|all tool|bash|read|subagent|computer use|downsi": {
+   "count": 1,
+   "ms": 135,
+   "maxMs": 135,
+   "failures": 0
+  },
+  "bash\u0000cd ~/Downloads/video-digests/2026-11-19-this-experimental*/ && sed -n \"98,120p;200,212p;660,672p\" digest.md | cut -c1-220; rg -n -i \"remember|keeps|between calls|across|global|store\\(\" digest.md | hea": {
+   "count": 1,
+   "ms": 231,
+   "maxMs": 231,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"stepRetros|finishRetro|retroModel|RETRO_MODEL|Step retros|plan-finish retro\" extensions hub/src hub/web scripts/test-work-settings.mjs --glob \"!*.json\" | cut -c1-220 | head -40": {
+   "count": 1,
+   "ms": 106,
+   "maxMs": 106,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"opus|model\" extensions/plan3-stats.ts | cut -c1-220 | head -30; sed -n \"4490,4515p\" extensions/work-models.ts | cut -c1-200; rg -n \"stepRetros|reviewAfterPlan\" hub/web/app.ts hub/src/": {
+   "count": 1,
+   "ms": 165,
+   "maxMs": 165,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -a -n \"opus|claude-|modelRegistry|\\.find\\(\" extensions/plan3-stats.ts | cut -c1-220 | head -20; rg -n \"plan3.*[Ss]ettings|/wo|stepRetros|planModels|codingModel\" hub/web/app.ts | cut -c1-1": {
+   "count": 1,
+   "ms": 183,
+   "maxMs": 183,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"4300,4315p\" extensions/work-models.ts | cut -c1-220; rg -n \"function owns\" -A8 extensions/work-models.ts | cut -c1-200; rg -n \"\\\"stepRetros\\\"|reviewAfterPlan\" extensions/*.ts | grep ": {
+   "count": 1,
+   "ms": 250,
+   "maxMs": 250,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n -i \"plan models|coding model|review after|retro\" hub/web/index.html hub/web/app.ts | cut -c1-180 | head": {
+   "count": 1,
+   "ms": 90,
+   "maxMs": 90,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -a -n \"RETRO_MODEL\" extensions scripts hub | cut -c1-220; rg -n \"mappingModel\" extensions/*.ts scripts/*.mjs | cut -c1-220 | head -30": {
+   "count": 1,
+   "ms": 241,
+   "maxMs": 241,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"1118,1140p\" extensions/work-models.ts; sed -n \"4550,4566p;4785,4835p\" extensions/work-models.ts; sed -n \"325,370p\" extensions/plan3-stats.ts | tr -d \"\\000\"": {
+   "count": 1,
+   "ms": 116,
+   "maxMs": 116,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"548,557p;1244,1275p;1655,1690p\" extensions/plan3.ts": {
+   "count": 1,
+   "ms": 53,
+   "maxMs": 53,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"^const NONE_MODEL|^const INHERIT_MODEL|export const NONE_MODEL|async function chooseModel\" extensions/work-models.ts; sed -n \"4316,4345p\" extensions/work-models.ts; sed -n \"4696,4712p": {
+   "count": 1,
+   "ms": 224,
+   "maxMs": 224,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"624,640p;725,745p\" extensions/work-models.ts; sed -n \"960,1000p\" scripts/test-work-plan3.mjs | cut -c1-260; rg -n \"RETRO|retroModel|claude-opus-5-5\" scripts/test-work-plan3*.mjs | cu": {
+   "count": 1,
+   "ms": 213,
+   "maxMs": 213,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"925,960p\" scripts/test-work-plan3.mjs | cut -c1-260; rg -n \"finishRetro|Finish retro|retro skipped\" scripts/test-work-plan3*.mjs | cut -c1-200": {
+   "count": 1,
+   "ms": 143,
+   "maxMs": 143,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"4509p\" extensions/work-models.ts; sed -n \"640,700p\" extensions/work-models.ts | rg -n \"None|INHERIT|inherit\" | cut -c1-220; rg -n \"^import|readJson\" extensions/plan3.ts | head -30 | ": {
+   "count": 1,
+   "ms": 188,
+   "maxMs": 188,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"640,700p\" extensions/work-models.ts | cut -c1-200": {
+   "count": 1,
+   "ms": 69,
+   "maxMs": 69,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"943p\" scripts/test-work-plan3.mjs; rg -n \"retroCalls\" scripts/test-work-plan3.mjs | head -3 | cut -c1-300; rg -n \"function splitLevel\" -A6 extensions/work-models.ts": {
+   "count": 1,
+   "ms": 150,
+   "maxMs": 150,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && rg -n \"splitLevel\" extensions/*.ts | head -3 | cut -c1-200; sed -n \"915,924p\" scripts/test-work-plan3.mjs | cut -c1-200; rg -n \"const agentDir|PI_CODING_AGENT_DIR\" scripts/test-work-plan3.mj": {
+   "count": 1,
+   "ms": 184,
+   "maxMs": 184,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"import .*plan3\\.ts|stepRetrosOn\" scripts/test-work-plan3.mjs | head; sed -n \"924p\" scripts/test-work-plan3.mjs | cut -c180-600": {
+   "count": 1,
+   "ms": 155,
+   "maxMs": 155,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const f='scripts/test-work-plan3.mjs';let s=fs.readFileSync(f,'utf8'); const a='streamSimple: (model, request) => { retroCalls.push({ model, request });'; if": {
+   "count": 1,
+   "ms": 176,
+   "maxMs": 176,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"\\.pi\\\", \\\"settings.json\\\"\" scripts/test-work-plan3.mjs | head -5 | cut -c1-200; timeout 600 node scripts/test-work-plan3.mjs > \"$TEMP/p3.log\" 2>&1; echo \"plan3 exit=$?\"; tail -5 \"$TEM": {
+   "count": 1,
+   "ms": 3755,
+   "maxMs": 3755,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && head -20 \"$TEMP/p3.log\" | cut -c1-300": {
+   "count": 1,
+   "ms": 71,
+   "maxMs": 71,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"1136,1140p\" scripts/test-work-plan3.mjs | cut -c1-250": {
+   "count": 1,
+   "ms": 106,
+   "maxMs": 106,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"944s|await rm(path.join(cwd, \\\".pi\\\", \\\"settings.json\\\"));|await rm(path.join(cwd, \\\".pi\\\"), { recursive: true });|\" scripts/test-work-plan3.mjs && sed -n \"944p\" scripts/test-work-pl": {
+   "count": 1,
+   "ms": 10387,
+   "maxMs": 10387,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 600 node scripts/test-work-settings.mjs > \"$TEMP/ws.log\" 2>&1; echo \"settings exit=$?\"; grep -m3 \"AssertionError\\|Error\" \"$TEMP/ws.log\" | cut -c1-200": {
+   "count": 1,
+   "ms": 1880,
+   "maxMs": 1880,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short; git log --oneline -1 -- scripts/benchmark-compaction-recall-live.mjs; rg -n \"PI_WORK_PROJECT_MAP\" scripts/benchmark-compaction-recall-live.mjs | head -3; rg -n \"must defa": {
+   "count": 1,
+   "ms": 221,
+   "maxMs": 221,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"^import|process.env\" scripts/benchmark-compaction-recall-live.mjs | head -12 | cut -c1-160; rg -n \"PI_WORK_PROJECT_MAP \\?\\?= \\\"off\\\"\" scripts/*.mjs | head -3 | cut -c1-160": {
+   "count": 1,
+   "ms": 148,
+   "maxMs": 148,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 600 node scripts/test-work-settings.mjs > \"$TEMP/ws.log\" 2>&1; echo \"settings exit=$?\"; grep -m3 \"AssertionError\\|Error\" \"$TEMP/ws.log\" | cut -c1-200; tail -2 \"$TEMP/ws.log\" | cut -c": {
+   "count": 1,
+   "ms": 2930,
+   "maxMs": 2930,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"226,262p\" scripts/test-work-settings.mjs | cut -c1-260": {
+   "count": 1,
+   "ms": 66,
+   "maxMs": 66,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"195,225p\" scripts/test-work-settings.mjs | cut -c1-260; rg -n \"^const mod|import\\(.*plan3\" scripts/test-work-settings.mjs | head": {
+   "count": 1,
+   "ms": 110,
+   "maxMs": 110,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"^import assert|assert\\.equal\" scripts/test-work-settings.mjs | head -2; timeout 600 node scripts/test-work-settings.mjs > \"$TEMP/ws.log\" 2>&1; echo \"settings exit=$?\"; grep -m3 -A3 \"A": {
+   "count": 1,
+   "ms": 1815,
+   "maxMs": 1815,
+   "failures": 0
+  },
+  "\u0000(other)": {
+   "count": 2,
+   "ms": 83,
+   "maxMs": 45,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && timeout 600 node scripts/test-work-settings.mjs > \"$TEMP/ws.log\" 2>&1; echo \"settings exit=$?\"; grep -m3 -A3 \"Error\" \"$TEMP/ws.log\" | cut -c1-250; tail -1 \"$TEMP/ws.log\"": {
+   "count": 1,
+   "ms": 2040,
+   "maxMs": 2040,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"1,8p\" CHANGELOG.md": {
+   "count": 1,
+   "ms": 47,
+   "maxMs": 47,
+   "failures": 0
   }
  },
  "steps": {
@@ -1094,11 +1346,11 @@
    "failures": 6
   },
   "(none)": {
-   "ms": 2596782,
-   "testMs": 1239567,
-   "replies": 91,
+   "ms": 2982612,
+   "testMs": 1246593,
+   "replies": 144,
    "models": {
-    "anthropic/claude-opus-5-5:high": 91
+    "anthropic/claude-opus-5-5:high": 144
    },
    "commands": {
     "bash\u0000cd \".\" && git log --since=\"2026-11-18\" --format=\"%h %ad %s\" --date=format:\"%m-%d %H:%M\" | head -60; ls docs/plans/*.md 2>/dev/null; ls docs/plans/done | grep \"2026-11-1[89]\\|2026-11-2\"": {
@@ -1402,7 +1654,7 @@
      "failures": 0
     }
    },
-   "failures": 5
+   "failures": 7
   }
  },
  "spans": [
@@ -1425,6 +1677,22 @@
   {
    "start": "2026-11-20T20:13:34.514Z",
    "ms": 7586
+  },
+  {
+   "start": "2026-11-20T20:13:47.399Z",
+   "ms": 13011
+  },
+  {
+   "start": "2026-11-20T20:14:51.525Z",
+   "ms": 164982
+  },
+  {
+   "start": "2026-11-20T20:20:18.232Z",
+   "ms": 61963
+  },
+  {
+   "start": "2026-11-20T20:23:24.169Z",
+   "ms": 35073
   }
  ],
  "hints": [

@@ -18,7 +18,7 @@ import { deliverReferenceBundle } from "./design-bundles.ts";
 import { captureUrlReference } from "./browser-fetch.ts";
 import { originalForHub, pickForHub, searchForHub } from "./browser-search.ts";
 import { reworkRequest } from "./plan3-rework.ts";
-import { createStats, finishRetro, statsItems, stepRetro, stepSignal, writeRequests } from "./plan3-stats.ts";
+import { createStats, finishRetro, RETRO_MODEL, statsItems, stepRetro, stepSignal, writeRequests } from "./plan3-stats.ts";
 import { HUMAN, HUMAN_TEXT, availLine, changeMessage, chooseAvail, isOn, needsFile, readAvail, setBoth, setMode, unset, writeAvail } from "./plan3-needs.ts";
 import { hubActive, publish as hubPublish } from "./hub-channel.ts";
 import { releaseSessionLock, takeSessionLock } from "./session-lock.ts";
@@ -553,6 +553,13 @@ function keepOverrides(file, input) {
 export function stepRetrosOn(cwd) {
 	const agentDir = process.env.PI_CODING_AGENT_DIR ?? path.join(os.homedir(), ".pi", "agent");
 	return readJson(path.join(cwd, ".pi", "settings.json")).workOrchestrator?.stepRetros ?? readJson(path.join(agentDir, "settings.json")).workOrchestrator?.stepRetros ?? true;
+}
+// Retro model (finish and step), project then global: "provider/id:effort", or "off" for no retros; unset or malformed keeps RETRO_MODEL.
+export function retroModel(cwd) {
+	const agentDir = process.env.PI_CODING_AGENT_DIR ?? path.join(os.homedir(), ".pi", "agent");
+	const value = readJson(path.join(cwd, ".pi", "settings.json")).workOrchestrator?.retroModel ?? readJson(path.join(agentDir, "settings.json")).workOrchestrator?.retroModel;
+	if (value === "off") return undefined;
+	return typeof value === "string" && /^[^/\s:]+\/[^\s:]+:(off|minimal|low|medium|high|xhigh|max)$/.test(value) ? value : RETRO_MODEL;
 }
 // Per-phase model/effort; each key: plan override, then project, then global; unset keeps the session's own value.
 export function phaseSettings(cwd, plan?) {
@@ -1246,12 +1253,13 @@ export default function plan3(pi) {
 	// D-04/D-05 step retros: plan-scope rules wait here for the next step start after they arrive.
 	const stepRules = new Map(), stepRetros = new Set();
 	function stepRetroAfter(ctx, plan, id) {
-		if (!id || stepRetros.has(`${plan.id}:${id}`) || !stepRetrosOn(ctx.cwd)) return;
+		const model = retroModel(ctx.cwd);
+		if (!id || stepRetros.has(`${plan.id}:${id}`) || !stepRetrosOn(ctx.cwd) || !model) return;
 		stepRetros.add(`${plan.id}:${id}`);
 		const run = async () => {
 			const row = await statsHooks.stepRow(logFile(plan.file), id);
 			if (!stepSignal(row).length) return;
-			const result = await stepRetro(ctx.modelRegistry, { title: plan.title, step: id, row, log: await readFile(logFile(plan.file), "utf8").catch(() => "") });
+			const result = await stepRetro(ctx.modelRegistry, { title: plan.title, step: id, row, model, log: await readFile(logFile(plan.file), "utf8").catch(() => "") });
 			await appendLog(plan.file, result.text);
 			await writeRequests(ctx.cwd, { title: plan.title, step: id, items: [...result.retro.project, ...result.retro.workflow] });
 			const rules = [...result.retro.project, ...result.retro.workflow].filter((item) => item.scope === "plan");
@@ -1661,10 +1669,11 @@ export default function plan3(pi) {
 	}
 	// D-06: one retro per archive (complete or force finish), in the background; no stats or a failure never blocks the archive.
 	function retroAfterArchive(ctx, plan, file) {
-		if (plan.folder === "done") return; // already archived: no second retro
+		const model = retroModel(ctx.cwd);
+		if (plan.folder === "done" || !model) return; // already archived: no second retro; Retro model off: none
 		const run = async () => {
 			await statsHooks.flush();
-			const result = await finishRetro(ctx.modelRegistry, { title: plan.title, statsPath: statsFile(file), logPath: logFile(file) });
+			const result = await finishRetro(ctx.modelRegistry, { title: plan.title, model, statsPath: statsFile(file), logPath: logFile(file) });
 			if (!result) return;
 			await appendLog(file, result.text);
 			const requests = await writeRequests(ctx.cwd, { title: plan.title, items: [...result.retro.project, ...result.retro.workflow] });

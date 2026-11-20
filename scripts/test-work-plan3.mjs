@@ -12,7 +12,7 @@ import { existsSync, readFileSync, renameSync } from "node:fs";
 import { access, copyFile, mkdir, mkdtemp, readFile, readdir, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import plan3, { listPlans, similarity, optimizeLint, phaseSettings, inlineOptions, questionChoices, finishProblems, needsThinkTags } from "../extensions/plan3.ts";
+import plan3, { retroModel, listPlans, similarity, optimizeLint, phaseSettings, inlineOptions, questionChoices, finishProblems, needsThinkTags } from "../extensions/plan3.ts";
 // Prose "Options:" lists become resolve choices when a question has no "- Option:" lines.
 assert.deepEqual(inlineOptions("- **Q-03** Pick. Options: (a) freeze v1, keep hashes; (b) snapshots; (c) leave it. Picked (a).").map(o => o.label), ["(a) freeze v1, keep hashes", "(b) snapshots", "(c) leave it"]);
 assert.deepEqual(inlineOptions("- **Q-04** Cap? Options: accept as incomplete (current), raise the cap, or send smaller. Any change needs a version.").map(o => o.label), ["accept as incomplete (current)", "raise the cap", "send smaller"]);
@@ -921,15 +921,27 @@ try {
 	entries.pop();
 	// D-06 finish retro: one stub-model call per archive, none on reads or a repeated complete.
 	const retroCalls = [], savedRetroRegistry = ctx.modelRegistry;
-	ctx.modelRegistry = { ...savedRetroRegistry, find: (provider, id) => ({ provider, id }), streamSimple: (model, request) => { retroCalls.push({ model, request }); return { result: async () => ({ stopReason: "stop", content: [{ type: "text", text: '{"project":[{"advice":"Split the slow step","cites":"S-01: 5m"}],"workflow":[]}' }] }) }; } };
+	ctx.modelRegistry = { ...savedRetroRegistry, find: (provider, id) => ({ provider, id }), streamSimple: (model, request, options) => { retroCalls.push({ model, request, options }); return { result: async () => ({ stopReason: "stop", content: [{ type: "text", text: '{"project":[{"advice":"Split the slow step","cites":"S-01: 5m"}],"workflow":[]}' }] }) }; } };
 	await mkdir(path.join(directory, "logs"), { recursive: true });
 	await writeFile(path.join(directory, "logs", "33333333.stats.json"), JSON.stringify({ version: 1, activeMs: 600000, runs: 1, waitingMs: 0, toolWallMs: 0, compactions: { count: 0, ms: 0 }, steps: { "S-01": { ms: 300000, testMs: 0 } }, commands: {}, tools: {}, spans: [] }));
 	await tool({ action: "get", plan: "33333333" });
 	assert.equal(retroCalls.length, 0, "a status read starts no retro");
+	// Retro model setting: default Opus 5.5 medium; project beats global; "off" means no retros; malformed keeps the default.
+	assert.equal(retroModel(cwd), "anthropic/claude-opus-5-5:medium");
+	await writeFile(path.join(agentDir, "settings.json"), JSON.stringify({ workOrchestrator: { retroModel: "off" } }));
+	assert.equal(retroModel(cwd), undefined, "off turns retros off");
+	await mkdir(path.join(cwd, ".pi"), { recursive: true });
+	await writeFile(path.join(cwd, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { retroModel: "zai/glm-5.3:low" } }));
+	assert.equal(retroModel(cwd), "zai/glm-5.3:low", "project setting beats global");
+	assert.equal(retroModel(path.join(cwd, "nowhere")), undefined, "global off applies without a project setting");
+	await writeFile(path.join(agentDir, "settings.json"), JSON.stringify({ workOrchestrator: { retroModel: "zai/glm-5.3" } }));
+	assert.equal(retroModel(path.join(cwd, "nowhere")), "anthropic/claude-opus-5-5:medium", "malformed (no effort) keeps the default");
+	await rm(path.join(agentDir, "settings.json"));
 	state = await tool({ action: "status", plan: "33333333", value: "complete" });
 	for (let i = 0; i < 100 && !notices.some((n) => /Plan3 retro \(Small\)/.test(n.message)); i++) await new Promise((r) => setTimeout(r, 20));
 	assert.equal(retroCalls.length, 1, "archive runs exactly one retro");
-	assert.equal(`${retroCalls[0].model.provider}/${retroCalls[0].model.id}`, "anthropic/claude-opus-5-5");
+	assert.deepEqual([`${retroCalls[0].model.provider}/${retroCalls[0].model.id}`, retroCalls[0].options.reasoning], ["zai/glm-5.3", "low"], "the finish retro uses the Retro model setting and its effort");
+	await rm(path.join(cwd, ".pi"), { recursive: true });
 	assert.match(await readFile(path.join(directory, "logs", "33333333.md"), "utf8"), /Finish retro[\s\S]*- Split the slow step \(cites: S-01: 5m\)[\s\S]*Workflow:\n- none/);
 	await tool({ action: "get", plan: "33333333" });
 	await tool({ action: "status", plan: "33333333", value: "complete" }).catch(() => {});
