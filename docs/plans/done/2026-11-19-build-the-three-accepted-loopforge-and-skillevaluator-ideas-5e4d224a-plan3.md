@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: ready
+status: complete
 created: 2026-11-19
-updated: 2026-11-20T08:49:18.989Z
+updated: 2026-11-20T08:51:35.056Z
 reviewed: 2026-11-19
 started: 2026-11-19T22:26:38.664Z
 ---
@@ -89,7 +89,7 @@ Commands: targeted tests only (`node scripts/test-compare-benchmark-runs.mjs`, `
 
 ### Phase 4: Records [code]
 
-- [ ] **UB-08** Update docs/upstream/loopforge.md and skillevaluator.md (Pending to Adopted or Dropped, with evidence); scoped catch-up entry per built upstream (D-03)
+- [x] **UB-08** Ledgers: loopforge.md L13+L3 and skillevaluator.md S5 moved Pending→Adopted with code paths and evidence (all re-implementations, no ports/notices); scoped kind "git" watches Tencent/LoopForge (LICENSE + 4 idea paths) and NVIDIA/SkillEvaluator (LICENSE, NOTICE, docs/metrics-reference.mdx) added to extensions/work-catch-up-baseline.json; BugHunter stays none taken, no watch.
 
 ## Global validation
 

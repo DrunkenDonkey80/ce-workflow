@@ -381,6 +381,64 @@
           "version": "614795896e09a2c1682b24cc1406529baf531bd7"
         }
       ]
+    },
+    {
+      "name": "Tencent/LoopForge",
+      "kind": "git",
+      "url": "https://github.com/Tencent/LoopForge",
+      "ledger": "docs/upstream/loopforge.md",
+      "paths": [
+        "LICENSE",
+        "internal/procwatch/procwatch.go",
+        "internal/runeval/facts.go",
+        "internal/runeval/apply.go",
+        "internal/domain/run_eval.go"
+      ],
+      "version": "6f606cf2a7354f05d1dbf2085f4eb832b7e89ccb",
+      "reviewedAt": "2026-11-20T12:00:00.000Z",
+      "reviewedVersion": "6f606cf2a7354f05d1dbf2085f4eb832b7e89ccb",
+      "decisions": [
+        {
+          "title": "L13 quiet-process notice",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "Re-implemented (display only, no kill) in the hub activity rows; see docs/upstream/loopforge.md",
+          "verification": "UB-03 7086530b",
+          "version": "6f606cf2a7354f05d1dbf2085f4eb832b7e89ccb"
+        },
+        {
+          "title": "L3 post-plan retro",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "Re-implemented as planDigest + finishRetro (Opus 5.5 after archive); see docs/upstream/loopforge.md",
+          "verification": "UB-04 76597312, UB-05 c5a53e62, UB-06 blind trial, UB-07 32d69539",
+          "version": "6f606cf2a7354f05d1dbf2085f4eb832b7e89ccb"
+        }
+      ]
+    },
+    {
+      "name": "NVIDIA/SkillEvaluator",
+      "kind": "git",
+      "url": "https://github.com/NVIDIA/SkillEvaluator",
+      "ledger": "docs/upstream/skillevaluator.md",
+      "paths": [
+        "LICENSE",
+        "NOTICE",
+        "docs/metrics-reference.mdx"
+      ],
+      "version": "d8ddd4f76de78dfc3425d0a829d2c7dc9ccb9037",
+      "reviewedAt": "2026-11-20T12:00:00.000Z",
+      "reviewedVersion": "d8ddd4f76de78dfc3425d0a829d2c7dc9ccb9037",
+      "decisions": [
+        {
+          "title": "S5 honest small-sample results",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "Re-implemented in compare-benchmark-runs and the judges; see docs/upstream/skillevaluator.md",
+          "verification": "UB-01 5ff59103, UB-02 34d93a6d",
+          "version": "d8ddd4f76de78dfc3425d0a829d2c7dc9ccb9037"
+        }
+      ]
     }
   ]
 }

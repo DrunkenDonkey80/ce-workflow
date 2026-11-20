@@ -2,16 +2,16 @@
 
 Upstream: [Tencent/LoopForge](https://github.com/Tencent/LoopForge) (MIT, with listed third-party exceptions). Reviewed at commit `6f606cf2a7354f05d1dbf2085f4eb832b7e89ccb` (2026-11-19), everything including the chat workbench and SOP designer UIs. Plan `docs/plans/done/2026-11-19-mine-loopforge-claude-bughunter-and-skillevaluator-for-ce-wo-3f8f9ab7-plan3.md`; review with measurements and the blind Astra merge `docs/proposals/2026-11-19-loopforge-bughunter-skillevaluator-review.md` (areas L1-L14).
 
-No catch-up watch yet: nothing is built. The umbrella plan adds a scoped entry when it builds an idea from this repo (D-09, user: "Only when built").
+Catch-up watch: `Tencent/LoopForge` in `extensions/work-catch-up-baseline.json`, scoped to `LICENSE` and the source paths below (D-09, user: "Only when built"). Both ideas are re-implementations, not ports: no LoopForge code or license notice is copied.
 
-## Pending (accepted, not built)
+## Adopted
 
-Umbrella plan: `docs/plans/2026-11-19-build-the-three-accepted-loopforge-and-skillevaluator-ideas-5e4d224a-plan3.md`.
+Umbrella plan: `docs/plans/done/2026-11-19-build-the-three-accepted-loopforge-and-skillevaluator-ideas-5e4d224a-plan3.md`.
 
-| Idea | Upstream path (idea source) | Ours (planned) |
-| --- | --- | --- |
-| L13 Quiet-process notice: show a running command that printed nothing for a while, with its last line; never kill | `internal/procwatch/procwatch.go:60` | tool rows via `extensions/plan3-web.ts:144-148` (UB-03) |
-| L3 Post-plan retro: digest of a plan's stats, recommendations for the project flow and for ce-workflow, trialled offline on finished plans across models first | `internal/runeval/facts.go:72`, `internal/domain/run_eval.go:40`, `internal/runeval/apply.go:10` | `extensions/plan3-stats.ts` (UB-04 to UB-07) |
+| Idea | Upstream path (idea source) | Ours | Evidence |
+| --- | --- | --- | --- |
+| L13 Quiet-process notice: a running bash command silent for 2 min shows "quiet for N min" and its last line; display only, never kills or tells the agent | `internal/procwatch/procwatch.go:60` | `extensions/plan3-web.ts`, `hub/web/app.ts` | UB-03 7086530b; `test-work-plan3-web` (always-stamp mutant caught), `hub/scripts/test-browser.mjs` |
+| L3 Post-plan retro: code-only digest of a plan's stats and log, then one model call after archive with at most 3 cited recommendations each for the project and the workflow, appended to the sidecar log | `internal/runeval/facts.go:72`, `internal/domain/run_eval.go:40`, `internal/runeval/apply.go:10` | `extensions/plan3-stats.ts` (`planDigest`, `retroPrompt`, `parseRetro`, `finishRetro`), `extensions/plan3.ts` archive paths, `scripts/trial-plan-retro.mjs` | UB-04 76597312, UB-05 c5a53e62, UB-07 32d69539. Blind trial on 8 finished plans, strict bar on 7: Opus 5.5 27/40 useful, Astra 6.2 13/28, Luna 6/22, Terra 6.1 5/23; kept with Opus 5.5 (D-11) |
 
 ## Rejected
 
