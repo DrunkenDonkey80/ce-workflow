@@ -2,8 +2,9 @@
 plan3: true
 status: ready
 created: 2026-11-19
-updated: 2026-11-19T22:20:53.596Z
+updated: 2026-11-20T08:49:18.989Z
 reviewed: 2026-11-19
+started: 2026-11-19T22:26:38.664Z
 ---
 
 # Build the three accepted LoopForge and SkillEvaluator ideas
@@ -40,6 +41,13 @@ Non-goals:
 - **D-04 L3 trial runs offline on finished plans, several models, two-sided recommendations.** Source: user comment at idea review (above). Replaces the original "trial on the next 5-10 finishes".
 - **D-05 L13 is display only, never a kill.** Source: idea as accepted; Astra's review also said "warning, not kill".
 - **D-06 Force-finished plans get the L3 retro too.** One hook after `archive()` (`extensions/plan3.ts:516`, callers :1624 force and :1822 complete) covers both. Reason: the user usually force-finishes at the last 1-2 steps, once everything is decided. Source: user answer to Q-03, 2026-11-19.
+- **D-07 (assumed) S5 conventions.** Pass/fail intervals use the run as unit, labelled, with distinct scenarios printed beside it and a "not independent" caveat when reps > 1. A judge failure is written as `<field>Error` (e.g. `scoreError`, `handoffJudgedError`), not applicable as a null value; both leave the metric unscored.
+- **Q-01 → D-09** L3 trial models: GPT-6 Luna, Terra, gpt-6.2-astra high, Opus 5.5 on the same digests (user, UB-05).
+- **Q-02 → D-10** L3 trial size: 8 finished plans with stats, mixed sizes (user, UB-05).
+- **D-11** Retro kept with Opus 5.5 (UB-06 blind score: 27/40 useful vs Astra 13/28, Luna 6/22, Terra 5/23). Per-step background retro, outcome routing to redacted GitHub issues, a hub counter button + /plan3 to process them, and async questions go to a new draft follow-up plan; UB-07 is built as scoped here (user, UB-06).
+
+
+
 
 ## Open questions
 
@@ -49,18 +57,7 @@ None.
 
 ### Deferred
 
-- **Q-01** Which models does the L3 retro trial compare?
-  - Context: the user expects thinking models to do better. Candidates already used here: GPT-6 Luna (cheap), Terra, gpt-6.2-astra high, Opus 5.5. Price per call matters only if the retro runs on every plan finish.
-  - Recommendation: Luna, Terra, gpt-6.2-astra high and Opus 5.5 (two cheap, two thinking), on the same digests.
-  - Option: Four models — Luna, Terra, Astra 6.2 high, Opus 5.5; best coverage, a few dollars.
-  - Option: Two thinking models only — Astra 6.2 high and Opus 5.5; cheaper trial, no cheap baseline.
-  - Independent: yes
-- **Q-02** How many finished plans go into the L3 trial?
-  - Context: 37 `docs/plans/logs/*.stats.json` exist (34 tracked) and 50 plans in `docs/plans/done/`; not every done plan has stats. The user scores a sample blind.
-  - Recommendation: 8 plans with stats, mixed sizes, so scoring stays within about half an hour.
-  - Option: 8 plans — quick to score.
-  - Option: All plans with stats — more evidence, much more scoring.
-  - Independent: yes
+None (Q-01, Q-02 answered: D-09, D-10).
 
 ## Relevant files and approach
 
@@ -76,35 +73,19 @@ Commands: targeted tests only (`node scripts/test-compare-benchmark-runs.mjs`, `
 
 ### Phase 1: Honest small-sample results (S5) [code]
 
-- [ ] **UB-01** compare-benchmark-runs.mjs: distinct cases, both-direction pair counts, unscored/error counts, Wilson intervals and a 'not established' line
-  - Read the producer's `pass` field as well as `passed`/`score`. Each interval states its unit: distinct scenarios, repetitions and checklist items are counted apart; item totals stay descriptive counts, not interval denominators. A judge error marks only that metric unscored; runtime and cost of the run still count.
-  - Fixture self-check in `scripts/test-compare-benchmark-runs.mjs`: a producer-shaped pair (`pass`), duplicate reps, several reps of one scenario, a judge timeout, an N/A metric, overlapping 95% intervals ('not established') and zero scorable cases.
-  - Check: `node scripts/test-compare-benchmark-runs.mjs`.
-- [ ] **UB-02** judge-handoff.mjs and judge-design-extras.mjs: reply shape check, one retry, judge error and N/A apart from failures, intervals on rates
-  - Each judge attempt has a deadline; after the one retry, the affected handoff batch or page is a judge error and the rest keep scoring. design-extras rates use pages as the unit (as in UB-01), item totals descriptive only.
-  - Self-check with a fake judge runner on canned replies (valid, invalid then valid, invalid twice, a child that never exits); no paid calls. Add it to `scripts/verify-package.mjs` next to `test-compare-benchmark-runs.mjs`.
-  - Check: the new judge self-check.
+- [x] **UB-01** compare-benchmark-runs reads `pass`, counts distinct scenarios and both directions, Wilson 95% per arm (unit: runs, scenarios beside it), 'not established' on overlap; `<field>Error`/null leave pairs unscored with cost kept (5ff59103)
+- [x] **UB-02** New scripts/judge-common.mjs (5-min deadline with tree kill, one retry, shape check, Wilson rate); handoff batches and design pages fail alone as judge errors; handoff empty reply = n/a; design must-haves rated over pages, extras item counts (34d93a6d)
 
 ### Phase 2: Quiet-process notice (L13) [code]
 
-- [ ] **UB-03** Track last-output time per running bash call and show 'quiet for N min' plus the last line on its tool row past a threshold
-  - Display only (D-05); threshold about 120 s. `plan3-web.ts` stamps the last nonempty update and keeps the last output line before the 16,000-character clip; `hub/web/app.ts` computes quiet time on its existing one-second clock.
-  - Fake-clock self-check in `scripts/test-work-plan3-web.mjs`: print a known line → silence with no events → print again → finish; the notice appears, clears on new output and is gone after finish.
-  - Check: that self-check, then the headless hub (agent-browser + screen_read) with a command that sleeps silently past a lowered test threshold.
+- [x] **UB-03** L13 quiet notice built (7086530b): running bash rows show "quiet for N min, last: <line>" on its own line after 120 s without output; new output clears it; display only.
 
 ### Phase 3: Post-plan retro trial (L3) [think]
 
-- [ ] **UB-04** Code-only digest from a plan's stats.json and sidecar log: repeated and failed commands, slowest steps, wait share, retries
-  - Repeated commands and failed calls are reported as counted; a retry is named only when a cited sidecar line shows it, otherwise the digest says 'retries not recorded'.
-  - Fixture self-check in `scripts/test-work-plan3-stats.mjs`; no model call. Check: `node scripts/test-work-plan3-stats.mjs`.
-- [ ] **UB-05** Offline trial on finished plans: digest plus retro prompt on the Q-01 models; each recommendation tagged project flow or ce-workflow, citing digest lines
-  - Plans chosen per Q-02; same prompt and the UB-07 cap (at most 3 per side) for every model, so no model wins by listing more; outputs blinded by model before scoring.
-- [ ] **UB-06** User scores a blinded sample useful or not; pick the model by useful count and cost; record in the log and decide keep or drop
-  - User step: mark it `human` when reached. Ask with the numbers then: keep with model X, or drop the retro.
-- [ ] **UB-07** If kept: run the retro at plan finish with the chosen model, at most 3 cited recommendations per side, to the sidecar log plus one notice
-  - Not started unless UB-06 recorded a keep decision; if dropped, mark it done as 'dropped per UB-06'.
-  - Runs once after a successful archive and the final stats flush (both archive paths, D-06), never on `/plan3 finish` (draft to ready); missing stats skip it without blocking the archive.
-  - Stub-model self-check: no call on draft to ready, one call on an eligible archive, none on a repeated status read. Check: `node scripts/test-work-plan3-stats.mjs` or the Plan3 test that owns archive.
+- [x] **UB-04** planDigest(stats, log) in extensions/plan3-stats.ts (76597312): time/wait share, top-5 slowest steps, repeated and failed commands (evicted '(other)' pool excluded, 'approximate' flag), failed tools, retries only from cited check/note log lines else 'retries not recorded'.
+- [x] **UB-05** retroPrompt/parseRetro in plan3-stats.ts + scripts/trial-plan-retro.mjs (c5a53e62); 4 models × 8 plans all valid: Luna 23 recs/$0.004/2 uncited dropped, Terra 6.1 28/$0.034, Astra 6.2 high 32/$0.309, Opus 5.5 46/$0.248; blind sheet + key in .pi/plan-retro-trial/2026-11-20T06-35-14-553Z.
+- [x] **UB-06** Keep the retro with Opus 5.5 (user, D-11): strict blind score over 7 plans, Opus 27/40 useful (68%, ~$0.03/plan), Astra 6.2 high 13/28 (46%), Luna 6/22 (27%), Terra 6.1 5/23 (22%); round 1 lenient (all 16 ticked) excluded.
+- [x] **UB-07** Finish retro built: finishRetro (plan3-stats.ts, Opus 5.5 medium, one retry on wrong shape) runs in the background after both archive paths (status complete and archiveForced), after a stats flush; appends to the sidecar log plus one notice; missing stats skip, failures warn, already-archived plans never retro twice.
 
 ### Phase 4: Records [code]
 

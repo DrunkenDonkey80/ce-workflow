@@ -18,7 +18,7 @@ import { deliverReferenceBundle } from "./design-bundles.ts";
 import { captureUrlReference } from "./browser-fetch.ts";
 import { originalForHub, pickForHub, searchForHub } from "./browser-search.ts";
 import { reworkRequest } from "./plan3-rework.ts";
-import { createStats, statsItems } from "./plan3-stats.ts";
+import { createStats, finishRetro, statsItems } from "./plan3-stats.ts";
 import { HUMAN, HUMAN_TEXT, availLine, changeMessage, chooseAvail, isOn, needsFile, readAvail, setBoth, setMode, unset, writeAvail } from "./plan3-needs.ts";
 import { hubActive, publish as hubPublish } from "./hub-channel.ts";
 import { releaseSessionLock, takeSessionLock } from "./session-lock.ts";
@@ -1226,7 +1226,7 @@ export default function plan3(pi) {
 	const runBudget = createRunBudget(pi, { fingerprint });
 	const night = createNight(pi, { listPlans, currentPlan, resume, research, executingPlan, tagging: () => Boolean(tagging), switchNeeds, budgetSpent: runBudget.exhausted });
 	// shortcut: a run counts while the session's current plan is the one /resume3 executes, so later chat in that session counts too.
-	createStats(pi, {
+	const statsHooks = createStats(pi, {
 		plan: async (ctx) => {
 			const id = executingPlan(ctx);
 			const plan = id && (await listPlans(ctx.cwd)).find((candidate) => candidate.id === id);
@@ -1621,7 +1621,21 @@ export default function plan3(pi) {
 			setMeta(lines, "status", "complete");
 			appendToSection(lines, "Amendments", `- ${today()}: Force-finished by the user${open.length ? ` with unfinished steps: ${open.join(", ")}` : ""}.`);
 		});
-		return archive(ctx.cwd, plan);
+		const file = await archive(ctx.cwd, plan);
+		retroAfterArchive(ctx, plan, file);
+		return file;
+	}
+	// D-06: one retro per archive (complete or force finish), in the background; no stats or a failure never blocks the archive.
+	function retroAfterArchive(ctx, plan, file) {
+		if (plan.folder === "done") return; // already archived: no second retro
+		const run = async () => {
+			await statsHooks.flush();
+			const result = await finishRetro(ctx.modelRegistry, { title: plan.title, statsPath: statsFile(file), logPath: logFile(file) });
+			if (!result) return;
+			await appendLog(file, result.text);
+			ctx.ui.notify(`Plan3 retro (${plan.title}): ${result.retro.project.length} project, ${result.retro.workflow.length} workflow recommendation(s) in ${path.relative(ctx.cwd, logFile(file))}`, "info");
+		};
+		run().catch((error) => ctx.ui.notify(`Plan3 retro skipped: ${error.message}`, "warning"));
 	}
 
 	async function browse(ctx) {
@@ -1820,6 +1834,7 @@ export default function plan3(pi) {
 				if (value === "complete") {
 					const accepted = ideaItems(split(await readFile(plan.file, "utf8")).lines).filter((idea) => idea.status === "accepted");
 					result = { file: await archive(ctx.cwd, plan) };
+					retroAfterArchive(ctx, plan, result.file);
 					// A final report once dropped ideas reported mid-run and silently swapped a user-approved condition.
 					if (accepted.length) Object.assign(result, { acceptedIdeas: accepted.map(({ id, title, requirement }) => ({ id, title, requirement })), report: "The final report covers every accepted idea, one line each, even if reported earlier: what was done and the result. Say plainly where the outcome differs from the idea's title, its requirement or the user's comment, or where a condition the user approved (for example 'switch only if X') was not followed." });
 					pi.events?.emit?.("plan3:completed", { ctx, plan });

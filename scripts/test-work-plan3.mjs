@@ -919,7 +919,23 @@ try {
 	await hooks.get("turn_end")({}, ctx);
 	assert.equal(statuses.at(-1), "🛠️ Plan (Small) [████████] 1/1");
 	entries.pop();
+	// D-06 finish retro: one stub-model call per archive, none on reads or a repeated complete.
+	const retroCalls = [], savedRetroRegistry = ctx.modelRegistry;
+	ctx.modelRegistry = { ...savedRetroRegistry, find: (provider, id) => ({ provider, id }), streamSimple: (model, request) => { retroCalls.push({ model, request }); return { result: async () => ({ stopReason: "stop", content: [{ type: "text", text: '{"project":[{"advice":"Split the slow step","cites":"S-01: 5m"}],"workflow":[]}' }] }) }; } };
+	await mkdir(path.join(directory, "logs"), { recursive: true });
+	await writeFile(path.join(directory, "logs", "33333333.stats.json"), JSON.stringify({ version: 1, activeMs: 600000, runs: 1, waitingMs: 0, toolWallMs: 0, compactions: { count: 0, ms: 0 }, steps: { "S-01": { ms: 300000, testMs: 0 } }, commands: {}, tools: {}, spans: [] }));
+	await tool({ action: "get", plan: "33333333" });
+	assert.equal(retroCalls.length, 0, "a status read starts no retro");
 	state = await tool({ action: "status", plan: "33333333", value: "complete" });
+	for (let i = 0; i < 100 && !notices.some((n) => /Plan3 retro \(Small\)/.test(n.message)); i++) await new Promise((r) => setTimeout(r, 20));
+	assert.equal(retroCalls.length, 1, "archive runs exactly one retro");
+	assert.equal(`${retroCalls[0].model.provider}/${retroCalls[0].model.id}`, "anthropic/claude-opus-5-5");
+	assert.match(await readFile(path.join(directory, "logs", "33333333.md"), "utf8"), /Finish retro[\s\S]*- Split the slow step \(cites: S-01: 5m\)[\s\S]*Workflow:\n- none/);
+	await tool({ action: "get", plan: "33333333" });
+	await tool({ action: "status", plan: "33333333", value: "complete" }).catch(() => {});
+	await new Promise((r) => setTimeout(r, 50));
+	assert.equal(retroCalls.length, 1, "repeated reads or complete on an archived plan start no second retro");
+	await writeFile(path.join(directory, "logs", "44444444.stats.json"), JSON.stringify({ version: 1, activeMs: 1, runs: 1, steps: {} }));
 	assert.equal(state.path, path.join(directory, "done", "2026-10-03-small-33333333-plan3.md"));
 	assert.deepEqual(state.acceptedIdeas, [{ id: "IDEA-0a0a0a0a", title: "Keep facts", requirement: "Facts survive compaction." }], "completion lists accepted ideas only");
 	assert.match(state.report, /every accepted idea[\s\S]*condition the user approved/);
@@ -1048,6 +1064,9 @@ try {
 	const forced = await readFile(path.join(directory, "done", "2026-10-04-fresh-44444444-plan3.md"), "utf8");
 	assert.match(forced, /^status: complete$/m);
 	assert.match(forced, /Force-finished by the user with unfinished steps: F-02/);
+	for (let i = 0; i < 100 && retroCalls.length < 2; i++) await new Promise((r) => setTimeout(r, 20));
+	assert.equal(retroCalls.length, 2, "force finish runs one retro too");
+	ctx.modelRegistry = savedRetroRegistry;
 	assert(!existsSync(path.join(directory, "2026-10-02-other-11111111-plan3.md")), "deleted only after confirmation");
 
 	// Legacy conversion: read-only store, markers, idempotent.
