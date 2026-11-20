@@ -1,30 +1,30 @@
 {
  "version": 1,
- "activeMs": 5349621,
- "runs": 10,
+ "activeMs": 5483592,
+ "runs": 12,
  "waitingMs": 41360,
- "toolWallMs": 3024805,
+ "toolWallMs": 3058444,
  "compactions": {
   "count": 0,
   "ms": 0
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
-   "replies": 267,
-   "thinkingMs": 1024270,
-   "actingMs": 572894,
-   "input": 662,
-   "output": 147683,
-   "cacheRead": 28306388,
-   "cacheWrite": 910773,
-   "cost": 13.1714506,
+   "replies": 277,
+   "thinkingMs": 1065006,
+   "actingMs": 605396,
+   "input": 694,
+   "output": 155115,
+   "cacheRead": 29686937,
+   "cacheWrite": 941954,
+   "cost": 13.7522334,
    "errors": 0
   }
  },
  "tools": {
   "bash": {
-   "count": 204,
-   "ms": 2621608,
+   "count": 212,
+   "ms": 2637641,
    "maxMs": 352183,
    "failures": 8
   },
@@ -35,9 +35,9 @@
    "failures": 7
   },
   "edit": {
-   "count": 40,
-   "ms": 401,
-   "maxMs": 67,
+   "count": 45,
+   "ms": 614,
+   "maxMs": 99,
    "failures": 0
   },
   "compaction_note": {
@@ -97,8 +97,8 @@
  },
  "categories": {
   "shell": {
-   "count": 177,
-   "ms": 1290367,
+   "count": 184,
+   "ms": 1294161,
    "maxMs": 184136,
    "failures": 8
   },
@@ -109,8 +109,8 @@
    "failures": 0
   },
   "test": {
-   "count": 24,
-   "ms": 1322585,
+   "count": 25,
+   "ms": 1334824,
    "maxMs": 352183,
    "failures": 0
   }
@@ -144,18 +144,6 @@
    "count": 1,
    "ms": 67,
    "maxMs": 67,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && grep -n \"Plan models\\|openSettings\\|value: \\\"plan\\|Quiet\\|ON\\b.*OFF\\|\\? \\\"on\\\" : \\\"off\\\"\\|(on)\\|: \\\"Off\\\"\" extensions/work-models.ts | head -40": {
-   "count": 1,
-   "ms": 62,
-   "maxMs": 62,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && grep -n \"function hasProjectOverride\\|function clearProjectOverride\" -A 22 extensions/work-models.ts | head -70": {
-   "count": 1,
-   "ms": 66,
-   "maxMs": 66,
    "failures": 0
   },
   "bash\u0000cd \".\" && grep -ln \"reviewAfterPlan\\|Review after plan\" scripts/*.mjs; grep -n \"test-work-plan3\\b\\|test-work-plan3-stats\\|test-work-models\\|test-work-settings\" package.json": {
@@ -248,12 +236,6 @@
    "maxMs": 143,
    "failures": 0
   },
-  "bash\u0000cd \".\" && grep -n -m3 -A6 \"^## Unreleased\" CHANGELOG.md": {
-   "count": 1,
-   "ms": 53,
-   "maxMs": 53,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && git add CHANGELOG.md extensions/plan3-stats.ts extensions/plan3.ts extensions/work-models.ts scripts/test-work-plan3-stats.mjs scripts/test-work-plan3.mjs \"docs/plans/2026-11-20-follow-ups-f": {
    "count": 1,
    "ms": 332,
@@ -302,12 +284,6 @@
    "maxMs": 399,
    "failures": 0
   },
-  "bash\u0000cd \".\" && grep -an \"<path>/\\|new RegExp(user\" extensions/plan3-stats.ts": {
-   "count": 1,
-   "ms": 57,
-   "maxMs": 57,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && grep -an \"<path>/\" extensions/plan3-stats.ts; T=\"$TEMP/rf02tsc\"; git show HEAD:extensions/plan3-stats.ts > \"$T/plan3-stats.ts\"; cp extensions/redact.ts \"$T/redact.ts\"; (cd \"$T\" && npx tsc --": {
    "count": 1,
    "ms": 2818,
@@ -336,12 +312,6 @@
    "count": 1,
    "ms": 118,
    "maxMs": 118,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && grep -n \"const directory\\|cwd:\" scripts/test-work-plan3.mjs | head -5": {
-   "count": 1,
-   "ms": 62,
-   "maxMs": 62,
    "failures": 0
   },
   "bash\u0000cd \".\" && grep -n \"^import.*fs/promises\" scripts/test-work-plan3.mjs": {
@@ -451,12 +421,6 @@
    "ms": 73,
    "maxMs": 73,
    "failures": 1
-  },
-  "bash\u0000cd \".\" && grep -n \"git?: \\|git: GitState\\|commands?: \" hub/web/*.ts | head -5": {
-   "count": 1,
-   "ms": 64,
-   "maxMs": 64,
-   "failures": 0
   },
   "bash\u0000cd \".\" && node -e \" const fs=require('fs');const f='extensions/plan3-stats.ts';let s=fs.readFileSync(f,'latin1'); s=s.replace('import { access, mkdir, readFile, writeFile } from \\\"node:fs/promises\\\";'": {
    "count": 1,
@@ -720,12 +684,6 @@
    "count": 1,
    "ms": 820,
    "maxMs": 820,
-   "failures": 0
-  },
-  "bash\u0000cd \"$TEMP/wt-pre\" && ls -d node_modules 2>&1; tail -5 \"$TEMP/tb3.log\"": {
-   "count": 1,
-   "ms": 64,
-   "maxMs": 64,
    "failures": 0
   },
   "bash\u0000cd \"$TEMP/wt-pre\" && powershell -NoProfile -Command \"New-Item -ItemType Junction -Path node_modules -Target '.\\node_modules' | Out-Null\" && ls -d node_modules && timeout 1500 node hub/scripts/test-bro": {
@@ -1172,12 +1130,6 @@
    "maxMs": 116,
    "failures": 0
   },
-  "bash\u0000cd \".\" && sed -n \"548,557p;1244,1275p;1655,1690p\" extensions/plan3.ts": {
-   "count": 1,
-   "ms": 53,
-   "maxMs": 53,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && rg -n \"^const NONE_MODEL|^const INHERIT_MODEL|export const NONE_MODEL|async function chooseModel\" extensions/work-models.ts; sed -n \"4316,4345p\" extensions/work-models.ts; sed -n \"4696,4712p": {
    "count": 1,
    "ms": 224,
@@ -1299,9 +1251,9 @@
    "failures": 0
   },
   "\u0000(other)": {
-   "count": 3,
-   "ms": 130,
-   "maxMs": 47,
+   "count": 11,
+   "ms": 611,
+   "maxMs": 66,
    "failures": 1
   },
   "bash\u0000cd \".\" && timeout 600 node scripts/test-work-settings.mjs > \"$TEMP/ws.log\" 2>&1; echo \"settings exit=$?\"; grep -m3 -A3 \"Error\" \"$TEMP/ws.log\" | cut -c1-250; tail -1 \"$TEMP/ws.log\"": {
@@ -1314,6 +1266,54 @@
    "count": 1,
    "ms": 280,
    "maxMs": 280,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short && sed -i \"s/^## Unreleased$/## 1.1.4 — 2026-11-20/\" CHANGELOG.md && sed -i \"0,/\\\"version\\\": \\\"1.1.3\\\"/s//\\\"version\\\": \\\"1.1.4\\\"/\" package.json && sed -i \"0,/\\\"version\\\": ": {
+   "count": 1,
+   "ms": 2775,
+   "maxMs": 2775,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -a -n -i \"retro\" extensions hub/src hub/web README.md docs/agent-rules.md --glob \"!*.json\" | grep -v -E \"^\\S+:\\d+:\\s*(//|import)\" | rg -i \"[\\\"\\`'][^\\\"\\`']*retro[^\\\"\\`']*[\\\"\\`']|^README|^d": {
+   "count": 1,
+   "ms": 112,
+   "maxMs": 112,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -a -n \"Finish retro|Step retro|Plan3 retro|step retro|Retro model|Step retros|retro improvement|usable retro\" scripts hub/scripts extensions docs/agent-rules.md README.md | grep -v \"^exte": {
+   "count": 1,
+   "ms": 151,
+   "maxMs": 151,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -o \"id=\\\"retro-requests\\\"[^>]*>\" hub/web/index.html | cut -c1-300; sed -n \"4514,4521p\" extensions/work-models.ts | cut -c1-400": {
+   "count": 1,
+   "ms": 103,
+   "maxMs": 103,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s|Unprocessed improvement requests from Plan3 retros|Unprocessed improvement requests from Plan3 self-analysis|\" hub/web/index.html && grep -c \"Plan3 self-analysis (.ce\" hub/web/inde": {
+   "count": 1,
+   "ms": 235,
+   "maxMs": 235,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff --stat scripts/; rg -n -F -e \"Plan3 retro\" -e \"Finish retro\" -e \"Step retro\" -e \"Retro model:\" scripts/test-work-plan3.mjs scripts/test-work-settings.mjs | cut -c1-220": {
+   "count": 1,
+   "ms": 144,
+   "maxMs": 144,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 600 node scripts/test-work-plan3.mjs > \"$TEMP/p3.log\" 2>&1; echo \"plan3 exit=$?\"; grep -m2 -A2 \"AssertionError\" \"$TEMP/p3.log\" | cut -c1-200; timeout 600 node scripts/test-work-setti": {
+   "count": 1,
+   "ms": 12239,
+   "maxMs": 12239,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add CHANGELOG.md extensions/plan3-stats.ts extensions/plan3.ts extensions/work-models.ts hub/web/index.html scripts/test-work-plan3.mjs scripts/test-work-settings.mjs && git commit -q -m": {
+   "count": 1,
+   "ms": 274,
+   "maxMs": 274,
    "failures": 0
   }
  },
@@ -1346,11 +1346,11 @@
    "failures": 6
   },
   "(none)": {
-   "ms": 2993892,
-   "testMs": 1246593,
-   "replies": 146,
+   "ms": 3083376,
+   "testMs": 1258832,
+   "replies": 156,
    "models": {
-    "anthropic/claude-opus-5-5:high": 146
+    "anthropic/claude-opus-5-5:high": 156
    },
    "commands": {
     "bash\u0000cd \".\" && git log --since=\"2026-11-18\" --format=\"%h %ad %s\" --date=format:\"%m-%d %H:%M\" | head -60; ls docs/plans/*.md 2>/dev/null; ls docs/plans/done | grep \"2026-11-1[89]\\|2026-11-2\"": {
@@ -1697,6 +1697,14 @@
   {
    "start": "2026-11-20T20:25:26.674Z",
    "ms": 320713
+  },
+  {
+   "start": "2026-11-20T20:31:15.326Z",
+   "ms": 13370
+  },
+  {
+   "start": "2026-11-20T20:33:23.886Z",
+   "ms": 120601
   }
  ],
  "hints": [
