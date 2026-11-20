@@ -374,13 +374,13 @@ try {
  // The excerpt and stream-gap refetches ask the hub for the whole row; here every row's full text is fixed.
  hub.views.get(id).row = async rowId => ({ id: rowId, role: "assistant", text: "Short excerpt. Full body loaded.", streaming: false });
  const snapshot = await browser("snapshot", "-i"); assert(JSON.stringify(snapshot).includes("Resize chat pane"));
- assert.equal(await evaluate("document.getElementById(\"chat\").getBoundingClientRect().width"), 380);
- await browser("focus", "#splitter"); await browser("press", "ArrowLeft");
- assert.equal(await evaluate("document.getElementById(\"chat\").getBoundingClientRect().width"), 390);
+ assert.equal(await evaluate("document.getElementById(\"chat\").getBoundingClientRect().width"), 640, "the chat starts at its maximum");
+ await browser("focus", "#splitter"); await browser("press", "Home"); await browser("press", "ArrowLeft");
+ assert.equal(await evaluate("document.getElementById(\"chat\").getBoundingClientRect().width"), 290);
  const handle = await evaluate("(() => { const r = document.getElementById(\"splitter\").getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()");
  await browser("mouse", "move", String(handle.x), String(handle.y)); await browser("mouse", "down", "left");
  await browser("mouse", "move", String(handle.x - 80), String(handle.y)); await browser("mouse", "up", "left");
- assert.equal(await evaluate("document.getElementById(\"chat\").getBoundingClientRect().width"), 470);
+ assert.equal(await evaluate("document.getElementById(\"chat\").getBoundingClientRect().width"), 370);
  await browser("focus", "#splitter"); await browser("press", "Home");
  assert.equal(await evaluate("document.getElementById(\"chat\").getBoundingClientRect().width"), 280);
  await browser("press", "End");

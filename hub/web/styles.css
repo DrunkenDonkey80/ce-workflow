@@ -1,7 +1,7 @@
 /* Themes: one block each, light-dark() pairs; the default is Pi's own light/dark theme values. Auto/Light/Dark
    sets color-scheme (app.ts applyTheme), so auto works before any script runs. */
 :root {
- color-scheme: light dark; --chat-width: 380px;
+ color-scheme: light dark; --chat-width: 640px;
  font: 15px/1.45 system-ui, sans-serif; color: var(--ink); background: var(--canvas);
  --canvas: light-dark(#ffffff, #21252c); --ink: light-dark(#3b3f41, #dee0e1); --muted: light-dark(#677176, #9da5a9); --blue: light-dark(#a5d8ff, #213b49);
  --group: light-dark(#868e96, #768186); --pink: light-dark(#ffc9c9, #5b282a); --focus: light-dark(#1971c2, #4dabf7); --on-focus: light-dark(#ffffff, #0b1a26);

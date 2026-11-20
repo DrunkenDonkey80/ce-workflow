@@ -237,7 +237,7 @@ function setDiagram(tab: DiagramTab, value: Diagram | null, refit = false) {
 let libraryReturn = { tab: "plan", left: "full" }, tabInitialized = false;
 // R8: each session keeps the pane mode and chat width per left tab; the library defaults to a wide left pane (narrow chat).
 // The global keys only seed tabs a session has not used yet, so the library's narrow chat never leaks into them.
-const layoutKey = "plan3-layout:" + location.pathname, LEFT_MODES = ["full", "narrow", "collapsed"];
+const layoutKey = "plan3-layout:" + location.pathname, LEFT_MODES = ["full", "narrow", "collapsed"], CHAT_WIDTH = 640;
 const currentTab = () => LEFT_TABS.find(view => $("tab-" + view).getAttribute("aria-selected") === "true");
 const savedLayouts = () => { try { return JSON.parse(localStorage.getItem(layoutKey) ?? "{}") ?? {}; } catch { return {}; } };
 function saveLayout() {
@@ -247,9 +247,11 @@ function saveLayout() {
  if (tab !== "library") { remember("plan3-left", left); remember("plan3-chat-width", width); }
 }
 function applyLayout(tab) {
- let width = 380; try { width = Number(localStorage.getItem("plan3-chat-width")) || 380; } catch { /* private mode */ }
+ // 380 was the old default, saved on every layout change, so it counts as never chosen: the chat starts at its 640 maximum.
+ const chosen = (value) => Number(value) !== 380 && Number(value) || 0;
+ let width = CHAT_WIDTH; try { width = chosen(localStorage.getItem("plan3-chat-width")) || CHAT_WIDTH; } catch { /* private mode */ }
  const saved = savedLayouts()[tab], fallback = tab === "library" ? { left: "full", width: 280 } : { left: remembered("plan3-left", LEFT_MODES, "full"), width };
- setLeft(LEFT_MODES.includes(saved?.left) ? saved.left : fallback.left); resizeChat(Number(saved?.width) || fallback.width);
+ setLeft(LEFT_MODES.includes(saved?.left) ? saved.left : fallback.left); resizeChat(chosen(saved?.width) || fallback.width);
 }
 try {
  const saved = JSON.parse(sessionStorage.getItem("design-library-back:" + location.pathname) ?? "null");
@@ -1894,7 +1896,7 @@ window.addEventListener("keydown", event => {
  event.preventDefault();
  if (designSession) return;
  const width = Number(splitter.getAttribute("aria-valuenow"));
- if (workspace.dataset.left === "full" && width <= 280) { const back = wideChat ?? { left: "full", width: 380 }; wideChat = undefined; setLeft(back.left); resizeChat(back.width); }
+ if (workspace.dataset.left === "full" && width <= 280) { const back = wideChat ?? { left: "full", width: CHAT_WIDTH }; wideChat = undefined; setLeft(back.left); resizeChat(back.width); }
  else { wideChat = { left: workspace.dataset.left!, width }; setLeft("full"); resizeChat(280); }
 });
 (window as unknown as { piHubGo: (id: string) => void }).piHubGo = jumpTo;

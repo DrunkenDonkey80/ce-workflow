@@ -27,6 +27,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ### Changed
 
+- Hub: the chat beside an open left panel (PDF, plan, files) now starts at its widest, 640 px, instead of 380 px. Pages still on the old 380 px default switch over; a width you dragged yourself stays.
 - Compaction keeps more facts: the compaction model setting now shows measured recall (Luna 24%, Terra 60%, Astra 6.2 93%, Opus 5.5 93% of planted key facts), and every session warns at start when Luna is the compaction model. Design sessions run without Ponytail, whose "smallest version" rule cut the sections a design brief implies.
 - The always-on self-check rule no longer forces a check after every change: whether to check is the agent's call, but when it would check, or would tell you to run, open or test something, it does it with its tools and asks you only when no tool can, saying why. In a 9-run A/B on Opus 5.5 (web, web-app, desktop) it checked as often as before (9/9), handed fewer checks to you (0 vs 1) and cost 28% less. A cheap-model judge () now scores benchmark hand-offs; the old regex counted honest caveats as hand-offs.
 - Plan3 execute runs can no longer `git push` (blocked in code, not just asked in the prompt); a later ordinary request can still push. Night mode also blocks `git push`, `git reset --hard`, `git clean -f` and recursive deletes outside the project and temp folders.
