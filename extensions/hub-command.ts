@@ -260,7 +260,9 @@ export const LONG_WAIT_REASON = "Blocked: sleep-waits of 5+ minutes keep this se
 // They must declare a lifetime: a `timeout <seconds>` that stops them, or `# long-running` when the user needs them up.
 export function undeclaredBackground(command) {
 	if (typeof command !== "string" || /#\s*long-running\b/i.test(command) || /\btimeout\s+(-\S+\s+)*\d/.test(command)) return false;
-	return /(?<![&>|])&(?![&>])\s*(?:$|[;)\n])/m.test(command) || /\b(nohup|setsid|Start-Process)\b/i.test(command) || /\bcmd(\.exe)?\s+[/-]+c\s+start\b/i.test(command);
+	// Parallel jobs followed by a bare `wait` end inside the command (SpaceMind T-01 ran four test suites that way).
+	const jobs = [...command.matchAll(/(?<![&>|])&(?![&>])\s*(?:$|[;)\n])/gm)].at(-1);
+	return jobs !== undefined && !/(?:^|[;&|\n(])\s*wait\s*(?:$|[;&|)\n])/m.test(command.slice(jobs.index)) || /\b(nohup|setsid|Start-Process)\b/i.test(command) || /\bcmd(\.exe)?\s+[/-]+c\s+start\b/i.test(command);
 }
 export const BACKGROUND_REASON = "Blocked: this starts a background process that would outlive the turn. Declare its lifetime: prefix the program with `timeout <seconds>` (e.g. `timeout 3600 python -m http.server 8781 &`) so it stops itself, or add `# long-running` at the end when the user needs it to keep running (then tell the user it is running and how to stop it).";
 

@@ -18,6 +18,8 @@ for (const [command, blocked] of [
 	['powershell -Command "Start-Process pythonw -ArgumentList x"', true], ["cmd //c start \"\" app.exe", true],
 	["timeout 3600 python -m http.server 8781 &", false], ["pythonw -m ainews serve & # long-running", false],
 	["npm test && git status", false], ["node x.mjs > out.log 2>&1", false], ["cmd &> log", false], ["npm start", false],
+	["( cd a && jest > a.txt ) &\n( pytest > b.txt ) &\nwait; tail a.txt b.txt", false], ["a & b & wait", false],
+	["wait; server &", true], ["a & wait 123; server &", true],
 ]) assert.equal(undeclaredBackground(command), blocked, command);
 // A woken parked session is found by its Pi session id, else (stable/claimed intercom id) as the one new session in its folder.
 const target = { id: 'h1', name: 'game', folder: '/p', sessionId: 'pi-1' };

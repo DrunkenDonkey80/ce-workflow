@@ -2,6 +2,12 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Fixed
+
+- The background-process guard no longer blocks commands that start parallel jobs and then `wait` for them all, such as four test suites run side by side.
+
 ## 1.1.5 — 2026-11-20
 
 ### Changed
