@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { classify, commandShape, createStats, planDigest, recordCommand, recordReply, sanitize, serialHint, statsItems, emptyStats } from "../extensions/plan3-stats.ts";
+import { classify, commandShape, createStats, planDigest, recordCommand, recordReply, sanitize, serialHint, statsItems, emptyStats, parseRetro, retroPrompt } from "../extensions/plan3-stats.ts";
 
 assert.equal(classify("cd \"C:/x\" && node scripts/test-work-plan3.mjs"), "test");
 assert.equal(classify("cargo nextest run"), "test");
@@ -126,4 +126,13 @@ const pooled = planDigest({ ...digestStats, commands: { ...digestStats.commands,
 assert.match(pooled, /approximate, over 200 distinct commands/);
 assert.doesNotMatch(pooled, /other/i, "the evicted-commands pool is not listed as a repeated or failed command");
 await rm(directory, { recursive: true, force: true });
+// Retro: the cap holds per side, advice citing a line that is not in the digest is dropped, a wrong shape is undefined.
+const rDigest = "Slowest steps:\n- S1: 5m\n- S2: 1m";
+const rec = (cites) => ({ advice: "do x", cites });
+const retro = parseRetro(`Sure: ${JSON.stringify({ project: [rec("- S1: 5m"), rec("S2: 1m"), rec("- S1: 5m"), rec("- S2: 1m")], workflow: [rec("- S9: invented"), rec("S1: 5m")] })}`, rDigest);
+assert.equal(retro.project.length, 3, "at most 3 per side");
+assert.deepEqual(retro.workflow, [rec("S1: 5m")], "an invented citation is dropped");
+assert.equal(retro.uncited, 1);
+assert.equal(parseRetro("{\"project\":[]}", rDigest), undefined);
+assert.match(retroPrompt("T", rDigest), /At most 3 per list[\s\S]*- S2: 1m$/);
 console.log("ok - plan3 stats collection, classification, viewer and digest");
