@@ -4512,13 +4512,13 @@ async function workSettingsLoop(ctx, pi = undefined) {
 			},
 {
 				kind: "stepRetros", value: "stepRetros",
-				label: `Plan3 → Step retros: ${settings.workOrchestrator?.stepRetros === false ? "off" : "on"}`,
-				description: "Enter toggles. On: a step that repeated a command 3+ times, had 3+ failed tools or took over 30 min gets a background retro (Retro model); off: no model calls. The finish retro still runs unless Retro model is None.",
+				label: `Plan3 → Step self-analysis: ${settings.workOrchestrator?.stepRetros === false ? "off" : "on"}`,
+				description: "Enter toggles. On: a step that repeated a command 3+ times, had 3+ failed tools or took over 30 min gets a background self-analysis (Self-analysis model); off: no model calls. The plan self-analysis at finish still runs unless Self-analysis model is None.",
 			},
 {
 				kind: "retroModel", value: "retroModel",
-				label: `Plan3 → Retro model: [${retroLabel(settings.workOrchestrator?.retroModel, names)}] ${SUBMENU_ARROW}`,
-				description: "Model and effort of the finish retro and step retros (default Opus 5.5: medium); None: no retros at all.",
+				label: `Plan3 → Self-analysis model: [${retroLabel(settings.workOrchestrator?.retroModel, names)}] ${SUBMENU_ARROW}`,
+				description: "Model and effort of the plan self-analysis at finish and after signal steps (default Opus 5.5: medium); None: no self-analysis at all.",
 			},
 {
 				kind: "scopedModels", value: "scopedModels",
@@ -4712,12 +4712,12 @@ async function workSettingsLoop(ctx, pi = undefined) {
 			const stored = settings.workOrchestrator?.retroModel;
 			const current = stored === "off" ? { model: NONE_MODEL, level: undefined } : splitLevel(stored ?? INHERIT_MODEL);
 			const project = scope === "project";
-			const selected = await chooseModel(ctx, "Retro model", current.model, true, project,
-				project ? undefined : { label: "Default", description: "Opus 5.5: medium" }, { noneDescription: "No finish or step retros" });
+			const selected = await chooseModel(ctx, "Self-analysis model", current.model, true, project,
+				project ? undefined : { label: "Default", description: "Opus 5.5: medium" }, { noneDescription: "No plan or step self-analysis" });
 			if (selected === undefined) continue;
 			let value = selected === NONE_MODEL ? "off" : selected;
 			if (![INHERIT_MODEL, NONE_MODEL].includes(selected)) {
-				const level = await choose(ctx, "Retro model: choose effort", THINKING_LEVELS.map((item) => ({ value: item, label: item, description: "Effort of each retro call" })), current.level ?? "medium", { forceCustom: true });
+				const level = await choose(ctx, "Self-analysis model: choose effort", THINKING_LEVELS.map((item) => ({ value: item, label: item, description: "Effort of each self-analysis call" })), current.level ?? "medium", { forceCustom: true });
 				if (level === undefined) continue;
 				value = `${selected}:${level}`;
 			}
@@ -4726,7 +4726,7 @@ async function workSettingsLoop(ctx, pi = undefined) {
 			if (selected === INHERIT_MODEL) delete settings.workOrchestrator.retroModel;
 			else settings.workOrchestrator.retroModel = value;
 			writeScopedSettings(ctx.cwd, scope, settings);
-			ctx.ui.notify(`Plan3 retro model: ${retroLabel(settings.workOrchestrator.retroModel, new Map())}`, "info");
+			ctx.ui.notify(`Plan3 self-analysis model: ${retroLabel(settings.workOrchestrator.retroModel, new Map())}`, "info");
 			continue;
 		}
 		if (pick.kind === "stepRetros") {
@@ -4735,7 +4735,7 @@ async function workSettingsLoop(ctx, pi = undefined) {
 			settings.workOrchestrator ??= {};
 			settings.workOrchestrator.stepRetros = !on;
 			writeScopedSettings(ctx.cwd, scope, settings);
-			ctx.ui.notify(`Plan3 step retros: ${on ? "off" : "on"}`, "info");
+			ctx.ui.notify(`Plan3 step self-analysis: ${on ? "off" : "on"}`, "info");
 			continue;
 		}
 		if (pick.kind === "reviewAfterPlan" || pick.kind === "reviewBeforeCommit") {

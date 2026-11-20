@@ -237,18 +237,18 @@ try {
 		{ expectText: "Mapping agent: [Text Only", key: "escape" },
 	]));
 	assert(mod.mappingModelSettings(cwd) === "test/text-only:high", "global mapping model and effort persist as one value");
-	// Plan3 → Retro model: model+effort in one value, None saves "off", Default removes the key.
+	// Plan3 → Self-analysis model: model+effort in one value, None saves "off", Default removes the key.
 	const retroSetting = () => JSON.parse(readFileSync(globalSettingsFile(), "utf8")).workOrchestrator?.retroModel;
 	await invoke("work-settings", "", mappingCtx([
-		{ target: "Plan3 → Retro model: [Default", key: "enter" },
+		{ target: "Plan3 → Self-analysis model: [Default", key: "enter" },
 		{ target: "Text Only", key: "enter" },
 		{ target: "High", key: "enter" },
-		{ expectText: "Plan3 → Retro model: [Text Only: high", key: "escape" },
+		{ expectText: "Plan3 → Self-analysis model: [Text Only: high", key: "escape" },
 	]));
 	assert(retroSetting() === "test/text-only:high", "retro model and effort persist as one value");
-	await invoke("work-settings", "", mappingCtx([{ target: "Plan3 → Retro model:", key: "enter" }, { target: "None", key: "enter" }, { expectText: "Plan3 → Retro model: [None", key: "escape" }]));
+	await invoke("work-settings", "", mappingCtx([{ target: "Plan3 → Self-analysis model:", key: "enter" }, { target: "None", key: "enter" }, { expectText: "Plan3 → Self-analysis model: [None", key: "escape" }]));
 	assert(retroSetting() === "off", "None turns retros off");
-	await invoke("work-settings", "", mappingCtx([{ target: "Plan3 → Retro model:", key: "enter" }, { target: "Default", key: "enter" }, { key: "escape" }]));
+	await invoke("work-settings", "", mappingCtx([{ target: "Plan3 → Self-analysis model:", key: "enter" }, { target: "Default", key: "enter" }, { key: "escape" }]));
 	assert(retroSetting() === undefined, "Default removes the setting");
 	{
 		// P3-06: live tests and benchmarks default PI_WORK_PROJECT_MAP=off, so a global mapping model never runs in them.

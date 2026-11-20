@@ -1265,19 +1265,19 @@ export default function plan3(pi) {
 			const rules = [...result.retro.project, ...result.retro.workflow].filter((item) => item.scope === "plan");
 			const open = rules.length && (await listPlans(ctx.cwd)).find((candidate) => candidate.id === plan.id && isOpen(candidate));
 			if (open) {
-				await mutate(open, (lines) => appendToSection(lines, "Decisions", rules.map((rule) => `- **Step retro rule (${id})** ${rule.advice} Source: step retro, cites "${rule.cites.trim()}".`).join("\n"), true));
+				await mutate(open, (lines) => appendToSection(lines, "Decisions", rules.map((rule) => `- **Step self-analysis rule (${id})** ${rule.advice} Source: step self-analysis, cites "${rule.cites.trim()}".`).join("\n"), true));
 				stepRules.set(plan.id, [...(stepRules.get(plan.id) ?? []), ...rules.map((rule) => rule.advice)]);
 			}
-			ctx.ui.notify(`Plan3 step retro ${id}: ${open ? `${rules.length} rule(s) for the rest of this plan, ` : ""}see ${path.relative(ctx.cwd, logFile(plan.file))}`, "info");
+			ctx.ui.notify(`Plan3 step self-analysis ${id}: ${open ? `${rules.length} rule(s) for the rest of this plan, ` : ""}see ${path.relative(ctx.cwd, logFile(plan.file))}`, "info");
 		};
-		run().catch((error) => ctx.ui.notify(`Plan3 step retro ${id} skipped: ${error.message}`, "warning"));
+		run().catch((error) => ctx.ui.notify(`Plan3 step self-analysis ${id} skipped: ${error.message}`, "warning"));
 	}
 	// Sent once at a step start, never into a running step.
 	function sendStepRules(plan, started) {
 		const rules = started && stepRules.get(plan.id);
 		if (!rules?.length) return;
 		stepRules.delete(plan.id);
-		pi.sendMessage?.({ customType: "plan3-step-rule", display: true, content: `Plan3 step retro: work rules for the rest of this plan (also in its Decisions), starting with ${started}:\n${rules.map((rule) => `- ${rule}`).join("\n")}` }, { deliverAs: "steer" });
+		pi.sendMessage?.({ customType: "plan3-step-rule", display: true, content: `Plan3 step self-analysis: work rules for the rest of this plan (also in its Decisions), starting with ${started}:\n${rules.map((rule) => `- ${rule}`).join("\n")}` }, { deliverAs: "steer" });
 	}
 	// Reconcile run settled: questions it added get the resolve dialog again instead of a typed /plan3 resolve.
 	async function afterResolve(ctx, aborted) {
@@ -1677,9 +1677,9 @@ export default function plan3(pi) {
 			if (!result) return;
 			await appendLog(file, result.text);
 			const requests = await writeRequests(ctx.cwd, { title: plan.title, items: [...result.retro.project, ...result.retro.workflow] });
-			ctx.ui.notify(`Plan3 retro (${plan.title}): ${result.retro.project.length} project, ${result.retro.workflow.length} workflow recommendation(s) in ${path.relative(ctx.cwd, logFile(file))}${requests.length ? `, ${requests.length} new request(s) in .ce-workflow/local/requests` : ""}`, "info");
+			ctx.ui.notify(`Plan3 self-analysis (${plan.title}): ${result.retro.project.length} project, ${result.retro.workflow.length} workflow recommendation(s) in ${path.relative(ctx.cwd, logFile(file))}${requests.length ? `, ${requests.length} new request(s) in .ce-workflow/local/requests` : ""}`, "info");
 		};
-		run().catch((error) => ctx.ui.notify(`Plan3 retro skipped: ${error.message}`, "warning"));
+		run().catch((error) => ctx.ui.notify(`Plan3 self-analysis skipped: ${error.message}`, "warning"));
 	}
 
 	async function browse(ctx) {

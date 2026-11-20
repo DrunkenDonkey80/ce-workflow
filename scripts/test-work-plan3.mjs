@@ -938,11 +938,11 @@ try {
 	assert.equal(retroModel(path.join(cwd, "nowhere")), "anthropic/claude-opus-5-5:medium", "malformed (no effort) keeps the default");
 	await rm(path.join(agentDir, "settings.json"));
 	state = await tool({ action: "status", plan: "33333333", value: "complete" });
-	for (let i = 0; i < 100 && !notices.some((n) => /Plan3 retro \(Small\)/.test(n.message)); i++) await new Promise((r) => setTimeout(r, 20));
+	for (let i = 0; i < 100 && !notices.some((n) => /Plan3 self-analysis \(Small\)/.test(n.message)); i++) await new Promise((r) => setTimeout(r, 20));
 	assert.equal(retroCalls.length, 1, "archive runs exactly one retro");
 	assert.deepEqual([`${retroCalls[0].model.provider}/${retroCalls[0].model.id}`, retroCalls[0].options.reasoning], ["zai/glm-5.3", "low"], "the finish retro uses the Retro model setting and its effort");
 	await rm(path.join(cwd, ".pi"), { recursive: true });
-	assert.match(await readFile(path.join(directory, "logs", "33333333.md"), "utf8"), /Finish retro[\s\S]*- Split the slow step \(cites: S-01: 5m\)[\s\S]*Workflow:\n- none/);
+	assert.match(await readFile(path.join(directory, "logs", "33333333.md"), "utf8"), /Plan self-analysis[\s\S]*- Split the slow step \(cites: S-01: 5m\)[\s\S]*Workflow:\n- none/);
 	await tool({ action: "get", plan: "33333333" });
 	await tool({ action: "status", plan: "33333333", value: "complete" }).catch(() => {});
 	await new Promise((r) => setTimeout(r, 50));
@@ -961,11 +961,11 @@ try {
 		const until = async (test) => { for (let i = 0; i < 150 && !test(); i++) await new Promise((r) => setTimeout(r, 20)); };
 		await rm(path.join(cwd, ".ce-workflow"), { recursive: true, force: true }); // the finish retro block above wrote its own requests
 		await tool({ action: "step", plan: "55555555", id: "T-01", mark: "done", summary: "loud" });
-		await until(() => /Step retro rule \(T-01\)/.test(readFileSync(file, "utf8")));
+		await until(() => /Step self-analysis rule \(T-01\)/.test(readFileSync(file, "utf8")));
 		assert.equal(calls.length, 1, "a signal step gets one retro");
 		assert.match(calls[0].messages[0].content[0].text, /^Step T-01 of the plan "Steps" just finished[\s\S]*- ×3, 3s: bash: npm test/);
-		assert.match(readFileSync(file, "utf8"), /## Decisions\n[\s\S]*- \*\*Step retro rule \(T-01\)\*\* Run the suite once per step/);
-		assert.match(await readFile(path.join(directory, "logs", "55555555.md"), "utf8"), /Step retro T-01[\s\S]*Add a quick test mode \(cites: bash: npm test\) \[scope: script\]/);
+		assert.match(readFileSync(file, "utf8"), /## Decisions\n[\s\S]*- \*\*Step self-analysis rule \(T-01\)\*\* Run the suite once per step/);
+		assert.match(await readFile(path.join(directory, "logs", "55555555.md"), "utf8"), /Step self-analysis T-01[\s\S]*Add a quick test mode \(cites: bash: npm test\) \[scope: script\]/);
 		const requestDir = path.join(cwd, ".ce-workflow", "local", "requests");
 		assert.deepEqual((await readdir(requestDir)).map((name) => name.split("-")[0]), ["script"], "the step retro writes its script-scope item as a request; the plan rule is not one");
 		await rm(path.join(cwd, ".ce-workflow"), { recursive: true });
@@ -983,7 +983,7 @@ try {
 		await until(() => calls.length === 2);
 		assert.equal(calls.length, 2, "next triggers like step done");
 		release();
-		await until(() => /Step retro rule \(T-03\)/.test(readFileSync(file, "utf8")));
+		await until(() => /Step self-analysis rule \(T-03\)/.test(readFileSync(file, "utf8")));
 		assert.equal(rules().length, 1, "a reply arriving after T-04 started waits for the following start");
 		await writeFile(path.join(agentDir, "settings.json"), JSON.stringify({ workOrchestrator: { stepRetros: false } }));
 		await tool({ action: "next", plan: "55555555", summary: "quiet" });
