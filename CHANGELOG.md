@@ -2,6 +2,12 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Fixed
+
+- AGENTS.md audit and `/wo context_report` no longer fail with "Pi CLI not found" when Pi is an `npm -g` install whose `npm` is not on the PATH (e.g. on a Mac); they now also look next to the running Node.
+
 ## 1.1.2 — 2026-11-20
 
 ### Added

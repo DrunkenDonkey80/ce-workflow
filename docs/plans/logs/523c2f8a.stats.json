@@ -1,47 +1,47 @@
 {
  "version": 1,
- "activeMs": 2068092,
- "runs": 2,
- "waitingMs": 0,
- "toolWallMs": 1993853,
+ "activeMs": 4746293,
+ "runs": 4,
+ "waitingMs": 32816,
+ "toolWallMs": 2892892,
  "compactions": {
   "count": 0,
   "ms": 0
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
-   "replies": 159,
-   "thinkingMs": 623719,
-   "actingMs": 383680,
-   "input": 402,
-   "output": 97811,
-   "cacheRead": 15730548,
-   "cacheWrite": 734534,
-   "cost": 8.7766076,
+   "replies": 210,
+   "thinkingMs": 824899,
+   "actingMs": 464686,
+   "input": 518,
+   "output": 121217,
+   "cacheRead": 21804521,
+   "cacheWrite": 789198,
+   "cost": 10.733306200000003,
    "errors": 0
   }
  },
  "tools": {
   "bash": {
-   "count": 127,
-   "ms": 1723600,
-   "maxMs": 185757,
+   "count": 161,
+   "ms": 2586610,
+   "maxMs": 352183,
    "failures": 6
   },
   "read": {
-   "count": 29,
-   "ms": 499,
-   "maxMs": 45,
+   "count": 35,
+   "ms": 615,
+   "maxMs": 53,
    "failures": 7
   },
   "edit": {
-   "count": 24,
-   "ms": 186,
+   "count": 31,
+   "ms": 233,
    "maxMs": 22,
    "failures": 0
   },
   "compaction_note": {
-   "count": 4,
+   "count": 5,
    "ms": 0,
    "maxMs": 0,
    "failures": 2
@@ -59,22 +59,34 @@
    "failures": 1
   },
   "codemode": {
-   "count": 4,
-   "ms": 122069,
+   "count": 5,
+   "ms": 122135,
    "maxMs": 84868,
-   "failures": 0
+   "failures": 1
   },
   "lens_diagnostic_mark": {
    "count": 7,
    "ms": 32614,
    "maxMs": 7950,
    "failures": 0
+  },
+  "tools_enable": {
+   "count": 1,
+   "ms": 1,
+   "maxMs": 1,
+   "failures": 0
+  },
+  "peer_ls": {
+   "count": 1,
+   "ms": 418,
+   "maxMs": 418,
+   "failures": 0
   }
  },
  "categories": {
   "shell": {
-   "count": 108,
-   "ms": 1252455,
+   "count": 138,
+   "ms": 1262395,
    "maxMs": 184136,
    "failures": 6
   },
@@ -85,9 +97,9 @@
    "failures": 0
   },
   "test": {
-   "count": 16,
-   "ms": 462489,
-   "maxMs": 185757,
+   "count": 20,
+   "ms": 1315559,
+   "maxMs": 352183,
    "failures": 0
   }
  },
@@ -847,6 +859,204 @@
    "ms": 347,
    "maxMs": 347,
    "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"1,12p;44,52p\" CHANGELOG.md | cut -c1-120; git add -u && git add docs/plans/logs/*.stats.json docs/changelog/1.1.2-long-option-title.png && git status --short && git commit -q -m \"1.1": {
+   "count": 1,
+   "ms": 370,
+   "maxMs": 370,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git push origin master 2>&1 | tail -2; git status -sb | head -2; git worktree remove --force \"$TEMP/wt-pre\" 2>&1 | tail -1": {
+   "count": 1,
+   "ms": 3386,
+   "maxMs": 3386,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls node_modules | wc -l; ls -d \"$TEMP/wt-pre\" 2>&1; git worktree list": {
+   "count": 1,
+   "ms": 119,
+   "maxMs": 119,
+   "failures": 0
+  },
+  "bash\u0000ls -A \"$TEMP/wt-pre\"; cmd //c rmdir \"$(cygpath -w \"$TEMP/wt-pre/node_modules\")\" 2>&1; rmdir \"$TEMP/wt-pre\" 2>&1; ls -d \"$TEMP/wt-pre\" 2>&1; ls \"./node_modules\" | wc -l": {
+   "count": 1,
+   "ms": 209,
+   "maxMs": 209,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"355,380p\" hub/scripts/test-browser.mjs | cut -c1-500; grep -n \"const reload\\|async function reload\\|reload = \" hub/scripts/test-browser.mjs | head": {
+   "count": 1,
+   "ms": 206,
+   "maxMs": 206,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"640\\|chat-width\\|hub-chat\\|innerWidth\" hub/web/layout.ts hub/web/app.ts | head -30 | cut -c1-220; grep -n \"viewport\" hub/scripts/test-browser.mjs | head | cut -c1-200": {
+   "count": 1,
+   "ms": 118,
+   "maxMs": 118,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"380\\|--chat-width\" hub/web/styles.css | head | cut -c1-250; grep -n \"380\" hub/web/app.ts hub/web/index.html | head | cut -c1-200": {
+   "count": 1,
+   "ms": 115,
+   "maxMs": 115,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rn \"Pi CLI not found\\|function piCli\\|piCli(\" scripts extensions --include=*.mjs --include=*.ts | head; grep -c \"DEBUG-fl1\" hub/scripts/test-browser.mjs; tasklist | grep -i -c \"node.ex": {
+   "count": 1,
+   "ms": 486,
+   "maxMs": 486,
+   "failures": 0
+  },
+  "bash\u0000ls ~/.pi/agent/install/ ~/.pi/agent/install/releases; ls ~/.pi/agent/install/releases/1.6.0/node_modules/@earendil-works/pi-coding-agent/dist | head; cat ~/.pi/agent/install/releases/1.6.0/node_module": {
+   "count": 1,
+   "ms": 129,
+   "maxMs": 129,
+   "failures": 0
+  },
+  "bash\u0000cat ~/.pi/agent/install/managed-install.json | head -20; cd \"C:/Users/Flex/.pi/agent/install/releases/1.6.0/node_modules/@earendil-works/pi-coding-agent\" && grep -rln \"managed-install\\|install/release": {
+   "count": 1,
+   "ms": 124,
+   "maxMs": 124,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rln \"piCli\" scripts/test-*.mjs | head; node --input-type=module -e \"import('./scripts/tool-usage-census.mjs').then(m => console.log(m.piCli()))\" 2>&1 | tail -1; ls \"$(dirname \"$(which ": {
+   "count": 1,
+   "ms": 227,
+   "maxMs": 227,
+   "failures": 0
+  },
+  "bash\u0000for i in 1 2 3; do echo \"== $i\"; grep -h \"DEBUG-fl1\\|AssertionError\\|Error: Command failed\\|^[0-9]* !== \\|!==\" \"$TEMP/fl$i.log\" | cut -c1-400; done": {
+   "count": 1,
+   "ms": 251,
+   "maxMs": 251,
+   "failures": 0
+  },
+  "bash\u0000grep -n -A14 \"AssertionError\" \"$TEMP/fl2.log\" | cut -c1-300 | head -30; cd \".\" && grep -n \"draft-retry\" hub/web/app.ts | head | cut -c1-300": {
+   "count": 1,
+   "ms": 107,
+   "maxMs": 107,
+   "failures": 0
+  },
+  "bash\u0000grep -n \"at file:\\|test-browser.mjs:\" \"$TEMP/fl2.log\" | head -3 | cut -c1-200; cd \".\" && grep -n \"state.connected = \" hub/web/app.ts | head | cut -c1-250": {
+   "count": 1,
+   "ms": 105,
+   "maxMs": 105,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"690,703p\" hub/scripts/test-browser.mjs | cut -c1-400; sed -n \"3085,3095p;3138,3146p\" hub/web/app.ts | cut -c1-250; grep -n \"\\\"connection\\\")\\.textContent\\|connection.*textContent =\" h": {
+   "count": 1,
+   "ms": 116,
+   "maxMs": 116,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -o \"id=\\\"connection\\\"[^<]*<\" hub/web/index.html; sed -n \"48,56p\" hub/scripts/test-browser.mjs | cut -c1-300": {
+   "count": 1,
+   "ms": 115,
+   "maxMs": 115,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"\\\"download\\\"\\|download\\b.*=>\" hub/src/api.ts hub/src/hub.ts | head -5 | cut -c1-250": {
+   "count": 1,
+   "ms": 80,
+   "maxMs": 80,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rn \"function sendLinkedFile\" hub/src | cut -c1-200": {
+   "count": 1,
+   "ms": 92,
+   "maxMs": 92,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"pasted =\\|pasted,\\|const root\\|root =\" hub/scripts/test-browser.mjs | head -5 | cut -c1-250": {
+   "count": 1,
+   "ms": 67,
+   "maxMs": 67,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"580,592p\" hub/scripts/test-browser.mjs | cut -c1-300; grep -rn \"pasted\\|paste\" hub/src/api.ts | grep -i \"tmp\\|temp\\|dir\" | head -5 | cut -c1-250": {
+   "count": 1,
+   "ms": 114,
+   "maxMs": 114,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"hub spaces\\|spaced, \\\"..\\\"\\|rmSync\" hub/scripts/test-browser.mjs | cut -c1-200 | head": {
+   "count": 1,
+   "ms": 67,
+   "maxMs": 67,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for i in 1 2 3; do (timeout 900 node hub/scripts/test-browser.mjs > \"$TEMP/fl$i.log\" 2>&1; echo \"run$i exit=$?\" >> \"$TEMP/fl$i.log\") & done; wait; for i in 1 2 3; do tail -1 \"$TEMP/fl$i.log\"": {
+   "count": 1,
+   "ms": 202627,
+   "maxMs": 202627,
+   "failures": 0
+  },
+  "bash\u0000grep -n \"snapshot\\|error\\|at file\" \"$TEMP/fl1.log\" | grep -v -i warning | head -8 | cut -c1-300": {
+   "count": 1,
+   "ms": 79,
+   "maxMs": 79,
+   "failures": 0
+  },
+  "bash\u0000sed -n \"18,30p\" \"$TEMP/fl1.log\" | cut -c1-400; cd \".\" && grep -n \"\\\"snapshot\\\"\" hub/scripts/test-browser.mjs | cut -c1-160": {
+   "count": 1,
+   "ms": 111,
+   "maxMs": 111,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for i in 1 2 3; do timeout 900 node hub/scripts/test-browser.mjs > \"$TEMP/fs$i.log\" 2>&1; echo \"run$i exit=$?\"; grep -h \"DEBUG-fl1\\|AssertionError\\|Error: Command failed\\|!==\" \"$TEMP/fs$i.lo": {
+   "count": 1,
+   "ms": 298067,
+   "maxMs": 298067,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for i in 1 3; do echo \"== $i\"; grep -n \"test-browser.mjs:[0-9]*\\|killed\\|stdout\\|Wait timed\" \"$TEMP/fs$i.log\" | cut -c1-250 | head -5; done; grep -o \"eval -b [A-Za-z0-9+/=]*\" \"$TEMP/fs1.log\"": {
+   "count": 1,
+   "ms": 193,
+   "maxMs": 193,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"async function browser\\|const browser\\|function evaluate\\|const evaluate\" hub/scripts/test-browser.mjs | head; sed -n \"20,47p\" hub/scripts/test-browser.mjs | cut -c1-250": {
+   "count": 1,
+   "ms": 127,
+   "maxMs": 127,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for i in 1 2 3; do timeout 900 node hub/scripts/test-browser.mjs > \"$TEMP/fs$i.log\" 2>&1; echo \"run$i exit=$?\"; grep -h \"DEBUG-fl1] retry\\|AssertionError\\|Error: \\| from \" \"$TEMP/fs$i.log\" |": {
+   "count": 1,
+   "ms": 352183,
+   "maxMs": 352183,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n -A8 \"AssertionError\" \"$TEMP/fs2.log\" | cut -c1-250 | head -12; grep -n \"stdout\" \"$TEMP/fs3.log\" | cut -c1-300; grep -n \"typing searches\" hub/scripts/test-browser.mjs | cut -c1-50; se": {
+   "count": 1,
+   "ms": 175,
+   "maxMs": 175,
+   "failures": 0
+  },
+  "bash\u0000wmic cpu get loadpercentage 2>/dev/null | tr -s \" \\r\\n\" \" \"; echo; agent-browser --version 2>&1 | head -1; tasklist /fo csv 2>/dev/null | grep -i -c \"\\\"node.exe\\\"\"; wmic process where \"name='node.exe'": {
+   "count": 1,
+   "ms": 468,
+   "maxMs": 468,
+   "failures": 0
+  },
+  "bash\u0000powershell -NoProfile -Command \"(Get-CimInstance Win32_Processor).LoadPercentage; Get-Process node,chrome,pi -ErrorAction SilentlyContinue | Group-Object Name | Select Name,Count | Format-Table -HideT": {
+   "count": 2,
+   "ms": 2107,
+   "maxMs": 1822,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"DEBUG-fl1\" hub/scripts/test-browser.mjs | cut -c1-60": {
+   "count": 1,
+   "ms": 71,
+   "maxMs": 71,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -c \"DEBUG-fl1\" hub/scripts/test-browser.mjs; node --check hub/scripts/test-browser.mjs && echo syntax-ok; git diff --stat": {
+   "count": 1,
+   "ms": 199,
+   "maxMs": 199,
+   "failures": 0
   }
  },
  "steps": {
@@ -878,11 +1088,11 @@
    "failures": 6
   },
   "(none)": {
-   "ms": 1444372,
-   "testMs": 386497,
-   "replies": 38,
+   "ms": 2590216,
+   "testMs": 1239567,
+   "replies": 89,
    "models": {
-    "anthropic/claude-opus-5-5:high": 38
+    "anthropic/claude-opus-5-5:high": 89
    },
    "commands": {
     "bash\u0000cd \".\" && git log --since=\"2026-11-18\" --format=\"%h %ad %s\" --date=format:\"%m-%d %H:%M\" | head -60; ls docs/plans/*.md 2>/dev/null; ls docs/plans/done | grep \"2026-11-1[89]\\|2026-11-2\"": {
@@ -1076,9 +1286,117 @@
      "ms": 347,
      "maxMs": 347,
      "failures": 0
+    },
+    "bash\u0000cd \".\" && sed -n \"1,12p;44,52p\" CHANGELOG.md | cut -c1-120; git add -u && git add docs/plans/logs/*.stats.json docs/changelog/1.1.2-long-option-title.png && git status --short && git commit -q -m \"1.1": {
+     "count": 1,
+     "ms": 370,
+     "maxMs": 370,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && git push origin master 2>&1 | tail -2; git status -sb | head -2; git worktree remove --force \"$TEMP/wt-pre\" 2>&1 | tail -1": {
+     "count": 1,
+     "ms": 3386,
+     "maxMs": 3386,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && ls node_modules | wc -l; ls -d \"$TEMP/wt-pre\" 2>&1; git worktree list": {
+     "count": 1,
+     "ms": 119,
+     "maxMs": 119,
+     "failures": 0
+    },
+    "bash\u0000ls -A \"$TEMP/wt-pre\"; cmd //c rmdir \"$(cygpath -w \"$TEMP/wt-pre/node_modules\")\" 2>&1; rmdir \"$TEMP/wt-pre\" 2>&1; ls -d \"$TEMP/wt-pre\" 2>&1; ls \"./node_modules\" | wc -l": {
+     "count": 1,
+     "ms": 209,
+     "maxMs": 209,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && sed -n \"355,380p\" hub/scripts/test-browser.mjs | cut -c1-500; grep -n \"const reload\\|async function reload\\|reload = \" hub/scripts/test-browser.mjs | head": {
+     "count": 1,
+     "ms": 206,
+     "maxMs": 206,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && grep -n \"640\\|chat-width\\|hub-chat\\|innerWidth\" hub/web/layout.ts hub/web/app.ts | head -30 | cut -c1-220; grep -n \"viewport\" hub/scripts/test-browser.mjs | head | cut -c1-200": {
+     "count": 1,
+     "ms": 118,
+     "maxMs": 118,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && grep -n \"380\\|--chat-width\" hub/web/styles.css | head | cut -c1-250; grep -n \"380\" hub/web/app.ts hub/web/index.html | head | cut -c1-200": {
+     "count": 1,
+     "ms": 115,
+     "maxMs": 115,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && grep -rn \"Pi CLI not found\\|function piCli\\|piCli(\" scripts extensions --include=*.mjs --include=*.ts | head; grep -c \"DEBUG-fl1\" hub/scripts/test-browser.mjs; tasklist | grep -i -c \"node.ex": {
+     "count": 1,
+     "ms": 486,
+     "maxMs": 486,
+     "failures": 0
+    },
+    "bash\u0000ls ~/.pi/agent/install/ ~/.pi/agent/install/releases; ls ~/.pi/agent/install/releases/1.6.0/node_modules/@earendil-works/pi-coding-agent/dist | head; cat ~/.pi/agent/install/releases/1.6.0/node_module": {
+     "count": 1,
+     "ms": 129,
+     "maxMs": 129,
+     "failures": 0
+    },
+    "bash\u0000cat ~/.pi/agent/install/managed-install.json | head -20; cd \"C:/Users/Flex/.pi/agent/install/releases/1.6.0/node_modules/@earendil-works/pi-coding-agent\" && grep -rln \"managed-install\\|install/release": {
+     "count": 1,
+     "ms": 124,
+     "maxMs": 124,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && grep -rln \"piCli\" scripts/test-*.mjs | head; node --input-type=module -e \"import('./scripts/tool-usage-census.mjs').then(m => console.log(m.piCli()))\" 2>&1 | tail -1; ls \"$(dirname \"$(which ": {
+     "count": 1,
+     "ms": 227,
+     "maxMs": 227,
+     "failures": 0
+    },
+    "bash\u0000for i in 1 2 3; do echo \"== $i\"; grep -h \"DEBUG-fl1\\|AssertionError\\|Error: Command failed\\|^[0-9]* !== \\|!==\" \"$TEMP/fl$i.log\" | cut -c1-400; done": {
+     "count": 1,
+     "ms": 251,
+     "maxMs": 251,
+     "failures": 0
+    },
+    "bash\u0000grep -n -A14 \"AssertionError\" \"$TEMP/fl2.log\" | cut -c1-300 | head -30; cd \".\" && grep -n \"draft-retry\" hub/web/app.ts | head | cut -c1-300": {
+     "count": 1,
+     "ms": 107,
+     "maxMs": 107,
+     "failures": 0
+    },
+    "bash\u0000grep -n \"at file:\\|test-browser.mjs:\" \"$TEMP/fl2.log\" | head -3 | cut -c1-200; cd \".\" && grep -n \"state.connected = \" hub/web/app.ts | head | cut -c1-250": {
+     "count": 1,
+     "ms": 105,
+     "maxMs": 105,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && sed -n \"690,703p\" hub/scripts/test-browser.mjs | cut -c1-400; sed -n \"3085,3095p;3138,3146p\" hub/web/app.ts | cut -c1-250; grep -n \"\\\"connection\\\")\\.textContent\\|connection.*textContent =\" h": {
+     "count": 1,
+     "ms": 116,
+     "maxMs": 116,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && grep -o \"id=\\\"connection\\\"[^<]*<\" hub/web/index.html; sed -n \"48,56p\" hub/scripts/test-browser.mjs | cut -c1-300": {
+     "count": 1,
+     "ms": 115,
+     "maxMs": 115,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && grep -n \"\\\"download\\\"\\|download\\b.*=>\" hub/src/api.ts hub/src/hub.ts | head -5 | cut -c1-250": {
+     "count": 1,
+     "ms": 80,
+     "maxMs": 80,
+     "failures": 0
+    },
+    "bash\u0000cd \".\" && grep -rn \"function sendLinkedFile\" hub/src | cut -c1-200": {
+     "count": 1,
+     "ms": 92,
+     "maxMs": 92,
+     "failures": 0
     }
    },
-   "failures": 4
+   "failures": 5
   }
  },
  "spans": [
@@ -1089,7 +1407,20 @@
   {
    "start": "2026-11-20T17:46:56.496Z",
    "ms": 28390
+  },
+  {
+   "start": "2026-11-20T19:22:33.114Z",
+   "ms": 1543767
+  },
+  {
+   "start": "2026-11-20T19:53:00.782Z",
+   "ms": 1134434
   }
  ],
- "hints": []
+ "hints": [
+  {
+   "at": "2026-11-20T20:04:13.882Z",
+   "shape": "for i"
+  }
+ ]
 }

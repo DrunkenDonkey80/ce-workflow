@@ -111,6 +111,9 @@ export function piCli() {
 	const releases = path.join(os.homedir(), ".pi", "agent", "install", "releases");
 	const installed = (existsSync(releases) ? readdirSync(releases) : []).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
 		.map((v) => path.join(releases, v, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "bundle", "cli.js"));
+	// npm -g under the node running us (macOS/Linux: <prefix>/lib/node_modules, Windows: <prefix>/node_modules); npm itself may be off PATH.
+	const bin = path.dirname(process.execPath), pkg = ["@earendil-works", "pi-coding-agent", "dist", "bundle", "cli.js"];
+	installed.push(path.join(bin, "..", "lib", "node_modules", ...pkg), path.join(bin, "node_modules", ...pkg));
 	if (installed.some(existsSync)) return installed.find(existsSync);
 	let npmRoot = "";
 	try { npmRoot = execFileSync("npm", ["root", "-g"], { encoding: "utf8", shell: true }).trim(); } catch {}

@@ -21,7 +21,10 @@ const hostAgentDir=process.env.PI_CODING_AGENT_DIR??join(os.homedir(),".pi","age
 async function browser(...args) {
  if (process.env.BROWSER_TRACE) console.error(Math.round(performance.now() / 1000) + "s", args.join(" ").slice(0, 100));
  // execFile's timeout can't end a call whose pipe the agent-browser daemon still holds (Windows), so a failed wait hung the run.
+ // The async failure loses the caller; name the test line so a flaky step is findable without rerunning.
+ const caller = new Error().stack.split("\n").find(line => line.includes("test-browser.mjs") && !/\bat (?:browser|evaluate|clickShown) /.test(line))?.trim() ?? "";
  const run = execute(binary, ["--session", session, "--json", ...args], { timeout: 30_000, maxBuffer: 2_000_000, windowsHide: true }); let timer;
+ run.catch(error => { error.message += "\n  from " + caller; });
  const { stdout } = await Promise.race([run, new Promise((_, reject) => { timer = setTimeout(() => { run.child.kill(); reject(new Error("agent-browser timed out: " + args.join(" ").slice(0, 200))); }, 35_000); })]).finally(() => clearTimeout(timer));
  let result; try { result = JSON.parse(stdout); } catch { throw new Error("agent-browser returned non-JSON: " + stdout.slice(0, 500)); }
  assert(result.success, JSON.stringify(result)); return result.data;
@@ -309,7 +312,8 @@ try {
   await browser("wait", "#draft-retry:not([hidden])");
   const saved = await evaluate("JSON.parse(localStorage.getItem('plan3-draft:' + location.pathname.split('/')[2])).pending.request.references.submission");
   assert.equal(messages.length, sentBefore, "a refused delivery reaches no agent");
-  await reload("document.getElementById('draft-retry').checkVisibility() && !document.getElementById('connection').textContent.includes('Disconnected')");
+  // Enabled, not just visible: Retry stays disabled until the first snapshot connects (the page starts at "Connecting…").
+  await reload("document.getElementById('draft-retry').checkVisibility() && !document.getElementById('draft-retry').disabled");
   await browser("click", "#draft-retry"); await browser("wait", "--fn", "document.getElementById('draft-recovery').hidden && !document.getElementById('send').disabled");
   assert.equal(messages.length, sentBefore + 1); assert.equal(messages.at(-1).bundle, saved, "retry reuses the frozen submission ID");
   assert.equal(messages.at(-1).references, undefined, "the agent receives a bundle ID, not browser selections");
@@ -691,7 +695,7 @@ try {
  }
  // Quoted or backticked paths may hold spaces (and _ that is not italics); file:/// URLs link to their decoded path.
  {
-  const spaced = join(pasted, "..", "_pi_ hub spaces", "shot one.png"), decoded = spaced.replaceAll("\\", "/"), fileUrl = "file:///" + decoded.replace(/^\//, "").replaceAll(" ", "%20"), bare = process.platform === "win32" ? "C:\\tmp\\a.png" : "/tmp/a.png";
+  const spaced = join(root, "_pi_ hub spaces", "shot one.png") /* own root: a shared temp folder is deleted by parallel runs */, decoded = spaced.replaceAll("\\", "/"), fileUrl = "file:///" + decoded.replace(/^\//, "").replaceAll(" ", "%20"), bare = process.platform === "win32" ? "C:\\tmp\\a.png" : "/tmp/a.png";
   fs.mkdirSync(join(spaced, ".."), { recursive: true }); fs.copyFileSync(pasted, spaced);
   const row = { id: "space_row", role: "agent", text: `quoted "${spaced}" and \`${spaced}\` and ${fileUrl}. [pic](${fileUrl}) "docs/my notes.md" "/review docs/plan.md" \`/review docs/plan.md\` "see docs/notes.md" "hello world" file:///C:/archive.png/photo.png file:///C:/a.txt my shot one.png "oops ${bare}\n\n\`\`\`\nsaved "${spaced}"\n\`\`\``, streaming: false }; chatRows.set(row.id, row); publish("message", row);
   await browser("wait", "--fn", "[...document.querySelectorAll('[data-id=space_row] .thumb img')].some(img => img.naturalWidth > 0)");
