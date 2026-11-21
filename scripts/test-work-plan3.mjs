@@ -2262,8 +2262,12 @@ try {
 		entries.push({ type: "custom", customType: "plan3-night", data: null });
 		await hooks.get("session_start")({ reason: "resume" }, ctx);
 		await assert.rejects(tool({ action: "status", plan: map.id, value: "complete" }), /Map ticket T-02 is still open/);
-		for (const id of ["T-02", "T-03"]) await tool({ action: "step", plan: map.id, id, mark: "done", summary: "Resolved." });
-		await writeFile(map.file, (await readFile(map.file, "utf8")).replace("## Not yet specified\n\nNone.", "## Not yet specified\n\nExporter batching."));
+		await writeFile(map.file, (await readFile(map.file, "utf8")).replace("## Not yet specified\n\nNone.", "## Not yet specified\n\n- Exporter batching."));
+		const closed = await tool({ action: "step", plan: map.id, id: "T-02", mark: "done", summary: "Resolved." });
+		assert.deepEqual(closed.notYetSpecified, ["- Exporter batching."], "closing a map ticket shows the fog to graduate");
+		assert.match(closed.graduate, /remove the line from Not yet specified/);
+		assert.equal((await tool({ action: "checkpoint", plan: map.id, text: "x" })).notYetSpecified, undefined, "only on ticket close or add");
+		await tool({ action: "step", plan: map.id, id: "T-03", mark: "done", summary: "Resolved." });
 		await assert.rejects(tool({ action: "status", plan: map.id, value: "complete" }), /resolve the fog first/);
 		await rm(map.file);
 

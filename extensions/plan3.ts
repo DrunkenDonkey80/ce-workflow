@@ -1962,6 +1962,10 @@ export default function plan3(pi) {
 			}
 			const fresh = summarize(file, freshText, path.dirname(file) === doneDir(ctx.cwd) ? "done" : "plans");
 			const packetBytes = fresh.status === "complete" ? 0 : Buffer.byteLength(resumePacket(freshText, availOf(file)));
+			// A live map once kept a fog line its T-05 answer had settled (tickets added, line left): show the fog when a ticket closes or tickets are added.
+			const freshLines = split(freshText).lines, fogAt = (args.action === "next" || args.action === "add" || (args.action === "step" && args.mark === "done")) && isMap(freshLines) && section(freshLines, "Not yet specified");
+			const fogLines = fogAt ? freshLines.slice(fogAt.start + 1, fogAt.end).filter((line) => /^\s*-\s/.test(line)).map((line) => line.trim()) : [];
+			if (fogLines.length) Object.assign(result, { notYetSpecified: fogLines, graduate: "If this answer settled any of these lines, add its tickets (plan3 add) and remove the line from Not yet specified (edit); the map cannot complete while a settled line remains." });
 			if (packetBytes > PLAN_WARN_BYTES) result.warning = `Resume packet is ${Math.round(packetBytes / 1024)} KB; /plans3 \u2192 Optimize compacts the plan.`;
 			if (args.action !== "get" && (pointer(ctx).id !== fresh.id || result.file)) setPointer(fresh, pointer(ctx).planning);
 			await refresh(ctx);
