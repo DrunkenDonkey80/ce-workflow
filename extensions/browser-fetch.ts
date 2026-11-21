@@ -93,9 +93,11 @@ export async function dnsCheck(host: string, resolve: typeof lookup = lookup) {
 }
 
 type Grant = { until: number | null };
-/** browser_act control grants (plan 607b2518 D5): always timed, separate from read grants. */
-export type Policy = { blocked: string[]; grants: Record<string, Grant>; control: Record<string, { until: number }>; corrupt?: string };
+/** browser_act control grants (plan 607b2518 D5): timed, or until: null for a site the user allows always; separate from read grants. */
+export type Policy = { blocked: string[]; grants: Record<string, Grant>; control: Record<string, Grant>; corrupt?: string };
 export const CONTROL_MINUTES = [10, 20, 30];
+/** Deadline reported for an always-allowed control grant (31 Dec 9999): the add-on and the prompts need a number. */
+export const CONTROL_ALWAYS = 253402300799000;
 const policyFile = () => path.join(fetchDir(), "policy.json");
 export const logFile = () => path.join(fetchDir(), "log.jsonl");
 
@@ -109,8 +111,7 @@ export function readPolicy(): Policy {
 		if (!Array.isArray(value?.blocked) || !value.blocked.every(entry => typeof entry === "string") || !map(value.grants) || (value.control !== undefined && !map(value.control))) throw new Error("unexpected shape");
 		const grants: Record<string, Grant> = {}, control: Policy["control"] = {};
 		for (const [host, grant] of Object.entries(value.grants as Record<string, Grant>)) if (grant && (grant.until === null || Number.isFinite(grant.until))) grants[host] = { until: grant.until };
-		// a control grant without a finite deadline is dropped: control is never "always"
-		for (const [host, grant] of Object.entries((value.control ?? {}) as Record<string, Grant>)) if (Number.isFinite(grant?.until)) control[host] = { until: grant.until! };
+		for (const [host, grant] of Object.entries((value.control ?? {}) as Record<string, Grant>)) if (grant && (grant.until === null || Number.isFinite(grant.until))) control[host] = { until: grant.until };
 		return { blocked: value.blocked, grants, control };
 	} catch (error) {
 		return { blocked: [], grants: {}, control: {}, corrupt: `${file} is unreadable (${(error as Error).message}); fix or delete it` };
@@ -123,7 +124,8 @@ export const granted = (policy: Policy, host: string, now = Date.now()) => {
 };
 /** Deadline of a live control grant for the host, or undefined. */
 export const controlUntil = (policy: Policy, host: string, now = Date.now()) => {
-	const until = policy.corrupt ? undefined : policy.control[grantKey(host)]?.until;
+	const grant = policy.corrupt ? undefined : policy.control[grantKey(host)];
+	const until = grant && (grant.until ?? CONTROL_ALWAYS);
 	return until !== undefined && until > now ? until : undefined;
 };
 
@@ -149,7 +151,7 @@ export async function updatePolicy(change: (policy: Policy) => void) {
 		change(policy);
 		const now = Date.now();
 		for (const [host, grant] of Object.entries(policy.grants)) if (grant.until !== null && grant.until <= now) delete policy.grants[host];
-		for (const [host, grant] of Object.entries(policy.control)) if (!(grant.until > now)) delete policy.control[host];
+		for (const [host, grant] of Object.entries(policy.control)) if (grant.until !== null && grant.until <= now) delete policy.control[host];
 		writeFileSync(temporary, JSON.stringify({ blocked: [...new Set(policy.blocked)], grants: policy.grants, control: policy.control }, null, 1));
 		renameSync(temporary, policyFile());
 	} finally {

@@ -14,7 +14,7 @@ const agent = mkdtempSync(path.join(os.tmpdir(), "browser-fetch-test-"));
 process.env.PI_CODING_AGENT_DIR = agent;
 process.env.PI_BROWSER_FETCH_PIPE = path.join(agent, "no-host.sock"); // never the real browser, nor WSL's Windows one
 const bf = await import("../extensions/browser-fetch.ts");
-const { checkUrl, privateIp, blockedList, readPolicy, updatePolicy, granted, controlUntil, grantKey, blockEntry, dnsCheck, fetchDir, DEFAULT_BLOCKED, extensionId } = bf;
+const { checkUrl, privateIp, blockedList, readPolicy, updatePolicy, granted, controlUntil, CONTROL_ALWAYS, grantKey, blockEntry, dnsCheck, fetchDir, DEFAULT_BLOCKED, extensionId } = bf;
 
 try {
 	// URL checks (D16, R1)
@@ -63,7 +63,9 @@ try {
 	assert.equal(granted(policy, "shop.test"), false, "a control grant is not a read grant");
 	assert.equal(policy.control["gone.test"], undefined, "expired control grants pruned on write");
 	writeFileSync(path.join(fetchDir(), "policy.json"), JSON.stringify({ blocked: [], grants: {}, control: { "x.test": { until: null } } }));
-	assert.equal(controlUntil(readPolicy(), "x.test"), undefined, "control is never always");
+	assert.equal(controlUntil(readPolicy(), "www.x.test"), CONTROL_ALWAYS, "an always control grant reports the far deadline");
+	await updatePolicy(() => {});
+	assert.deepEqual(readPolicy().control["x.test"], { until: null }, "an always control grant survives pruning");
 	writeFileSync(path.join(fetchDir(), "policy.json"), JSON.stringify({ blocked: [], grants: {}, control: [] }));
 	assert.match(readPolicy().corrupt, /unexpected shape/, "a malformed control map fails closed");
 	writeFileSync(path.join(fetchDir(), "policy.json"), "{broken");
@@ -802,7 +804,7 @@ async function actPiSide() {
 		await assert.rejects(run({ action: "open", url: "https://shop.test/" }, { cwd: agent, hasUI: false }), /not approved/);
 		let labels;
 		await assert.rejects(run({ action: "open", url: "https://shop.test/" }, { cwd: agent, hasUI: true, ui: { select: async (_t, l) => { labels = l; return "Deny"; } } }), /denied/);
-		assert.deepEqual(labels, ["Allow control of shop.test for 10 minutes", "Allow control of shop.test for 20 minutes", "Allow control of shop.test for 30 minutes", "Deny"]);
+		assert.deepEqual(labels, ["Allow control of shop.test for 10 minutes", "Allow control of shop.test for 20 minutes", "Allow control of shop.test for 30 minutes", "Always allow control of shop.test — Until you revoke it in /wo → Settings → Browser access → Controlled sites. Risky actions and uploads still ask.", "Deny"]);
 		assert.equal(got.length, 0, "nothing reaches the browser before a grant");
 		picks = ["Allow control of shop.test for 10 minutes"];
 		assert.match(await run({ action: "open", url: "https://shop.test/" }), /URL: https:\/\/shop\.test\//);
