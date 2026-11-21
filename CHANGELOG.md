@@ -15,6 +15,9 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - `test_sensitivity`: when the baseline fails, the message now also covers missing ignored generated files (such as a Prisma client) and a bare `bash` on Windows that starts WSL.
 - Hub: opening a file no longer shrinks the chat to its thinnest column; it stays at its 640 px width, and the file list beside the viewer is half as wide.
 - `browser_act`: besides 10, 20 or 30 minutes you can now allow a site always. It lasts until you revoke it in `/wo → Settings → Browser access → Controlled sites`; risky actions and uploads still ask.
+- `test_sensitivity` now works on a file in another repository: pass its absolute (or `../`) path and the check runs from that repository's root, with the same copy and restore safeguards.
+- `ask_user` refuses a question that names an image file that does not exist, so you are never asked to judge a render that was not written yet.
+- `compaction_note` now asks for about 2000 characters (limit still 2500) and says a design or decision that exists only in the agent's head goes into the plan first, with the note pointing to it.
 - `test_sensitivity`: a failure marker written with JSON escapes (\" for a quote) no longer just comes back inconclusive; the message gives the text as printed, to retry with.
 
 ## 1.1.5 — 2026-11-20

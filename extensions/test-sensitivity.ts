@@ -34,9 +34,20 @@ export async function runSensitivity(cwd, input, exec, signal) {
 		if (!green(result)) throw new Error(`Git snapshot unavailable: ${output(result).slice(-2000)}`);
 		return result.stdout;
 	};
+	let name = String(input.file ?? "").replace(/^@/, "");
+	if (path.isAbsolute(name) || name.split(/[\\/]/).includes("..")) {
+		// A file in another repository (e.g. a sibling engine repo): run the check from that repository's root.
+		let foreign;
+		try { foreign = await realpath(path.resolve(cwd, name)); } catch { throw new Error(`File not found: ${path.resolve(cwd, name)}`); }
+		cwd = path.dirname(foreign);
+		cwd = await realpath((await git(["rev-parse", "--show-toplevel"])).trim());
+		name = path.relative(cwd, foreign);
+	}
 	const root = await realpath((await git(["rev-parse", "--show-toplevel"])).trim());
-	const source = local(cwd, input.file.replace(/^@/, ""));
-	if (!inside(root, await realpath(source))) throw new Error("Mutation target resolves outside the repository");
+	const source = local(cwd, name);
+	let resolved;
+	try { resolved = await realpath(source); } catch { throw new Error(`File not found: ${source}. For a file in another repository pass its absolute path`); }
+	if (!inside(root, resolved)) throw new Error("Mutation target resolves outside the repository");
 	const target = path.relative(root, source);
 	const dependencies = [...new Set(input.dependencyDirs ?? [])].map(name => local(root, name));
 	for (const dir of dependencies) {
@@ -124,9 +135,9 @@ export function registerTestSensitivity(pi) {
 		description: "Check one meaningful production-code mutation using an existing local test executable. Copies current Git tracked and nonignored untracked files (including dirty edits), not Git metadata; never patches the original. Runs green baseline → mutant → restored. Select a specific failing assertion marker absent from passing output, not a test name. No syntax errors, test edits, unconditional throws, live services or destructive test commands. Source isolation is not an OS sandbox; optional dependency directories are shared. Missing ignored fixtures or unsupported layouts remain inconclusive. Review the assertion before claiming the bug is caught.",
 		promptSnippet: "Prove a focused test catches a deliberate bug in a disposable source copy",
 		parameters: { type: "object", properties: {
-			file: { type: "string", description: "Production source file relative to current project directory" },
+			file: { type: "string", description: "Production source file relative to current project directory, or an absolute path into another Git repository (the check then runs from that repository's root)" },
 			oldText: { type: "string", minLength: 1 }, newText: { type: "string" },
-			command: { type: "string", minLength: 1, description: "Existing test executable, no shell interpolation; runs from the copy of the current project directory, so paths in args are relative to it" },
+			command: { type: "string", minLength: 1, description: "Existing test executable, no shell interpolation; runs from the copy of the current project directory (or of the other repository's root), so paths in args are relative to it" },
 			args: { type: "array", items: { type: "string" }, maxItems: 100 },
 			expectedFailure: { type: "string", minLength: 1, description: "Specific assertion failure text, not merely a test name or generic exit status" },
 			dependencyDirs: { type: "array", items: { type: "string" }, maxItems: 8, description: "Optional installed dependency or ignored generated directories relative to Git root (e.g. node_modules, a generated Prisma client); linked, not copied. Must contain no tracked source." },

@@ -1431,7 +1431,7 @@ function compactionNoteNudge(event, ctx) {
 	try { trigger = compactTriggerTokens(ctx, readEffectiveSettings(ctx.cwd)); } catch { return undefined; }
 	if (!tokens || tokens < trigger * 0.85) return undefined;
 	return { messages: [...event.messages, { role: "custom", customType: "compaction-note-nudge", display: false, timestamp: Date.now(),
-		content: `[context] ${tokens.toLocaleString("en-US")} of ~${trigger.toLocaleString("en-US")} tokens before automatic compaction. Keep working; when you reach a natural stopping point, call ${COMPACTION_NOTE_TOOL} once: exact next action first, then only what is not already in the plan, sidecar log or git (boundaries, plan path, HEAD, current step, environment and tool gotchas), under ${COMPACTION_NOTE_MAX} characters.` }] };
+		content: `[context] ${tokens.toLocaleString("en-US")} of ~${trigger.toLocaleString("en-US")} tokens before automatic compaction. Keep working; when you reach a natural stopping point, call ${COMPACTION_NOTE_TOOL} once: exact next action first, then only what is not already in the plan, sidecar log or git (boundaries, plan path, HEAD, current step, environment and tool gotchas), about ${COMPACTION_NOTE_MAX - 500} characters (hard limit ${COMPACTION_NOTE_MAX}). Record an unrecorded design or decision in the plan first and point to it.` }] };
 }
 
 function storeCompactionKnowledge(ctx, claims, bucket) {
@@ -3684,7 +3684,7 @@ export default function workModelsExtension(pi) {
 	registerConstrainedTool(pi, {
 		name: COMPACTION_NOTE_TOOL,
 		label: "Compaction Note",
-		description: `Leave a note to your future self that is copied verbatim into the next context compaction summary. Call once when told compaction is near. Put the exact next action FIRST, then only what exists nowhere else: boundaries, plan path, HEAD, current step, environment and tool gotchas. Never copy step text, decisions or finished-work details already in the plan, its sidecar log or git. At most ${COMPACTION_NOTE_MAX} characters with normal spacing; longer notes are rejected. A newer note replaces the older one.`,
+		description: `Leave a note to your future self that is copied verbatim into the next context compaction summary. Call once when told compaction is near. Put the exact next action FIRST, then only what exists nowhere else: boundaries, plan path, HEAD, current step, environment and tool gotchas. Never copy step text, decisions or finished-work details already in the plan, its sidecar log or git. A design or decision that exists only in your head belongs in the plan first (plan3 section or step note); the note then points to it. Aim for about ${COMPACTION_NOTE_MAX - 500} characters: at most ${COMPACTION_NOTE_MAX} with normal spacing, longer notes are rejected. A newer note replaces the older one.`,
 		parameters: {
 			type: "object", additionalProperties: false, required: ["note"],
 			properties: { note: { type: "string", minLength: 1 } },
@@ -3692,7 +3692,7 @@ export default function workModelsExtension(pi) {
 		execute(_id, args) {
 			const note = String(args.note ?? "").trim();
 			if (!note) throw new Error("The compaction note must not be empty.");
-			if (note.length > COMPACTION_NOTE_MAX) throw new Error(`Not saved: the note is ${note.length} characters; the limit is ${COMPACTION_NOTE_MAX}. Cut at least ${note.length - COMPACTION_NOTE_MAX + 200} characters (models undercount; a 200-character margin avoids another retry). Drop anything already in the plan, sidecar log or git and call again with normal spacing.`);
+			if (note.length > COMPACTION_NOTE_MAX) throw new Error(`Not saved: the note is ${note.length} characters; the limit is ${COMPACTION_NOTE_MAX}. Cut at least ${note.length - COMPACTION_NOTE_MAX + 200} characters (models undercount; a 200-character margin avoids another retry). Drop anything already in the plan, sidecar log or git; move an unrecorded design or decision into the plan (plan3 section or step note) and point to it; then call again with normal spacing.`);
 			return { content: [{ type: "text", text: "Saved; it will be included verbatim in the next compaction summary. Continue working." }] };
 		},
 	});

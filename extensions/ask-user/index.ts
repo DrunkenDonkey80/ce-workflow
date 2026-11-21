@@ -43,6 +43,7 @@ import {
 import { renderSingleSelectRows, type QuestionOption } from "./single-select-layout.ts";
 import { raceRemoteAsk, remoteResponse, remoteBatch } from "./remote.ts";
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -2933,6 +2934,11 @@ export function registerAskUser(pi: ExtensionAPI) {
       }),
 
       async execute(_toolCallId, params, signal, onUpdate, ctx) {
+         // Asking the user to judge a render that was never written wastes their verdict; refuse before showing it.
+         const texts: string[] = [];
+         JSON.stringify(params, (_key, value) => (typeof value === "string" && texts.push(value), value));
+         const missing = (texts.join("\n").match(/(?<![\w:/.])(?:[A-Za-z]:[\\/]|\/)[^\s"'`<>|*?]*?\.(?:png|jpe?g|webp|gif)\b/gi) ?? []).filter((file) => !existsSync(file));
+         if (missing.length) throw new Error(`Not asked: referenced image ${missing.join(", ")} does not exist. Render it, open it with read and check it before asking the user to judge it.`);
          if ((params as AskParams).questions != null) {
             if (signal?.aborted) {
                return {

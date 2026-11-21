@@ -89,7 +89,16 @@ try {
 	assert.equal((await run({ args: ["dependency-test.mjs"], dependencyDirs: ["deps"] })).status, "caught");
 	assert.equal(await readFile(path.join(cwd, "deps/limit.mjs"), "utf8"), "export const limit = 10;\n", "cleanup must not follow dependency links");
 	await assert.rejects(runSensitivity(cwd, { ...input, dependencyDirs: ["src"] }, exec), /shared dependency/);
-	for (const file of ["../outside.mjs", ".git/config", path.join(cwd, "src/guard.mjs")]) await assert.rejects(runSensitivity(cwd, { ...input, file }, exec), /relative project path/);
+	await assert.rejects(runSensitivity(cwd, { ...input, file: ".git/config" }, exec), /relative project path/);
+	await assert.rejects(runSensitivity(cwd, { ...input, file: "../outside.mjs" }, exec), /File not found/);
+	const sibling = await mkdtemp(path.join(os.tmpdir(), "test-sensitivity-sibling-"));
+	try {
+		await exec("git", ["init", "--quiet"], { cwd: sibling });
+		for (const file of [path.join(cwd, "src/guard.mjs"), path.relative(sibling, path.join(cwd, "src/guard.mjs"))]) {
+			const foreign = await run({ file }, exec, sibling);
+			assert.deepEqual([foreign.status, foreign.file], ["caught", path.join("src", "guard.mjs")], "a file in another repository runs the check from that repository's root");
+		}
+	} finally { await rm(sibling, { recursive: true, force: true }); }
 	await assert.rejects(runSensitivity(cwd, { ...input, oldText: "" }, exec), /nonempty/);
 	await assert.rejects(runSensitivity(cwd, { ...input, expectedFailure: " " }, exec), /specific assertion/);
 

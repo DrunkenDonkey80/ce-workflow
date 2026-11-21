@@ -25,6 +25,8 @@ assert.equal(tool.exposure, "model-only");
 assert.equal(tool.parameters.properties.questions.maxItems, 4);
 await assert.rejects(tool.execute("a", { question: "Choose?" }, undefined, undefined, { hasUI: false }), /interactive mode/);
 await assert.rejects(tool.execute("b", { questions: [{ question: "Only one?" }] }, undefined, undefined, { hasUI: false }), /2-4/);
+const absent = path.join(homedir(), "no-such-render-t17.png");
+await assert.rejects(tool.execute("img", { questions: [{ question: "Ok?" }, { question: "Designer-made?", context: `Renders:\n${absent} and https://img.test/1.jpg` }] }, undefined, undefined, { hasUI: false }), (error) => error.message.includes(`referenced image ${absent} does not exist`), "a judged render must exist before the user is asked");
 const result = await tool.execute("c", { question: "Cancelled?" }, AbortSignal.abort(), undefined, { hasUI: false });
 assert.equal(result.details.cancelled, true);
 
