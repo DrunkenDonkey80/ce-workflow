@@ -12,6 +12,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - Plan3 maps: closing a ticket or adding tickets now shows the map's remaining **Not yet specified** lines, so a line the answer settled gets removed instead of lingering and blocking completion.
 - Plan3 step self-analysis now finishes before the next step starts (about 20 seconds), so its work rules reach the very next step instead of the one after it.
 - The step self-analysis now sees failed edit, read and search calls with their error message, not only failed shell commands.
+- `test_sensitivity`: when the baseline fails, the message now also covers missing ignored generated files (such as a Prisma client) and a bare `bash` on Windows that starts WSL.
 
 ## 1.1.5 — 2026-11-20
 

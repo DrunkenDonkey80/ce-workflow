@@ -86,7 +86,7 @@ export async function runSensitivity(cwd, input, exec, signal) {
 			return result;
 		};
 		const baseline = await run("baseline");
-		if (!green(baseline)) { report.reason = "Baseline is not green; no mutation attempted. The command runs in the copy of the current project directory; dependencyDirs (e.g. node_modules) are not copied unless listed"; return report; }
+		if (!green(baseline)) { report.reason = "Baseline is not green; no mutation attempted. The command runs in the copy of the current project directory; dependencyDirs (e.g. node_modules) are not copied unless listed. Ignored generated output (a Prisma client, dist/ of a workspace package) is not copied either: list its directory in dependencyDirs. On Windows a bare `bash` command may start WSL with another Node; run node directly"; return report; }
 		if (output(baseline).includes(input.expectedFailure)) { report.reason = "Failure marker already occurs in passing output; choose a specific failing assertion"; return report; }
 		if (await readFile(file, "utf8") !== original) throw new Error("Baseline command changed the mutation target");
 		await writeFile(file, mutated);
@@ -124,7 +124,7 @@ export function registerTestSensitivity(pi) {
 			command: { type: "string", minLength: 1, description: "Existing test executable, no shell interpolation; runs from the copy of the current project directory, so paths in args are relative to it" },
 			args: { type: "array", items: { type: "string" }, maxItems: 100 },
 			expectedFailure: { type: "string", minLength: 1, description: "Specific assertion failure text, not merely a test name or generic exit status" },
-			dependencyDirs: { type: "array", items: { type: "string" }, maxItems: 8, description: "Optional installed dependency directories relative to Git root (e.g. node_modules); linked, not copied. Must contain no tracked source." },
+			dependencyDirs: { type: "array", items: { type: "string" }, maxItems: 8, description: "Optional installed dependency or ignored generated directories relative to Git root (e.g. node_modules, a generated Prisma client); linked, not copied. Must contain no tracked source." },
 			timeoutMs: { type: "integer", minimum: 1, maximum: 120000, description: "Per test run, default 120000" },
 		}, required: ["file", "oldText", "newText", "command", "args", "expectedFailure"], additionalProperties: false },
 		async execute(_id, input, signal, _update, ctx) {
