@@ -4513,7 +4513,7 @@ async function workSettingsLoop(ctx, pi = undefined) {
 {
 				kind: "stepRetros", value: "stepRetros",
 				label: `Plan3 → Step self-analysis: ${settings.workOrchestrator?.stepRetros === false ? "off" : "on"}`,
-				description: "Enter toggles. On: a step that repeated a command 3+ times, had 3+ failed tools or took over 30 min gets a background self-analysis (Self-analysis model); off: no model calls. The plan self-analysis at finish still runs unless Self-analysis model is None.",
+				description: "Enter toggles. On: a step that repeated a command 3+ times, had 3+ failed tools or took over 30 min gets a self-analysis (Self-analysis model) before the next step starts; off: no model calls. The plan self-analysis at finish still runs unless Self-analysis model is None.",
 			},
 {
 				kind: "retroModel", value: "retroModel",

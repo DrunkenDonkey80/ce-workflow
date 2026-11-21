@@ -947,7 +947,7 @@ try {
 	await tool({ action: "status", plan: "33333333", value: "complete" }).catch(() => {});
 	await new Promise((r) => setTimeout(r, 50));
 	assert.equal(retroCalls.length, 1, "repeated reads or complete on an archived plan start no second retro");
-	// RF-02 step retros: signal steps only, from step done and next, never delaying the mark; rules wait for a later step start.
+	// RF-02 step retros: signal steps only, from step done and next; the mark is written first, then the call waits for the retro so its rules reach the very next step.
 	{
 		const calls = []; let release; const held = new Promise((r) => { release = r; }); let hold = false;
 		const reply = JSON.stringify({ project: [{ advice: "Add a quick test mode", cites: "bash: npm test", scope: "script" }], workflow: [{ advice: "Run the suite once per step", cites: "bash: npm test", scope: "plan" }] });
@@ -961,7 +961,7 @@ try {
 		const until = async (test) => { for (let i = 0; i < 150 && !test(); i++) await new Promise((r) => setTimeout(r, 20)); };
 		await rm(path.join(cwd, ".ce-workflow"), { recursive: true, force: true }); // the finish retro block above wrote its own requests
 		await tool({ action: "step", plan: "55555555", id: "T-01", mark: "done", summary: "loud" });
-		await until(() => /Step self-analysis rule \(T-01\)/.test(readFileSync(file, "utf8")));
+		assert.match(readFileSync(file, "utf8"), /Step self-analysis rule \(T-01\)/, "step done returns only after the retro wrote its rule");
 		assert.equal(calls.length, 1, "a signal step gets one retro");
 		assert.match(calls[0].messages[0].content[0].text, /^Step T-01 of the plan "Steps" just finished[\s\S]*- ×3, 3s: bash: npm test/);
 		assert.match(readFileSync(file, "utf8"), /## Decisions\n[\s\S]*- \*\*Step self-analysis rule \(T-01\)\*\* Run the suite once per step/);
@@ -978,17 +978,19 @@ try {
 		await tool({ action: "step", plan: "55555555", id: "T-03", mark: "wip" });
 		assert.equal(calls.length, 1, "a quiet step (2 repeats) gets no retro");
 		hold = true;
-		const state = await tool({ action: "next", plan: "55555555", summary: "loud" });
-		assert.deepEqual([state.wip, /\[x\] \*\*T-03\*\*/.test(readFileSync(file, "utf8"))], [["T-04"], true], "next marks done and starts T-04 while the retro reply is still held");
+		const pending = tool({ action: "next", plan: "55555555", summary: "loud" });
 		await until(() => calls.length === 2);
 		assert.equal(calls.length, 2, "next triggers like step done");
+		assert.match(readFileSync(file, "utf8"), /\[x\] \*\*T-03\*\*[\s\S]*\[wip\] \*\*T-04\*\*/, "next writes done and the new wip before the retro reply");
+		assert.equal(rules().length, 1, "no rule yet while the retro is held");
 		release();
-		await until(() => /Step self-analysis rule \(T-03\)/.test(readFileSync(file, "utf8")));
-		assert.equal(rules().length, 1, "a reply arriving after T-04 started waits for the following start");
+		const state = await pending;
+		assert.deepEqual(state.wip, ["T-04"]);
+		assert.equal(rules().length, 2, "the held retro's rule reaches T-04, the step that just started");
+		assert.match(rules()[1].message, /starting with T-04/);
 		await writeFile(path.join(agentDir, "settings.json"), JSON.stringify({ workOrchestrator: { stepRetros: false } }));
 		await tool({ action: "next", plan: "55555555", summary: "quiet" });
-		assert.equal(rules().length, 2, "T-05 start delivers it");
-		assert.match(rules()[1].message, /starting with T-05/);
+		assert.equal(rules().length, 2, "T-05 start has nothing left to deliver");
 		await tool({ action: "step", plan: "55555555", id: "T-05", mark: "done", summary: "loud" });
 		await new Promise((r) => setTimeout(r, 60));
 		assert.equal(calls.length, 2, "step retros off: a signal step makes no model call");

@@ -1251,7 +1251,10 @@ export default function plan3(pi) {
 		},
 	});
 	// D-04/D-05 step retros: plan-scope rules wait here for the next step start after they arrive.
+	// The done/next call waits up to STEP_RETRO_WAIT_MS for the retro: started in the background, rules from step N reached only step N+2.
 	const stepRules = new Map(), stepRetros = new Set();
+	const STEP_RETRO_WAIT_MS = 120_000;
+	const awaitStepRetro = (retro) => retro && Promise.race([retro, new Promise((resolve) => setTimeout(resolve, STEP_RETRO_WAIT_MS).unref?.())]);
 	function stepRetroAfter(ctx, plan, id) {
 		const model = retroModel(ctx.cwd);
 		if (!id || stepRetros.has(`${plan.id}:${id}`) || !stepRetrosOn(ctx.cwd) || !model) return;
@@ -1270,7 +1273,7 @@ export default function plan3(pi) {
 			}
 			ctx.ui.notify(`Plan3 step self-analysis ${id}: ${open ? `${rules.length} rule(s) for the rest of this plan, ` : ""}see ${path.relative(ctx.cwd, logFile(plan.file))}`, "info");
 		};
-		run().catch((error) => ctx.ui.notify(`Plan3 step self-analysis ${id} skipped: ${error.message}`, "warning"));
+		return run().catch((error) => ctx.ui.notify(`Plan3 step self-analysis ${id} skipped: ${error.message}`, "warning"));
 	}
 	// Sent once at a step start, never into a running step.
 	function sendStepRules(plan, started) {
@@ -1894,7 +1897,7 @@ export default function plan3(pi) {
 					if (missing.length) throw new Error(`${args.id} needs ${missing.join(", ")}, which is off or undefined; continue with runnable work (the user switches requirements with Alt+A).`);
 					return markStep(lines, need("id"), mark, args);
 				});
-				if (mark === "done") stepRetroAfter(ctx, plan, args.id);
+				if (mark === "done") await awaitStepRetro(stepRetroAfter(ctx, plan, args.id));
 				if (mark === "wip") sendStepRules(plan, args.id);
 			} else if (args.action === "next") {
 				const avail = availOf(plan.file);
@@ -1909,8 +1912,8 @@ export default function plan3(pi) {
 					if (next) markStep(lines, next.id, "wip");
 					return { completed: current, started: next?.id, log };
 				});
+				await awaitStepRetro(stepRetroAfter(ctx, plan, result.completed));
 				sendStepRules(plan, result.started);
-				stepRetroAfter(ctx, plan, result.completed);
 			} else if (args.action === "section") {
 				const name = need("name"), text = need("text");
 				await mutate(plan, (lines) => {

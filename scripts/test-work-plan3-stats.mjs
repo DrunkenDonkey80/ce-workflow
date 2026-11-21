@@ -120,12 +120,15 @@ assert.deepEqual([b1.commands["bash\0npm test"].count, b2.commands["bash\0npm te
 assert.deepEqual([stepSignal(b1), stepSignal(b2)], [[], []], "2+1 over two steps fires no three-repeat signal");
 await bashRun("s4", "npm test"); await bashRun("s5", "npm test");
 assert.deepEqual(stepSignal(await sliceHooks.stepRow(log, "B-02")), ["a command ran 3 times"]);
+hooks4.get("tool_execution_start")({ toolCallId: "e1", toolName: "edit", args: { path: "a.ts" } }, { cwd: directory });
+hooks4.get("tool_execution_end")({ toolCallId: "e1", toolName: "edit", isError: true, durationMs: 5, result: { content: [{ type: "text", text: "\nEdit without read: a.ts\nmore" }] } });
+assert.deepEqual((await sliceHooks.stepRow(log, "B-02")).toolErrors, { "edit: Edit without read: a.ts": 1 }, "a failed non-shell tool keeps its name and first message line");
 await hooks4.get("agent_settled")({}, {});
 assert.deepEqual(stepSignal({ ms: 31 * 60_000, failures: 3 }), ["3 failed tools", "31m 0s active"]);
 assert.deepEqual(stepSignal(undefined), [], "a step with no activity is quiet");
-const sDigest = stepDigest("B-02", { ms: 3000, failures: 1, commands: { "bash\0npm test": { count: 3, ms: 3000, maxMs: 1000, failures: 1 } } },
+const sDigest = stepDigest("B-02", { ms: 3000, failures: 2, commands: { "bash\0npm test": { count: 3, ms: 3000, maxMs: 1000, failures: 1 } }, toolErrors: { "edit: Edit without read: a.ts": 1 } },
 	"# Plan3 log\n\n## 2026 B-01 done: x\n\n- check: old\n\n## 2026 B-02 done: fixed\n\n- [x] **B-02** fix\n  - check: npm test failed once, then ok\n\n## 2026 Superseded resume context\n\nother\n");
-assert.match(sDigest, /^Step B-02: 3s active, 1 failed tools\.\n\nRepeated commands in this step:\n- ×3, 3s: bash: npm test\n\nFailed commands in this step:\n- 1\/3 failed: bash: npm test\n\nStep log \(its notes and checks\):\n- \[x\] \*\*B-02\*\* fix\n- check: npm test failed once, then ok$/, "only this step's log entry");
+assert.match(sDigest, /^Step B-02: 3s active, 2 failed tools\.\n\nRepeated commands in this step:\n- ×3, 3s: bash: npm test\n\nFailed commands and tools in this step:\n- 1\/3 failed: bash: npm test\n- 1 failed: edit: Edit without read: a.ts\n\nStep log \(its notes and checks\):\n- \[x\] \*\*B-02\*\* fix\n- check: npm test failed once, then ok$/, "only this step's log entry");
 
 const labels = statsItems(saved).map((item) => item.label).join("\n");
 assert.match(labels, /Tests: \d+s/);

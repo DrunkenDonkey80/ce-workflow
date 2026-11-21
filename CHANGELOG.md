@@ -10,6 +10,8 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - `test_sensitivity` now says that its command runs from the copied project directory, and a red baseline points at the two usual causes: a path relative to a subfolder, or a missing `dependencyDirs` entry.
 - An over-long `compaction_note` is now rejected with how many characters to cut (with a small margin), so the agent saves it on the next try instead of trimming a few words at a time.
 - Plan3 maps: closing a ticket or adding tickets now shows the map's remaining **Not yet specified** lines, so a line the answer settled gets removed instead of lingering and blocking completion.
+- Plan3 step self-analysis now finishes before the next step starts (about 20 seconds), so its work rules reach the very next step instead of the one after it.
+- The step self-analysis now sees failed edit, read and search calls with their error message, not only failed shell commands.
 
 ## 1.1.5 — 2026-11-20
 
