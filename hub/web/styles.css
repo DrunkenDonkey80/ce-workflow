@@ -120,7 +120,7 @@ h2 { font-size: 15px; font-weight: 600; }
 .library-detail { max-width: 100%; overflow-wrap: anywhere; }
 .library-image { display: block; max-width: 100%; height: auto; margin: 16px 0; }
 /* D2: tree beside the viewer on desktop, above it on phones. */
-.files { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(180px, 30%) minmax(0, 1fr); font-size: 13px; }
+.files { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(120px, 15%) minmax(0, 1fr); font-size: 13px; }
 .files-tree { overflow: auto; padding: 8px; border-right: 1px solid var(--line); }
 .files-tree details { padding-left: 12px; }
 .files-tree > details { padding-left: 0; }

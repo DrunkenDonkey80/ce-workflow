@@ -13,6 +13,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - Plan3 step self-analysis now finishes before the next step starts (about 20 seconds), so its work rules reach the very next step instead of the one after it.
 - The step self-analysis now sees failed edit, read and search calls with their error message, not only failed shell commands.
 - `test_sensitivity`: when the baseline fails, the message now also covers missing ignored generated files (such as a Prisma client) and a bare `bash` on Windows that starts WSL.
+- Hub: opening a file no longer shrinks the chat to its thinnest column; it stays at its 640 px width, and the file list beside the viewer is half as wide.
 - `browser_act`: besides 10, 20 or 30 minutes you can now allow a site always. It lasts until you revoke it in `/wo → Settings → Browser access → Controlled sites`; risky actions and uploads still ask.
 - `test_sensitivity`: a failure marker written with JSON escapes (\" for a quote) no longer just comes back inconclusive; the message gives the text as printed, to retry with.
 

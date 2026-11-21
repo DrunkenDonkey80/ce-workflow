@@ -1199,7 +1199,7 @@ function showExplored(value) {
  }
  const was = filesView.key; if (was) void post("unview", { key: was }).catch(() => undefined); // the hub stops watching what it showed
  filesView.explore(value); promptView.minimize(); // a file opened from a question shows beside it, not under it
- if (phone.matches) setMobile("files"); else { setTab("files"); setLeft("full"); resizeChat(280); }
+ if (phone.matches) setMobile("files"); else { setTab("files"); setLeft("full"); resizeChat(CHAT_WIDTH); } // the chat keeps a readable width beside the file
  showNotice(value.open ? "" : `${value.name}: ${value.files.length} files` + (value.truncated ? " (first 5000 shown)" : ""));
 }
 // Close (or Back: the browser's, the mouse's) puts the chat back the way it was.

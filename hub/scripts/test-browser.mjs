@@ -430,7 +430,7 @@ try {
  assert.equal(await evaluate("document.querySelector(\"[data-path='docs/readme.md']\").closest(\"details\").open"), false);
  await browser("click", "[data-path=\"src/app.ts\"]"); await browser("wait", ".files-body .add");
  assert.deepEqual(await evaluate("[document.querySelector('.files-body .add').textContent, document.querySelector('.files-body .del').textContent, getComputedStyle(document.querySelector('.files-body .add')).backgroundColor]"), ["+new line\n", "-old line\n", "rgb(178, 242, 187)"]);
- assert.deepEqual(await evaluate("(() => { const r = [document.querySelector('.files-tree').getBoundingClientRect(), document.querySelector('.files-viewer').getBoundingClientRect()]; return [r[1].left >= r[0].right - 1, Math.abs(r[0].top - r[1].top) < 2]; })()"), [true, true], "desktop: tree beside the viewer");
+ assert.deepEqual(await evaluate("(() => { const r = [document.querySelector('.files-tree').getBoundingClientRect(), document.querySelector('.files-viewer').getBoundingClientRect()]; return [r[1].left >= r[0].right - 1, Math.abs(r[0].top - r[1].top) < 2, r[0].width <= Math.max(120, 0.15 * document.getElementById('files').getBoundingClientRect().width) + 1]; })()"), [true, true, true], "desktop: tree beside the viewer, at most 15% wide");
  // Hide files gives the viewer the whole panel; Show files brings the tree back.
  await browser("click", ".files-toggle");
  assert.deepEqual(await evaluate("[getComputedStyle(document.querySelector('.files-tree')).display, Math.round(document.querySelector('.files-viewer').getBoundingClientRect().width) === Math.round(document.getElementById('files').getBoundingClientRect().width), document.querySelector('.files-toggle').textContent]"), ["none", true, "Show files"]);
