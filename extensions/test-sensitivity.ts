@@ -100,7 +100,12 @@ export async function runSensitivity(cwd, input, exec, signal) {
 		if (green(mutant)) { report.status = "survived"; report.reason = "Mutant passed; strengthen the test or justify equivalence"; }
 		else if (mutant.code === 1 && !mutant.killed && !mutant.truncated && !infrastructureFailure.test(output(mutant)) && output(mutant).includes(input.expectedFailure)) {
 			report.status = "caught"; report.reason = "Green baseline, expected failing assertion under mutation, green restored run. Inspect the assertion's relevance; this is not proof against other bugs.";
-		} else report.reason = "Mutant did not produce the declared assertion failure; infrastructure errors and other failures do not count";
+		} else {
+			report.reason = "Mutant did not produce the declared assertion failure; infrastructure errors and other failures do not count";
+			// A JSON-escaped marker (\" for ") never matches the printed output; say so instead of a bare inconclusive.
+			const unescaped = input.expectedFailure.replace(/\\(["\\])/g, "$1");
+			if (unescaped !== input.expectedFailure && output(mutant).includes(unescaped)) report.reason += `. expectedFailure is matched literally and looks escaped: the output contains ${JSON.stringify(unescaped)}; retry with that text`;
+		}
 		return report;
 	} catch (error) {
 		report.status = "inconclusive"; report.reason = String(error.message ?? error);
