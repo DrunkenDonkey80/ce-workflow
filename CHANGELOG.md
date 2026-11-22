@@ -6,6 +6,9 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ### Fixed
 
+- Compaction summaries are about a third of their old size: only your last 5 requests stay word for word (older ones become one-line decisions), the checkpoint keeps to its size target, and facts about code the session just wrote are no longer stored. Planted-fact recall is unchanged.
+- A slow compaction call is no longer cut off after 120 seconds (now 300), and when it does time out the warning says so instead of "Request was aborted".
+
 - The background-process guard no longer blocks commands that start parallel jobs and then `wait` for them all, such as four test suites run side by side.
 - `test_sensitivity` now says that its command runs from the copied project directory, and a red baseline points at the two usual causes: a path relative to a subfolder, or a missing `dependencyDirs` entry.
 - An over-long `compaction_note` is now rejected with how many characters to cut (with a small margin), so the agent saves it on the next try instead of trimming a few words at a time.

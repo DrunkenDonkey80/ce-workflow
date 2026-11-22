@@ -738,7 +738,7 @@ assert.deepEqual(wakeRequests, ["Fix the parser.", "Subagent updates above. Summ
 const { header } = await import("../extensions/work-compaction-memory.ts");
 assert.deepEqual(decodeMemory(`${header}{broken\n{"source":"s","kind":"user-request","text":"t"}\n`).records, [{ source: "s", kind: "user-request", text: "t" }]);
 
-// Protected history stays bounded: answers keep question, answer and picked descriptions; 20 requests stay verbatim, older ones age
+// Protected history stays bounded: answers keep question, answer and picked descriptions; 5 requests stay verbatim, older ones age
 // into the checkpoint only through a validated model answer; a failure keeps everything.
 {
 	const ask = { questions: [{ question: "Which store?", context: "x".repeat(5000), options: [{ title: "SQLite (Recommended)", description: "One file, no server." }, { title: "Postgres", description: "y".repeat(3000) }] }, { question: "Never asked in the text?", options: [{ title: "Yes" }] }] };
@@ -774,15 +774,15 @@ assert.deepEqual(decodeMemory(`${header}{broken\n{"source":"s","kind":"user-requ
 	// A stray `}]` or fence after the object (seen live) keeps the answer; no object at all still fails.
 	assert.equal(validateMemory("```json\n{\"checkpoint\":\"x\",\"knowledge\":[]}] }]}\n```", new Set()).tail, '{"checkpoint":"x","knowledge":[]}');
 	assert.throws(() => validateMemory("not JSON", new Set()), /Invalid memory JSON/);
-	assert.deepEqual(seen.aging.map(r => r.text), requests.slice(0, 5).map(m => m.content), "the 5 oldest go to the model as aging");
+	assert.deepEqual(seen.aging.map(r => r.text), requests.slice(0, 20).map(m => m.content), "the 20 oldest go to the model as aging");
 	assert(!seen.delta.some(r => seen.aging.some(a => a.source === r.source)), "aging is not sent twice");
 	assert.match(seen.task, /"aging" holds older user requests/);
-	assert.deepEqual(decodeMemory(rolled.summary).records.map(r => r.text), requests.slice(5).map(m => m.content), "20 stay verbatim");
+	assert.deepEqual(decodeMemory(rolled.summary).records.map(r => r.text), requests.slice(20).map(m => m.content), "5 stay verbatim");
 	assert.match(rolled.summary, /Request 0: rule 0\./, "the aged request lives on as cited knowledge");
 	// Next round: the model gets the checkpoint, not the raw summary; citations to aged sources stay valid.
 	const next = await compactMemory({ messages: [{ role: "user", content: "Request 25." }], previousSummary: rolled.summary, registry: model, model: "test/summary" });
 	assert.equal(next.mode, "hybrid", next.fallback);
-	assert.deepEqual(seen.aging.map(r => r.text), ["Request 5: rule 5."]);
+	assert.deepEqual(seen.aging.map(r => r.text), ["Request 20: rule 20."]);
 	assert.equal(seen.previous, decodeMemory(rolled.summary).tail, "the model input is the checkpoint, not the whole previous summary");
 	assert.match(next.summary, /Request 0: rule 0\./, "old citations survive the next round");
 	// A failed checkpoint keeps every request verbatim: nothing ages out without a summary.
