@@ -1,30 +1,30 @@
 {
  "version": 1,
- "activeMs": 5483592,
- "runs": 12,
+ "activeMs": 5609817,
+ "runs": 13,
  "waitingMs": 41360,
- "toolWallMs": 3058444,
+ "toolWallMs": 3063321,
  "compactions": {
-  "count": 0,
-  "ms": 0
+  "count": 1,
+  "ms": 112579
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
-   "replies": 277,
-   "thinkingMs": 1065006,
-   "actingMs": 605396,
-   "input": 694,
-   "output": 155115,
-   "cacheRead": 29686937,
-   "cacheWrite": 941954,
-   "cost": 13.7522334,
+   "replies": 279,
+   "thinkingMs": 1069290,
+   "actingMs": 607798,
+   "input": 702,
+   "output": 155566,
+   "cacheRead": 29981513,
+   "cacheWrite": 944109,
+   "cost": 13.830975599999999,
    "errors": 0
   }
  },
  "tools": {
   "bash": {
-   "count": 212,
-   "ms": 2637641,
+   "count": 213,
+   "ms": 2640346,
    "maxMs": 352183,
    "failures": 8
   },
@@ -97,8 +97,8 @@
  },
  "categories": {
   "shell": {
-   "count": 184,
-   "ms": 1294161,
+   "count": 185,
+   "ms": 1296866,
    "maxMs": 184136,
    "failures": 8
   },
@@ -354,12 +354,6 @@
    "count": 1,
    "ms": 95,
    "maxMs": 95,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && grep -n \"D-08\\|D-10\\|D-06\\b\" \"docs/plans/2026-11-20-follow-ups-from-the-plan-finish-retro-5e4d224a-d-11-planning-523c2f8a-plan3.md\" | cut -c1-900": {
-   "count": 1,
-   "ms": 66,
-   "maxMs": 66,
    "failures": 0
   },
   "bash\u0000cd \".\" && sed -n \"360,400p\" hub/src/api.ts | cut -c1-260; grep -n \"function folder\\|const folder\\|case \\\"hub\\\"\\|case \\\"message\\\"\" hub/src/api.ts | head; ls hub/scripts; grep -n \"\\\"test\" hub/package.js": {
@@ -1251,8 +1245,8 @@
    "failures": 0
   },
   "\u0000(other)": {
-   "count": 11,
-   "ms": 611,
+   "count": 12,
+   "ms": 677,
    "maxMs": 66,
    "failures": 1
   },
@@ -1315,6 +1309,12 @@
    "ms": 274,
    "maxMs": 274,
    "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/^## Unreleased$/## 1.1.5 — 2026-11-20/\" CHANGELOG.md && sed -i \"0,/\\\"version\\\": \\\"1.1.4\\\"/s//\\\"version\\\": \\\"1.1.5\\\"/\" package.json && sed -i \"0,/\\\"version\\\": \\\"1.1.4\\\"/s//\\\"version": {
+   "count": 1,
+   "ms": 2705,
+   "maxMs": 2705,
+   "failures": 0
   }
  },
  "steps": {
@@ -1346,11 +1346,11 @@
    "failures": 6
   },
   "(none)": {
-   "ms": 3083376,
+   "ms": 3092767,
    "testMs": 1258832,
-   "replies": 156,
+   "replies": 158,
    "models": {
-    "anthropic/claude-opus-5-5:high": 156
+    "anthropic/claude-opus-5-5:high": 158
    },
    "commands": {
     "bash\u0000cd \".\" && git log --since=\"2026-11-18\" --format=\"%h %ad %s\" --date=format:\"%m-%d %H:%M\" | head -60; ls docs/plans/*.md 2>/dev/null; ls docs/plans/done | grep \"2026-11-1[89]\\|2026-11-2\"": {
@@ -1705,6 +1705,10 @@
   {
    "start": "2026-11-20T20:33:23.886Z",
    "ms": 120601
+  },
+  {
+   "start": "2026-11-20T20:36:10.733Z",
+   "ms": 13646
   }
  ],
  "hints": [
