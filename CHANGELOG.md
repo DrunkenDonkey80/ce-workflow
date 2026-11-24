@@ -4,6 +4,10 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+### Changed
+
+- While a plan runs, a question that blocks only some steps no longer stops the work. The agent does the unblocked steps first, then asks all the collected questions at once.
+
 ### Fixed
 
 - The **Requests** button no longer loses requests when the session is busy. It refuses while the agent works, and if the analysis cannot be sent its files go back to pending. Before, every request was marked processed and then the `/plan3` message failed.
