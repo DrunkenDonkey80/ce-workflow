@@ -2,6 +2,14 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Fixed
+
+- The **Requests** button no longer loses requests when the session is busy. It refuses while the agent works, and if the analysis cannot be sent its files go back to pending. Before, every request was marked processed and then the `/plan3` message failed.
+- A `/plan3` or other extension command sent from the hub while the agent works now fails right away with a clear message, instead of seeming sent and failing later.
+- The self-analysis now sees the project's earlier request titles and skips advice that says the same thing in other words, so the same tip no longer piles up dozens of times.
+
 ## 1.1.6 — 2026-11-22
 
 ### Fixed

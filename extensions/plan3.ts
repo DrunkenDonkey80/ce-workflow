@@ -18,7 +18,7 @@ import { deliverReferenceBundle } from "./design-bundles.ts";
 import { captureUrlReference } from "./browser-fetch.ts";
 import { originalForHub, pickForHub, searchForHub } from "./browser-search.ts";
 import { reworkRequest } from "./plan3-rework.ts";
-import { createStats, finishRetro, RETRO_MODEL, statsItems, stepRetro, stepSignal, writeRequests } from "./plan3-stats.ts";
+import { createStats, finishRetro, knownRequests, RETRO_MODEL, statsItems, stepRetro, stepSignal, writeRequests } from "./plan3-stats.ts";
 import { HUMAN, HUMAN_TEXT, availLine, changeMessage, chooseAvail, isOn, needsFile, readAvail, setBoth, setMode, unset, writeAvail } from "./plan3-needs.ts";
 import { hubActive, publish as hubPublish } from "./hub-channel.ts";
 import { releaseSessionLock, takeSessionLock } from "./session-lock.ts";
@@ -1262,7 +1262,7 @@ export default function plan3(pi) {
 		const run = async () => {
 			const row = await statsHooks.stepRow(logFile(plan.file), id);
 			if (!stepSignal(row).length) return;
-			const result = await stepRetro(ctx.modelRegistry, { title: plan.title, step: id, row, model, log: await readFile(logFile(plan.file), "utf8").catch(() => "") });
+			const result = await stepRetro(ctx.modelRegistry, { title: plan.title, step: id, row, model, known: await knownRequests(ctx.cwd), log: await readFile(logFile(plan.file), "utf8").catch(() => "") });
 			await appendLog(plan.file, result.text);
 			await writeRequests(ctx.cwd, { title: plan.title, step: id, items: [...result.retro.project, ...result.retro.workflow] });
 			const rules = [...result.retro.project, ...result.retro.workflow].filter((item) => item.scope === "plan");
@@ -1676,7 +1676,7 @@ export default function plan3(pi) {
 		if (plan.folder === "done" || !model) return; // already archived: no second retro; Retro model off: none
 		const run = async () => {
 			await statsHooks.flush();
-			const result = await finishRetro(ctx.modelRegistry, { title: plan.title, model, statsPath: statsFile(file), logPath: logFile(file) });
+			const result = await finishRetro(ctx.modelRegistry, { title: plan.title, model, known: await knownRequests(ctx.cwd), statsPath: statsFile(file), logPath: logFile(file) });
 			if (!result) return;
 			await appendLog(file, result.text);
 			const requests = await writeRequests(ctx.cwd, { title: plan.title, items: [...result.retro.project, ...result.retro.workflow] });

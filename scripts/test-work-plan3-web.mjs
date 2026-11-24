@@ -62,6 +62,12 @@ assert.equal(submitted.at(-1).message, "hello");
 }
 forwardDiagramChat(sendApi, { isIdle: () => false }, contextDiagram, "/plan3 review 12345678", [], () => {});
 assert.equal(submitted.at(-1).message, "/plan3 review 12345678");
+{ // A busy extension command is refused synchronously (Pi would reject it after the call returned ok).
+	const before = submitted.length, cmdApi = { ...sendApi, getCommands: () => [{ name: "plan3", source: "extension" }, { name: "tpl", source: "prompt" }] };
+	assert.throws(() => forwardDiagramChat(cmdApi, { isIdle: () => false }, contextDiagram, "/plan3 Analyze 2", [], () => {}), /cannot run while the agent works/);
+	forwardDiagramChat(cmdApi, { isIdle: () => false }, contextDiagram, "/tpl x", [], () => {});
+	assert.equal(submitted.length, before + 1, "a busy prompt template still steers");
+}
 assert.equal(submitted.at(-1).options.expandPromptTemplates, true);
 forwardDiagramChat(sendApi, { isIdle: () => true }, contextDiagram, "/reload", [], () => {});
 assert.equal(submitted.at(-1).message, "/wo reload", "web /reload runs the extension reload command");

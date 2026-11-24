@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { classify, commandShape, createStats, planDigest, recordCommand, recordReply, sanitize, serialHint, statsItems, emptyStats, parseRetro, redactRequest, retroPrompt, stepDigest, stepSignal, writeRequests } from "../extensions/plan3-stats.ts";
+import { classify, commandShape, createStats, planDigest, recordCommand, recordReply, sanitize, serialHint, statsItems, emptyStats, parseRetro, redactRequest, retroPrompt, stepDigest, stepSignal, writeRequests, knownRequests } from "../extensions/plan3-stats.ts";
 
 assert.equal(classify("cd \"C:/x\" && node scripts/test-work-plan3.mjs"), "test");
 assert.equal(classify("cargo nextest run"), "test");
@@ -184,5 +184,11 @@ assert.match(reqFile, /^script-[0-9a-f]{12}\.md$/);
 const body = await readFile(path.join(reqDir, ".ce-workflow", "local", "requests", reqFile), "utf8");
 assert.match(body, /^# Add a quick mode to <path>\/t\.mjs\n[\s\S]*- From: step S1 of plan "T"\n- Evidence: ×4, 2m: bash: node <path>\/t\.mjs --key=\[REDACTED\]/);
 assert.doesNotMatch(body, /jdoe|Users|sk-/, "no user, path or secret");
+// The retro sees pending and done titles, so it can skip paraphrases of them.
+await mkdir(path.join(reqDir, ".ce-workflow", "local", "requests", "done"), { recursive: true });
+await writeFile(path.join(reqDir, ".ce-workflow", "local", "requests", "done", "project-old.md"), "# Old advice\n");
+assert.deepEqual((await knownRequests(reqDir)).sort(), ["Add a quick mode to <path>/t.mjs", "Old advice"]);
+assert.match(retroPrompt("T", rDigest, "S2", ["Old advice"]), /Already requested[^\n]*\n- Old advice\n/);
+assert.doesNotMatch(retroPrompt("T", rDigest), /Already requested/);
 await rm(reqDir, { recursive: true, force: true });
 console.log("ok - plan3 stats collection, classification, viewer and digest");

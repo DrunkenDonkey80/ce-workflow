@@ -23,7 +23,7 @@ import { catalogReference, designCatalog, designDocs, designImage } from "../../
 import { fetchSystem } from "../../extensions/design.ts";
 import { addDesignReference, designReferences, editDesignReference, referenceAssets, urlReference, urlSnapshot } from "../../extensions/design-references.ts";
 import { currentPlan, listPlans, webPlan } from "../../extensions/plan3.ts";
-import { pendingRequests, requestsPrompt, startRequests } from "../../extensions/plan3-stats.ts";
+import { pendingRequests, requestsPrompt, startRequests, undoRequests } from "../../extensions/plan3-stats.ts";
 import { toForm, toResponse } from "./forms.ts";
 import { nextName as nextFreeName, type Registry, scanRecents, star } from "./registry.ts";
 import type { RpcRecord } from "./rpc-client.ts";
@@ -452,9 +452,11 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 			// D-10: requests count as processed when the analysis starts; the /plan3 prompt names the moved files.
 			case "requests": {
 				only(data, ["target"], "Invalid fields.");
+				// Pi cannot queue /plan3 behind a running turn: refuse before anything moves.
+				if (host.live.get(id)?.running) throw fail(409, "The session is working; start the analysis when it is idle.");
 				const moved = await startRequests(await requestSet(folder(id)));
 				if (!moved.length) throw fail(409, "No unprocessed requests.");
-				await call(id, "/api/message", { text: requestsPrompt(moved) });
+				try { await call(id, "/api/message", { text: requestsPrompt(moved) }); } catch (error) { await undoRequests(moved); throw error; }
 				void publishStatus(id).catch(() => {});
 				return { ok: true, count: moved.length };
 			}

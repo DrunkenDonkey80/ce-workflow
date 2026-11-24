@@ -39,6 +39,8 @@ export function forwardDiagramChat(pi, ctx, diagram: Diagram | { diagram: Diagra
 	// Built-in /reload cannot run from sendUserMessage; /wo reload calls ctx.reload() and the page reconnects.
 	if (name === "reload") prepared.message = "/wo reload";
 	const queued = !ctx.isIdle();
+	// Pi rejects a queued extension command only after the call returned; refuse it now so the caller sees the failure.
+	if (queued && command && pi.getCommands?.().some(c => c.name === name && c.source === "extension")) throw new WebError(409, `/${name} cannot run while the agent works; send it when the session is idle.`);
 	// Our resend is source "extension", which Pi's input hook skips; work-models compacts a cold cache first and sends after (D1).
 	// Also while busy: an early compaction (hub typing wake) is busy too, and the message has to wait for it.
 	if (!command) {

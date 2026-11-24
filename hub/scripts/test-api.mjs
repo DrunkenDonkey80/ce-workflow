@@ -422,11 +422,20 @@ try {
 			assert.deepEqual([await count(id), await count(away.id)], [1, 2], "outside the ce-workflow checkout a project counts only its own");
 			fs.mkdirSync(path.dirname(baseline), { recursive: true }); fs.writeFileSync(baseline, JSON.stringify({ packages: [] }));
 			assert.equal(await count(id), 2, "ce-workflow adds only the other project's ce-workflow-scope request; its own folder's second session counts nothing extra");
+			const pendingNow = () => [fs.readdirSync(requests(folder)).filter((name) => name.endsWith(".md")), fs.readdirSync(requests(other)).filter((name) => name.endsWith(".md"))];
+			const { call: realCall, resume: realResume } = hub.host;
+			Object.assign(hub.host, { resume: async () => {}, call: async () => ({ ok: false, status: 409, error: "/plan3 cannot run while the agent works" }) });
+			try { assert.equal((await post(id, "requests", {})).status, 409); } finally { Object.assign(hub.host, { call: realCall, resume: realResume }); }
+			assert.deepEqual(pendingNow(), [["script-a.md"], ["ce-workflow-b.md", "project-c.md"]], "an undelivered analysis puts its files back to pending");
 			const started = await post(id, "requests", {});
 			assert.deepEqual(started.body, { ok: true, count: 2 });
 			assert.deepEqual([fs.readdirSync(path.join(requests(folder), "done")), fs.readdirSync(path.join(requests(other), "done")), fs.readdirSync(requests(other)).filter((name) => name.endsWith(".md"))], [["script-a.md"], ["ce-workflow-b.md"], ["project-c.md"]], "starting the analysis moves exactly the counted files to done/");
 			assert.deepEqual([await count(id), await count(away.id)], [0, 1]);
 			assert.equal((await post(id, "requests", {})).status, 409, "nothing left to analyze");
+			fs.writeFileSync(path.join(requests(folder), "script-d.md"), "# x\n");
+			hub.host.live.get(id).running = true;
+			try { assert.equal((await post(id, "requests", {})).status, 409, "a working session is refused"); } finally { hub.host.live.get(id).running = false; }
+			assert.deepEqual(pendingNow()[0], ["script-d.md"], "a refused click moves nothing");
 		} finally {
 			hub.registry.remove(twin.id); hub.registry.remove(away.id);
 			fs.rmSync(path.join(folder, ".ce-workflow"), { recursive: true, force: true }); fs.rmSync(path.join(folder, "extensions"), { recursive: true, force: true });
@@ -824,5 +833,6 @@ try {
 	console.log("api ok");
 } finally {
 	await hub.stop();
-	fs.rmSync(root, { recursive: true, force: true });
+	// A failed run can leave the dir locked on Windows; its EPERM must not hide the assertion.
+	try { fs.rmSync(root, { recursive: true, force: true }); } catch (error) { console.error(`cleanup: ${error.message}`); }
 }
