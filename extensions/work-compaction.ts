@@ -271,7 +271,8 @@ function toolCalls(message) {
 
 export const COMPACTION_NOTE_TOOL = "compaction_note";
 // Enforced in code, not the schema: providers with strict schemas silently cut the note at maxLength.
-export const COMPACTION_NOTE_MAX = 2500;
+// The aim stays 2000 (MAX - 1000); the slack absorbs the usual overshoot, which cost a rejected save and a retry turn.
+export const COMPACTION_NOTE_MAX = 3000;
 
 /** Standing warning: Luna drops most facts (docs/agent-rules.md "Compaction Model Fact Recall"). */
 export function lunaCompactionWarning(model: string) {

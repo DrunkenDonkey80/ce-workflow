@@ -51,6 +51,8 @@ hooks.get("tool_execution_start")({ toolCallId: "1", toolName: "bash", args: { c
 hooks.get("tool_execution_start")({ toolCallId: "2", toolName: "bash", args: { command: "cargo build" } }, { cwd: directory });
 hooks.get("tool_execution_end")({ toolCallId: "1", toolName: "bash", isError: true, durationMs: 3000 });
 hooks.get("tool_execution_end")({ toolCallId: "2", toolName: "bash", isError: false, durationMs: 2000 });
+hooks.get("tool_execution_start")({ toolCallId: "4", toolName: "bash", args: { command: "ls src; grep -n foo src/a.ts" } }, { cwd: directory });
+hooks.get("tool_execution_end")({ toolCallId: "4", toolName: "bash", isError: true, durationMs: 10, result: { content: [{ type: "text", text: "a.ts\n\nCommand exited with code 1" }] } });
 hooks.get("tool_execution_start")({ toolCallId: "3", toolName: "ask_user", args: {} }, {});
 hooks.get("ui_prompt_start")({});
 await new Promise((resolve) => setTimeout(resolve, 30));
@@ -73,6 +75,7 @@ assert(saved.waitingMs >= 20, "dialog time is waiting for you");
 assert.equal(saved.compactions.count, 1);
 assert.equal(saved.steps["A-02"].testMs, 3000);
 assert.equal(saved.commands["bash\0npm test"].failures, 1);
+assert.equal(saved.commands["bash\0ls src; grep -n foo src/a.ts"].failures, 0, "a search that ends in no match (exit 1) is not a failed tool");
 assert.deepEqual([saved.steps["A-02"].replies, saved.steps["A-02"].failures, saved.steps["A-02"].models], [1, 1, { "p/m:medium": 1 }], "steps count replies, failed tools and models");
 // Serial waits: two long runs of one command family with different arguments and no edits between send one steer.
 assert.equal(commandShape('cd "hub" && node import-benchmark.ts --round 0 --case bankya-f1 > out.json'), "node import-benchmark.ts");

@@ -9,6 +9,9 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - The **Requests** button no longer loses requests when the session is busy. It refuses while the agent works, and if the analysis cannot be sent its files go back to pending. Before, every request was marked processed and then the `/plan3` message failed.
 - A `/plan3` or other extension command sent from the hub while the agent works now fails right away with a clear message, instead of seeming sent and failing later.
 - The self-analysis now sees the project's earlier request titles and skips advice that says the same thing in other words, so the same tip no longer piles up dozens of times.
+- `test_sensitivity` works with Rust: a failing `cargo test` exits 101, which it used to report as inconclusive even when the mutant was caught. A compile error still does not count, and an inconclusive result now says why (timeout, exit code, infrastructure error, or the expected text was missing).
+- A search whose last `grep` or `rg` finds nothing (exit 1) no longer counts as a failed tool in plan stats, so the self-analysis stops suggesting fixes for it.
+- `compaction_note` accepts notes up to 3000 characters; the target stays about 2000. Notes that ran a little over the old 2500 limit cost a rejected save and another turn.
 
 ## 1.1.6 — 2026-11-22
 

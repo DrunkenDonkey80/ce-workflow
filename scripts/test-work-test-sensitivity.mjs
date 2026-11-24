@@ -63,6 +63,11 @@ try {
 		assert.equal((await run({}, scripted([ok, mutant, ok]))).status, "inconclusive");
 	}
 	assert.equal((await run({}, scripted([ok, fail, fail]))).status, "inconclusive", "restored must pass");
+	assert.equal((await run({}, scripted([ok, { ...fail, code: 101 }, ok]))).status, "caught", "a failing cargo test exits 101");
+	const compile = await run({}, scripted([ok, { ...fail, code: 101, stderr: `error[E0308]: mismatched types\n${input.expectedFailure}` }, ok]));
+	assert.deepEqual([compile.status, /infrastructure error \(error\[E0308\]\)/.test(compile.reason)], ["inconclusive", true], "a cargo compile error is not a caught mutant");
+	assert.match((await run({}, scripted([ok, { ...fail, stderr: "other assertion" }, ok]))).reason, /expectedFailure does not occur/);
+	assert.match((await run({}, scripted([ok, { ...fail, code: 2 }, ok]))).reason, /exit code 2 is not a test failure/);
 	const escaped = await run({ expectedFailure: '\\"route\\": \\"GET /x\\"' }, scripted([ok, { ...fail, stderr: '"route": "GET /x",' }, ok]));
 	assert.deepEqual([escaped.status, /looks escaped: the output contains "\\"route\\": \\"GET \/x\\""; retry/.test(escaped.reason)], ["inconclusive", true], "an escaped marker gets the unescaped retry text");
 	assert.equal((await run({}, scripted([{ ...ok, stdout: input.expectedFailure }]))).runs.length, 1, "marker in green output is not discriminating");

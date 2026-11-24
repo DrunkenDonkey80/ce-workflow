@@ -18,7 +18,9 @@ function local(root, name) {
 }
 const output = result => `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
 const green = result => result.code === 0 && !result.killed && !result.truncated;
-const infrastructureFailure = /SyntaxError:|Cannot find module|ERR_MODULE_NOT_FOUND|ModuleNotFoundError:|command not found|Test suite failed to run|error TS\d+:|No test files found/i;
+const infrastructureFailure = /SyntaxError:|Cannot find module|ERR_MODULE_NOT_FOUND|ModuleNotFoundError:|command not found|Test suite failed to run|error TS\d+:|No test files found|could not compile|error\[E\d{4}\]/i;
+// 1: most runners; 101: cargo test (a Rust test failure, compile errors are caught by the pattern above).
+const failCodes = [1, 101];
 
 // The copy isolates our mutation, not arbitrary test programs: commands must use disposable local fixtures.
 export async function runSensitivity(cwd, input, exec, signal) {
@@ -109,10 +111,13 @@ export async function runSensitivity(cwd, input, exec, signal) {
 			if (hash(await readFile(local(scratch, name))) !== digest) throw new Error(`Test command changed captured source: ${name}`);
 		}
 		if (green(mutant)) { report.status = "survived"; report.reason = "Mutant passed; strengthen the test or justify equivalence"; }
-		else if (mutant.code === 1 && !mutant.killed && !mutant.truncated && !infrastructureFailure.test(output(mutant)) && output(mutant).includes(input.expectedFailure)) {
+		else if (failCodes.includes(mutant.code) && !mutant.killed && !mutant.truncated && !infrastructureFailure.test(output(mutant)) && output(mutant).includes(input.expectedFailure)) {
 			report.status = "caught"; report.reason = "Green baseline, expected failing assertion under mutation, green restored run. Inspect the assertion's relevance; this is not proof against other bugs.";
 		} else {
-			report.reason = "Mutant did not produce the declared assertion failure; infrastructure errors and other failures do not count";
+			const text = output(mutant), why = mutant.killed ? "it was killed (timeout)" : mutant.truncated ? "its output was truncated"
+				: !failCodes.includes(mutant.code) ? `exit code ${mutant.code} is not a test failure (1 or 101)` : infrastructureFailure.test(text) ? `its output shows an infrastructure error (${text.match(infrastructureFailure)[0]})`
+				: "expectedFailure does not occur in its output; copy the exact assertion text from the mutant log tail";
+			report.reason = `Mutant did not produce the declared assertion failure: ${why}. Do not retry unchanged`;
 			// A JSON-escaped marker (\" for ") never matches the printed output; say so instead of a bare inconclusive.
 			const unescaped = input.expectedFailure.replace(/\\(["\\])/g, "$1");
 			if (unescaped !== input.expectedFailure && output(mutant).includes(unescaped)) report.reason += `. expectedFailure is matched literally and looks escaped: the output contains ${JSON.stringify(unescaped)}; retry with that text`;
