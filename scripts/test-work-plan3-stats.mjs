@@ -194,4 +194,22 @@ assert.deepEqual((await knownRequests(reqDir)).sort(), ["Add a quick mode to <pa
 assert.match(retroPrompt("T", rDigest, "S2", ["Old advice"]), /Already requested[^\n]*\n- Old advice\n/);
 assert.doesNotMatch(retroPrompt("T", rDigest), /Already requested/);
 await rm(reqDir, { recursive: true, force: true });
+// Helper runs (S-03): joined by recorded run id, each on its own step; an unrelated run in the same session is ignored.
+const helperDir = await mkdtemp(path.join(os.tmpdir(), "plan3-helpers-"));
+const artifacts = path.join(helperDir, "subagent-artifacts"), lanesFile = path.join(helperDir, "x.lanes.json");
+await mkdir(artifacts, { recursive: true });
+const meta = (run, agent, extra) => writeFile(path.join(artifacts, `${run}_${agent}_meta.json`), JSON.stringify({ runId: run, model: "p/m", usage: { input: 100, output: 20, cost: 0.25 }, ...extra }));
+await meta("r1", "plan3-lane", { durationMs: 60_000 });
+await meta("r2", "plan3-scout", {});
+await meta("r9", "delegate", { durationMs: 5_000 });
+await writeFile(lanesFile, JSON.stringify({ lanes: [], runs: [{ run: "r1", id: "S-01", kind: "lane", step: "S-01", artifacts }, { run: "r2", id: "q1", kind: "scout", step: "S-02", artifacts }] }));
+process.env.PI_SUBAGENTS_TEMP_ROOT = path.join(helperDir, "none");
+const { helperRuns } = await import("../extensions/plan3-lanes.ts");
+const helpers = helperRuns(lanesFile);
+assert.deepEqual(helpers.map(({ run, step, ms, cost }) => [run, step, ms, cost]), [["r1", "S-01", 60_000, 0.25], ["r2", "S-02", undefined, 0.25]], "a run without duration stays unknown");
+const helperLabels = statsItems(saved, helpers).map((item) => item.label);
+assert.equal(helperLabels.slice(0, statsItems(saved).length).join("\n"), labels, "main-agent rows unchanged");
+assert.deepEqual(helperLabels.slice(-2), ["S-01 · lane S-01: 1m 0s · $0.25", "S-02 · scout q1: unknown · $0.25"]);
+assert(helperLabels.includes("Helpers — 2 runs · 1m 0s + unknown · $0.50"));
+await rm(helperDir, { recursive: true, force: true });
 console.log("ok - plan3 stats collection, classification, viewer and digest");

@@ -25,7 +25,7 @@ import { releaseSessionLock, takeSessionLock } from "./session-lock.ts";
 import { childWorkItems, listWorkItems, loadStore } from "./work-store.ts";
 import { docCandidates, slug as docSlug, writeDocs } from "./plan3-docs.ts";
 import { lockedWritesNote } from "./locked-writes.ts";
-import { laneDrop, laneLand, laneList, lanePick, laneOwned, laneRun, laneScout, laneStart, removePlanSlots } from "./plan3-lanes.ts";
+import { helperRuns, laneDrop, laneLand, laneList, lanePick, laneOwned, laneRun, laneScout, laneStart, removePlanSlots } from "./plan3-lanes.ts";
 import { registerTestSensitivity, TEST_SENSITIVITY } from "./test-sensitivity.ts";
 import { SELF_VERIFY } from "./self-verify.ts";
 import { runsGit } from "./command-guard.ts";
@@ -1772,7 +1772,7 @@ export default function plan3(pi) {
 			if (action?.value === "stats") {
 				let stats = null;
 				try { stats = JSON.parse(await readFile(statsFile(plan.file), "utf8")); } catch (error) { report(ctx, error); }
-				if (stats) await showListDialog(ctx, { title: `Statistics — ${plan.title}`, purpose: "Accumulated over every /resume3 run of this plan.", items: statsItems(stats), cursorKey: `plan3-stats:${plan.id}`, maxVisible: 20 });
+				if (stats) await showListDialog(ctx, { title: `Statistics — ${plan.title}`, purpose: "Accumulated over every /resume3 run of this plan.", items: statsItems(stats, helperRuns(lanesFileOf(plan.file))), cursorKey: `plan3-stats:${plan.id}`, maxVisible: 20 });
 				continue;
 			}
 			if (action?.value === "ready") return idle(ctx) && finish(ctx, plan);
@@ -1869,7 +1869,10 @@ export default function plan3(pi) {
 					if (!summarize(plan.file, await readFile(plan.file, "utf8"), path.dirname(plan.file)).lanes.includes(id)) throw new Error(`${id} is not lane-eligible now: it needs an after: line whose steps are done, a [code] phase and no requirements.`);
 					result = await laneStart(lanes, id);
 				} else if (op === "trial") result = await laneStart(lanes, need("id"), "trial");
-				else if (op === "run") result = await laneRun(lanes, need("id"), need("run"));
+				else if (op === "run") {
+					const sessionFile = ctx.sessionManager?.getSessionFile?.();
+					result = await laneRun(lanes, need("id"), need("run"), { mainStep: plan.wip[0], artifacts: sessionFile && path.join(path.dirname(sessionFile), "subagent-artifacts") });
+				}
 				else if (op === "scout") result = await laneScout(lanes, need("id"));
 				else if (op === "pick") result = await lanePick(lanes, need("id"));
 				else if (op === "land") result = await laneLand(lanes, need("id"));

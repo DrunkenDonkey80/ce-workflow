@@ -13,6 +13,7 @@ type Owner = { plan: string; id: string; kind: "lane" | "trial"; branch: string;
 type Slot = { n: number; path: string; owner: Owner | null; lastPlan?: string; stale?: string[] };
 type Scout = { plan: string; id: string; run?: string; at: number };
 type Slots = { slots: Slot[]; scouts: Scout[] };
+type HelperRun = { run: string; id: string; kind: string; step?: string; artifacts?: string; at: string };
 type Lane = { id: string; kind: "lane" | "trial"; slot: string; branch: string; base: string; run?: string; mainBranch?: string; onto?: string };
 export type LaneOpts = { cwd: string; plan: string; lanesFile: string; limit: number };
 
@@ -25,17 +26,18 @@ const key = (file: string) => (process.platform === "win32" ? path.resolve(file)
 // ---------- helper run status (D-19) ----------
 const TERMINAL = new Set(["complete", "failed", "partial", "paused", "stopped", "rejected"]);
 // pi-subagents writes <temp root>/async-subagent-runs/<run>/status.json; the root is PI_SUBAGENTS_TEMP_ROOT or tmp/pi-subagents-<scope>.
-let runState = (run: string): string | undefined => {
+type RunStatus = { state?: string; startedAt?: number; endedAt?: number };
+let runStatus = (run: string): RunStatus | undefined => {
 	const env = process.env.PI_SUBAGENTS_TEMP_ROOT?.trim();
 	const roots = env ? [path.resolve(env)] : fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith("pi-subagents-")).map((name) => path.join(os.tmpdir(), name));
 	for (const root of roots) {
-		try { return JSON.parse(fs.readFileSync(path.join(root, "async-subagent-runs", run, "status.json"), "utf8")).state; } catch {}
+		try { return JSON.parse(fs.readFileSync(path.join(root, "async-subagent-runs", run, "status.json"), "utf8")); } catch {}
 	}
 	return undefined;
 };
-export const setRunState = (fn: typeof runState) => { runState = fn; };
+export const setRunState = (fn: (run: string) => string | undefined) => { runStatus = (run) => ({ state: fn(run) }); };
 // No recorded run means the helper was never launched; an unknown run is not proof it stopped.
-const stopped = (run?: string) => !run || TERMINAL.has(runState(run) ?? "");
+const stopped = (run?: string) => !run || TERMINAL.has(runStatus(run)?.state ?? "");
 
 // ---------- locked JSON ----------
 const held = new Set<string>();
@@ -79,8 +81,11 @@ function reconcile(state: Slots) {
 }
 const admitted = (state: Slots) => state.slots.filter((slot) => slot.owner).length + state.scouts.length;
 
-async function setLanes(o: LaneOpts, change: (lanes: Lane[]) => Lane[]) {
-	await locked(o.lanesFile, () => save(o.lanesFile, { lanes: change(load(o.lanesFile, { lanes: [] as Lane[] }).lanes) }));
+async function setLanes(o: LaneOpts, change: (lanes: Lane[]) => Lane[], run?: HelperRun) {
+	await locked(o.lanesFile, () => {
+		const data = load(o.lanesFile, { lanes: [] as Lane[], runs: [] as HelperRun[] });
+		save(o.lanesFile, { ...data, lanes: change(data.lanes), runs: [...data.runs ?? [], ...run ? [run] : []] });
+	});
 }
 export const laneOwned = (lanesFile: string) => load(lanesFile, { lanes: [] as Lane[] }).lanes.filter((lane) => lane.kind === "lane").map((lane) => lane.id);
 
@@ -131,20 +136,37 @@ export async function laneStart(o: LaneOpts, id: string, kind: "lane" | "trial" 
 	return { id, kind, slot: slot.path, branch, base };
 }
 
-// Records the helper run launched for a lane, trial or scout reservation (D-19).
-export async function laneRun(o: LaneOpts, id: string, run: string) {
+// Records the helper run launched for a lane, trial or scout reservation (D-19), and keeps it for the stats: a lane's
+// run counts on its step, a trial's or scout's on the main agent's step; artifacts = the session's subagent-artifacts folder.
+export async function laneRun(o: LaneOpts, id: string, run: string, { mainStep, artifacts }: { mainStep?: string; artifacts?: string } = {}) {
 	checkId(id); checkId(run, "run id");
 	const repo = await repoRoot(o.cwd), file = slotsFile(repo);
-	await locked(file, () => {
+	const kind = await locked(file, () => {
 		const state = load<Slots>(file, { slots: [], scouts: [] });
 		const owner = state.slots.find((slot) => slot.owner?.plan === o.plan && slot.owner.id === id && !slot.owner.orphan)?.owner;
 		const scout = state.scouts.find((item) => item.plan === o.plan && item.id === id);
 		if (!owner && !scout) throw new Error(`No helper ${id} to record a run for.`);
 		if (owner) owner.run = run; else scout.run = run;
 		save(file, state);
+		return owner?.kind ?? "scout";
 	});
-	await setLanes(o, (lanes) => lanes.map((lane) => lane.id === id ? { ...lane, run } : lane));
+	const step = kind === "lane" ? id : mainStep;
+	await setLanes(o, (lanes) => lanes.map((lane) => lane.id === id ? { ...lane, run } : lane), { run, id, kind, step, artifacts, at: new Date().toISOString() });
 	return { id, run };
+}
+
+// Usage, cost, model and duration of every helper run this plan recorded, from pi-subagents' <run>_<agent>[_i]_meta.json
+// files; duration from the metas' durationMs, else the run status. Unknown stays undefined, never 0.
+export function helperRuns(lanesFile: string) {
+	return load(lanesFile, { lanes: [] as Lane[], runs: [] as HelperRun[] }).runs?.map((recorded) => {
+		let metas = [];
+		try { metas = fs.readdirSync(recorded.artifacts).filter((name) => name.startsWith(`${recorded.run}_`) && name.endsWith("_meta.json")).map((name) => JSON.parse(fs.readFileSync(path.join(recorded.artifacts, name), "utf8"))); } catch {}
+		const status = runStatus(recorded.run);
+		const sum = (pick: (meta) => number | undefined) => metas.length && metas.every((meta) => Number.isFinite(pick(meta))) ? metas.reduce((total, meta) => total + pick(meta), 0) : undefined;
+		const span = Number.isFinite(status?.endedAt) && Number.isFinite(status?.startedAt) ? status.endedAt - status.startedAt : undefined;
+		return { run: recorded.run, id: recorded.id, kind: recorded.kind, step: recorded.step, model: [...new Set(metas.map((meta) => meta.model).filter(Boolean))].join(", ") || undefined,
+			cost: sum((meta) => meta.usage?.cost), tokens: sum((meta) => meta.usage && (meta.usage.input ?? 0) + (meta.usage.output ?? 0)), ms: sum((meta) => meta.durationMs) ?? span };
+	}) ?? [];
 }
 
 // A scout takes an admission place but no slot folder (D-20).

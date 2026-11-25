@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-25
-updated: 2026-11-25T11:19:02.094Z
+updated: 2026-11-25T11:22:08.854Z
 size: plan
 reviewed: 2026-11-25
 tagsChecked: a8b7e57e
@@ -131,9 +131,7 @@ Locked writes: `slots.json` changes only under the repository lock and `lanes.js
   - note: Design (assumed, from code reading): slot root = <PI_CODING_AGENT_DIR or ~/.pi/agent>/worktrees/<repo basename>-<sha8 of lowercased git toplevel>; slots.json there {limit, slots:[{n,path,owner|null,lastPlan}], scouts:[{plan,run}]} under withPlanLock(slots.json); per-plan docs/plans/logs/<id>.lanes.json {lanes:[{id,kind,slot,branch,base,run}]} under withPlanLock(lanes.json), lock order always repo then plan. Ops on tool action lane (param op): start (step|trial), run (record run id), scout (admit run id, no slot), drop, list; land is S-08. Run stopped = status.json state in complete/failed/partial/stopped/rejected/paused found at <PI_SUBAGENTS_TEMP_ROOT or tmpdir/pi-subagents-*>/async-subagent-runs/<run>/status.json; missing/queued/running = not stopped; status reader injectable for tests. workState gets lane-owned ids from lanes.json via summarize/resume (excluded from next/wip, still counted open for status complete). Complete: refuse while plan owns a lane; remove slots whose lastPlan is this plan and owner null.
 - [x] **S-02** plan3-lanes.ts slots (repo-wide admission cap shared with scouts, run-status guard, orphan slots, drop patches, completion cleanup) + plan3 action lane start|trial|run|scout|drop|list; lane-owned steps leave next/wip but block completion
 - [x] **S-08** lane pick (stopped helper, pinned range, refuse docs/plans/, cherry-pick onto current HEAD in slot, conflict aborts naming files) + lane land (ff-only main if HEAD unchanged else repick; D-17 watch: branch switch or rewritten history refused)
-- [ ] **S-03** Helper runs in plan stats: usage, cost, duration and model from subagent meta files, per plan and step, shown in the viewer
-  - Acceptance: a fixture with two overlapping helper runs recorded on two steps plus an unrelated run in the same session counts exactly the two, each on its own step; a run without duration shows unknown; main-agent numbers unchanged.
-  - Check: `node scripts/test-work-plan3-stats.mjs`.
+- [x] **S-03** lane run records {run,id,kind,step,artifacts} durably in lanes.json runs; helperRuns() joins pi-subagents <run>_*_meta.json (usage/cost/model, durationMs else status endedAt-startedAt, missing = unknown); stats viewer shows a Helpers section after main rows
 
 ### Phase 2: Helpers in planning and execution [think]
 
