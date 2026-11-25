@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-25
-updated: 2026-11-25T11:47:08.927Z
+updated: 2026-11-25T11:56:59.945Z
 size: plan
 reviewed: 2026-11-25
 tagsChecked: a8b7e57e
@@ -175,7 +175,7 @@ Plan acceptance:
 
 ## Resume context
 
-S-01, S-02, S-08, S-03 done and committed (HEAD 1a88d92f). Next: S-04 (settings Helpers 0..2 default 2 + Scout model; agents plan3-lane/plan3-scout; child write guard D-17; verify-package list). HELPERS const in extensions/plan3.ts (near availOf) is the placeholder S-04 replaces with the setting. Lane tool ops: start|trial|run|scout|pick|land|drop|list. No blockers.
+S-01..S-06 and S-08 done and committed (HEAD 32ff9ea1). Full `npm run verify:quiet`: exit 1 with 4 failures, none in the code this plan touched: test-work-compaction-notifications (:1484), test-work-wo-control (:41) and test-work-native-smoke (Cannot find module @earendil-works/pi-coding-agent) fail the same way on the pre-feature commit e8fc929d in a temporary worktree; the hub test-scheduler failed inside the suite but passes on its own (exit 0). All plan-targeted suites are green (plan3, -lanes, -stats, -night, settings). Remaining: S-07 is a pilot only the user can run (R-pilot-plan is off): the next real plan with 3+ independent steps at helpers=2, compared with the stats.json baselines; keep the default of 2 only if wall time drops at least 30% at no more than 30% extra cost, else set 0. No push.
 
 ## Amendments
 
