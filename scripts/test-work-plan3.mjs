@@ -2378,7 +2378,9 @@ try {
 		assert.match(on, /Land when your own step is committed[\s\S]*save those edits as a patch outside the repository[\s\S]*if restoring conflicts, stop and tell the user/);
 		// S-06: planning and write prompts carry the after:/scout rule with helpers, nothing at 0.
 		assert.match(planning, /give a step an indented "  - after: <step ids>" line only when it shares no functionality[\s\S]*same file in a different area is fine[\s\S]*When unsure, leave the step serial/);
-		assert.match(planning, /cleanup commands in the plan \(process kills, temp or port cleanup\) must match only the current checkout's path/);
+		assert.match(planning, /Cleanup commands in the plan \(process kills, temp or port cleanup\) must match only the current checkout's path/);
+		assert.match(planning, /stays serial when it writes or uses anything outside its own checkout \(the user's real data or settings folders, keys[\s\S]*check every after: step against this and remove the after: line/);
+		assert.match(on, /anything outside its own checkout[^.]*stays yours, even with an after: line/);
 		for (const [zero, two] of [[planningPrompt("p.md", "Draft plan:", true, 0), planningPrompt("p.md", "Draft plan:", true, 2)], [writePrompt("p.md", 0), writePrompt("p.md", 2)]]) {
 			assert.match(two, /lane op scout[\s\S]*prototype tickets may run as trials/);
 			assert.equal(two.replace(/\nHelpers \(at most 2[^\n]*/, ""), zero, "helpers 0 leaves planning prompts unchanged");
