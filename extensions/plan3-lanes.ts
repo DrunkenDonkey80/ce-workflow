@@ -7,7 +7,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+import { gitCalls } from "./command-guard.ts";
 import { withPlanLock } from "./plan3-files.ts";
+import { nightBlockReason } from "./plan3-night.ts";
 
 type Owner = { plan: string; id: string; kind: "lane" | "trial"; branch: string; base: string; run?: string; orphan?: boolean; started: string };
 type Slot = { n: number; path: string; owner: Owner | null; lastPlan?: string; stale?: string[] };
@@ -326,4 +328,40 @@ export async function removePlanSlots(cwd: string, plan: string) {
 	const branches = (await git(repo, "for-each-ref", "--format=%(refname:short)", `refs/heads/plan3/${plan}/`)).split(/\r?\n/).filter(Boolean);
 	for (const branch of branches) await git(repo, "branch", "-D", branch).catch(() => {});
 	return gone.map((slot) => slot.path);
+}
+
+// ---------- child guard (D-17, D-13) ----------
+// The slot (and the main checkout behind it) a helper child works in, or undefined when cwd is not a registered slot.
+function childSlot(cwd: string) {
+	const worktrees = path.join(process.env.PI_CODING_AGENT_DIR ?? path.join(os.homedir(), ".pi", "agent"), "worktrees");
+	const [root, name] = path.relative(worktrees, path.resolve(cwd)).split(path.sep);
+	if (!root || !name || root === ".." || path.isAbsolute(root)) return undefined;
+	const slot = path.join(worktrees, root, name);
+	if (!load<Slots>(path.join(worktrees, root, "slots.json"), { slots: [], scouts: [] }).slots.some((item) => key(item.path) === key(slot))) return undefined;
+	// A linked worktree's .git file points at <main>/.git/worktrees/<name>.
+	const gitdir = /^gitdir:\s*(.+)$/m.exec(fs.readFileSync(path.join(slot, ".git"), "utf8"))?.[1]?.trim();
+	return { slot, main: gitdir && path.resolve(slot, gitdir, "..", "..", "..") };
+}
+const slash = (text: string) => text.replaceAll("\\", "/").toLowerCase();
+// Git verbs that move refs other than the lane's own branch (a pathspec checkout after `--` is fine).
+const refChange = ({ verb, args }) => /^(?:push|update-ref|symbolic-ref|switch|worktree|fetch|pull)$/i.test(verb)
+	|| (/^checkout$/i.test(verb) && !args.includes("--"))
+	|| (/^branch$/i.test(verb) && args.some((arg) => /^(?:-[a-z]*[dDmMcCf]|--(?:delete|move|copy|force|set-upstream-to|unset-upstream))/.test(arg)))
+	|| (/^tag$/i.test(verb) && args.some((arg) => !/^(?:-l|--list|-n\d*)$/.test(arg)));
+// shortcut: word match on the shell text, not a sandbox; a disguised command can still escape (D-17 residual risk).
+export function slotGuard(event, cwd: string) {
+	if (process.env.PI_SUBAGENT_CHILD !== "1") return "";
+	const where = childSlot(cwd);
+	if (!where) return "";
+	if (["write", "edit"].includes(event.toolName)) {
+		const file = path.resolve(cwd, String(event.input?.path ?? "").replace(/^@/, ""));
+		return key(file).startsWith(key(where.slot) + path.sep) ? "" : `Plan3 helpers write only inside their slot ${where.slot}; stop and report what you need outside it.`;
+	}
+	if (!["bash", "hypa_shell"].includes(event.toolName)) return "";
+	const command = String(event.input?.command ?? "");
+	const main = where.main && slash(where.main);
+	const bashMain = main?.replace(/^([a-z]):/, "/$1");
+	if (main && (slash(command).includes(main) || slash(command).includes(bashMain))) return "Plan3 helpers never touch the main checkout; work only in your slot.";
+	if (gitCalls(command).some(refChange)) return "Plan3 helpers change no branch or ref but their own (no push, switch, checkout of a branch, branch/tag edits, fetch); commit on the current branch and report.";
+	return nightBlockReason(event, cwd);
 }

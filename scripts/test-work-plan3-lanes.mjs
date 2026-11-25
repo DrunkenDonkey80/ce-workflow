@@ -9,7 +9,7 @@ import path from "node:path";
 const temp = mkdtempSync(path.join(os.tmpdir(), "plan3-lanes-"));
 process.env.PI_CODING_AGENT_DIR = path.join(temp, "agent");
 Object.assign(process.env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" });
-const { assertSlot, laneDrop, laneLand, laneList, lanePick, laneOwned, laneRun, laneScout, laneStart, removePlanSlots, setRunState, slotRoot } = await import("../extensions/plan3-lanes.ts");
+const { assertSlot, laneDrop, laneLand, laneList, lanePick, laneOwned, laneRun, laneScout, laneStart, removePlanSlots, setRunState, slotGuard, slotRoot } = await import("../extensions/plan3-lanes.ts");
 
 const repo = path.join(temp, "repo");
 mkdirSync(repo);
@@ -164,6 +164,25 @@ try {
 	git(repo, "reset", "-q", "--keep", "HEAD~1");
 	await assert.rejects(lanePick(C, "L-06"), /Main checkout changed outside the main agent/, "rewritten history is caught too");
 	await laneDrop(C, "L-06");
+
+	// D-17/D-13 child guard: active only in a helper child whose cwd is a registered slot.
+	lane = await laneStart(C, "L-07");
+	const call = (toolName, input, cwd = lane.slot) => slotGuard({ toolName, input }, cwd);
+	assert.equal(call("write", { path: path.join(repo, "x.txt") }), "", "the main agent (no child flag) is not guarded");
+	process.env.PI_SUBAGENT_CHILD = "1";
+	try {
+		assert.match(call("write", { path: path.join(repo, "x.txt") }), /only inside their slot/, "a write into the main checkout is blocked");
+		assert.match(call("edit", { path: "../other/x.txt" }), /only inside their slot/, "a relative edit leaving the slot is blocked");
+		assert.equal(call("write", { path: "src/new.txt" }), "", "a write inside the slot passes");
+		assert.equal(call("bash", { command: "git add -A && git commit -m L-07 && git checkout -- a.txt" }), "", "own-branch work passes");
+		assert.match(call("bash", { command: `cat "${repo.replaceAll("\\", "/")}/a.txt"` }), /main checkout/, "naming the main checkout is blocked");
+		assert.match(call("bash", { command: "git push origin HEAD" }), /no branch or ref/);
+		assert.match(call("bash", { command: "git checkout master" }), /no branch or ref/, "switching branch is blocked");
+		assert.match(call("bash", { command: "git branch -f master HEAD" }), /no branch or ref/, "moving another branch is blocked");
+		assert.match(call("bash", { command: "shutdown /?" }), /Night mode blocks reboot/, "night-blocked commands are always refused");
+		assert.equal(call("write", { path: path.join(repo, "x.txt") }, repo), "", "outside a slot the hook does nothing");
+	} finally { delete process.env.PI_SUBAGENT_CHILD; }
+	await laneDrop(C, "L-07");
 	console.log("plan3 lanes ok");
 } finally {
 	rmSync(temp, { recursive: true, force: true, maxRetries: 5 });

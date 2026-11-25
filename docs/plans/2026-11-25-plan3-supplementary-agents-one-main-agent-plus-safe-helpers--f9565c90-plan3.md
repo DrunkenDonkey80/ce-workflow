@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-25
-updated: 2026-11-25T11:22:08.854Z
+updated: 2026-11-25T11:40:37.954Z
 size: plan
 reviewed: 2026-11-25
 tagsChecked: a8b7e57e
@@ -135,10 +135,7 @@ Locked writes: `slots.json` changes only under the repository lock and `lanes.js
 
 ### Phase 2: Helpers in planning and execution [think]
 
-- [ ] **S-04** Settings Helpers (0 to 2, default 2) and Scout model; agents plan3-lane and plan3-scout; child write guard (D-17); verify-package list updated
-  - Acceptance: project value beats global, unset means 2, 0 means off, 3 is refused; scout model unset means the coding model; the lane agent's tools exclude ask_user, plan3, subagent and intercom; the scout has only read, grep, find and ls.
-  - Guard, with `PI_SUBAGENT_CHILD=1` and cwd in a registered slot: write and edit outside the slot are blocked, a bash command naming the main checkout path or `git push` is blocked, a night-blocked command (harmless, e.g. `shutdown /?`) is blocked, work inside the slot passes; outside a slot the hook does nothing.
-  - Check: `node scripts/test-work-settings.mjs` and `node scripts/test-work-plan3-lanes.mjs`; the package list is covered by the final `npm run verify:quiet`.
+- [x] **S-04** Helpers 0..2 (project>global, unset 2, 0 refuses start/trial/scout, other values throw) and Scout model (unset = coding model) in phaseSettings + /work-settings rows; lane start/trial/scout return launch {agent, cwd, model}; agents plan3-lane (read,bash,edit,write) and plan3-scout (read,grep,find,ls); slotGuard child tool_call guard in plan3-lanes.ts wired into plan3.ts; verify-package list updated
 - [ ] **S-05** Execute prompt and boundary with helper rules (lanes, trials, scouts, landing, serial fallback); stop check and night stall aware of in-flight lanes
   - Prompt text only when helpers > 0; with 0 the prompts are byte-identical to today's (test compares).
   - Conflict fallback per D-14: the prompt says drop the lane and redo the step serially, never resolve or relaunch.
@@ -185,7 +182,7 @@ Plan acceptance:
 
 ## Resume context
 
-Planning done, review applied: all 11 advisor findings accepted (Amendments); new D-17 to D-20, D-05 and D-08 revised, S-08 landing step added. No open questions. Draft awaits /plan3 finish. Next: S-01 (after: dependencies in workState).
+S-01, S-02, S-08, S-03 done and committed (HEAD 1a88d92f). Next: S-04 (settings Helpers 0..2 default 2 + Scout model; agents plan3-lane/plan3-scout; child write guard D-17; verify-package list). HELPERS const in extensions/plan3.ts (near availOf) is the placeholder S-04 replaces with the setting. Lane tool ops: start|trial|run|scout|pick|land|drop|list. No blockers.
 
 ## Amendments
 

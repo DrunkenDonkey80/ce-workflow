@@ -37,7 +37,7 @@ check("native store is packaged", pkg.files?.includes("extensions/"));
 check("only active utility agents are statically advertised",
 	pkg.files?.includes("utility-agents/") &&
 	JSON.stringify(pkg.pi?.subagents?.agents) === '["./utility-agents"]' &&
-	JSON.stringify(listed("utility-agents")) === '["context-knowledge-discoverer.md","diff-reviewer.md","plan3-advisor.md"]');
+	JSON.stringify(listed("utility-agents")) === '["context-knowledge-discoverer.md","diff-reviewer.md","plan3-advisor.md","plan3-lane.md","plan3-scout.md"]');
 check("no legacy orchestration assets ship",
 	!pkg.pi?.prompts && !["agents", "prompts", "skills/work-orchestrator"].some((rel) => existsSync(path.join(root, rel))));
 check("only the standalone skills are statically advertised",

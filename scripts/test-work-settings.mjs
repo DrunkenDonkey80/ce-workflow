@@ -483,6 +483,23 @@ try {
 		!readdirSync(globalDir).some((name) => name.endsWith(".tmp")),
 		"successful imports leave no temporary files",
 	);
+	{
+		// D-03/D-04: Helpers 0..2 (project beats global, unset 2) and Scout model (unset = coding model).
+		const { phaseSettings } = await import(pathToFileURL(path.join(import.meta.dirname, "../extensions/plan3.ts")).href);
+		writeSettings({});
+		writeGlobalSettings({ workOrchestrator: { plan3: { codingModel: "test/coder" } } });
+		assert(phaseSettings(cwd).helpers === 2, "unset Helpers means 2");
+		assert(phaseSettings(cwd).scout.model === "test/coder", "unset Scout model means the coding model");
+		await invoke("work-settings", "", mappingCtx([{ target: "Plan3 → Helpers: 2", key: "enter" }, { target: "0 (off)", key: "enter" }, { expectText: "Plan3 → Helpers: 0", key: "escape" }]));
+		assert(JSON.parse(readFileSync(globalSettingsFile(), "utf8")).workOrchestrator.plan3.helpers === 0 && phaseSettings(cwd).helpers === 0, "the Helpers row saves 0 = off");
+		writeSettings({ workOrchestrator: { plan3: { helpers: 1, scoutModel: "test/cheap" } } });
+		assert(phaseSettings(cwd).helpers === 1 && phaseSettings(cwd).scout.model === "test/cheap", "project Helpers and Scout model beat global");
+		writeSettings({ workOrchestrator: { plan3: { helpers: 3 } } });
+		let refused = "";
+		try { phaseSettings(cwd); } catch (error) { refused = error.message; }
+		assert(/must be 0, 1 or 2/.test(refused), "Helpers 3 is refused");
+		writeSettings({});
+	}
 } finally {
 	rmSync(cwd, { recursive: true, force: true });
 	rmSync(globalDir, { recursive: true, force: true });

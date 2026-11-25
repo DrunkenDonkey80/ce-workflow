@@ -4505,6 +4505,16 @@ async function workSettingsLoop(ctx, pi = undefined) {
 				description: `${description}; unset keeps the session's own model. Each switch re-reads the context uncached once.`,
 			})),
 {
+				kind: "helpers", value: "helpers",
+				label: `Plan3 → Helpers: ${settings.workOrchestrator?.plan3?.helpers ?? 2} ${SUBMENU_ARROW}`,
+				description: "How many helper agents (lanes, trials, scouts) may run beside the main agent at once in this repository; 0 = the main agent does everything itself.",
+			},
+{
+				kind: "phaseModel", value: "scoutModel",
+				label: `Plan3 → Scout model: ${names.get(settings.workOrchestrator?.plan3?.scoutModel) ?? settings.workOrchestrator?.plan3?.scoutModel ?? "same as coding model"} ${SUBMENU_ARROW}`,
+				description: "Model of read-only research scouts; unset uses the Coding model. Lanes always use the Coding model and effort.",
+			},
+{
 				kind: "codingEffort",
 				value: "codingEffort",
 				label: `Plan3 → Coding effort: ${settings.workOrchestrator?.plan3?.codingEffort ?? "same as session"} ${SUBMENU_ARROW}`,
@@ -4675,8 +4685,20 @@ async function workSettingsLoop(ctx, pi = undefined) {
 			await editScopedModels(ctx);
 			continue;
 		}
+		if (pick.kind === "helpers") {
+			const count = await choose(ctx, "Plan3 helpers", ["0", "1", "2"].map((value) => ({ value, label: value === "0" ? "0 (off)" : value, description: value === "0" ? "The main agent works alone" : `At most ${value} helper${value === "1" ? "" : "s"} at once` })), String(settings.workOrchestrator?.plan3?.helpers ?? 2), { forceCustom: true });
+			if (!count) continue;
+			settings = readScopedSettings(ctx.cwd, scope);
+			settings.workOrchestrator ??= {};
+			settings.workOrchestrator.plan3 ??= {};
+			settings.workOrchestrator.plan3.helpers = Number(count);
+			writeScopedSettings(ctx.cwd, scope, settings);
+			ctx.ui.notify(`Plan3 helpers: ${count}`, "info");
+			continue;
+		}
 		if (pick.kind === "phaseModel") {
-			const model = await chooseModel(ctx, `Plan3 ${pick.value === "codingModel" ? "coding" : "planning"} model`, settings.workOrchestrator?.plan3?.[pick.value] ?? INHERIT_MODEL, false, scope === "project");
+			const what = { codingModel: "coding", planningModel: "planning", scoutModel: "scout" }[pick.value];
+			const model = await chooseModel(ctx, `Plan3 ${what} model`, settings.workOrchestrator?.plan3?.[pick.value] ?? INHERIT_MODEL, false, scope === "project");
 			if (!model) continue;
 			settings = readScopedSettings(ctx.cwd, scope);
 			settings.workOrchestrator ??= {};
@@ -4684,7 +4706,7 @@ async function workSettingsLoop(ctx, pi = undefined) {
 			if (model === INHERIT_MODEL) delete settings.workOrchestrator.plan3[pick.value];
 			else settings.workOrchestrator.plan3[pick.value] = model;
 			writeScopedSettings(ctx.cwd, scope, settings);
-			ctx.ui.notify(`Plan3 ${pick.value === "codingModel" ? "coding" : "planning"} model: ${model === INHERIT_MODEL ? "same as session" : model}`, "info");
+			ctx.ui.notify(`Plan3 ${what} model: ${model === INHERIT_MODEL ? (pick.value === "scoutModel" ? "same as coding model" : "same as session") : model}`, "info");
 			continue;
 		}
 		if (pick.kind === "codingEffort") {

@@ -25,7 +25,7 @@ import { releaseSessionLock, takeSessionLock } from "./session-lock.ts";
 import { childWorkItems, listWorkItems, loadStore } from "./work-store.ts";
 import { docCandidates, slug as docSlug, writeDocs } from "./plan3-docs.ts";
 import { lockedWritesNote } from "./locked-writes.ts";
-import { helperRuns, laneDrop, laneLand, laneList, lanePick, laneOwned, laneRun, laneScout, laneStart, removePlanSlots } from "./plan3-lanes.ts";
+import { helperRuns, laneDrop, laneLand, laneList, lanePick, laneOwned, laneRun, laneScout, laneStart, removePlanSlots, slotGuard } from "./plan3-lanes.ts";
 import { registerTestSensitivity, TEST_SENSITIVITY } from "./test-sensitivity.ts";
 import { SELF_VERIFY } from "./self-verify.ts";
 import { runsGit } from "./command-guard.ts";
@@ -220,7 +220,6 @@ function workState(lines, avail) {
 const isMap = (lines) => lines[0] === "---" && getMeta(lines, "kind") === "map";
 // Requirement switches plus the steps lanes own (D-18), so every workState caller leaves those out of next and wip.
 const availOf = (file) => ({ ...readAvail(needsFile(logFile(file))), laneOwned: laneOwned(lanesFileOf(file)) });
-const HELPERS = 2; // Helper places per repository (D-20).
 const lanesFileOf = (file) => logFile(file).replace(/\.md$/, ".lanes.json");
 function appendToSection(lines, name, text, create = false) {
 	let found = section(lines, name);
@@ -582,7 +581,9 @@ export function phaseSettings(cwd, plan?) {
 	const project = readJson(path.join(cwd, ".pi", "settings.json")).workOrchestrator?.plan3 ?? {};
 	const global = readJson(path.join(agentDir, "settings.json")).workOrchestrator?.plan3 ?? {};
 	const pick = (key) => plan?.overrides?.[key] ?? project[key] ?? global[key];
-	return { planning: { model: pick("planningModel") }, coding: { model: pick("codingModel"), thinking: pick("codingEffort") } };
+	const helpers = project.helpers ?? global.helpers ?? 2; // D-03: project, then global; never a plan override.
+	if (![0, 1, 2].includes(helpers)) throw new Error(`Setting workOrchestrator.plan3.helpers must be 0, 1 or 2, not ${JSON.stringify(helpers)}.`);
+	return { planning: { model: pick("planningModel") }, coding: { model: pick("codingModel"), thinking: pick("codingEffort") }, scout: { model: project.scoutModel ?? global.scoutModel ?? pick("codingModel") }, helpers };
 }
 const family = (model) => String(model).split("/").pop().split("-")[0].toLowerCase();
 // Default prefers another family; all excludes only the exact current model.
@@ -1863,7 +1864,8 @@ export default function plan3(pi) {
 				result = await byPlanId(plan.id, () => size(ctx, plan, need("mode"), need("text").split(/\r?\n/)[0].trim()));
 				if (result.tiny) { await refresh(ctx); return { content: [{ type: "text", text: JSON.stringify(result) }], details: result }; } // The draft is gone: skip the summary tail.
 			} else if (args.action === "lane") {
-				const op = need("op"), lanes = { cwd: ctx.cwd, plan: plan.id, lanesFile: lanesFileOf(plan.file), limit: HELPERS };
+				const op = need("op"), phases = phaseSettings(ctx.cwd, plan), lanes = { cwd: ctx.cwd, plan: plan.id, lanesFile: lanesFileOf(plan.file), limit: phases.helpers };
+				if (!phases.helpers && ["start", "trial", "scout"].includes(op)) throw new Error("Helpers are off (setting 0): do this yourself.");
 				if (op === "start") {
 					const id = need("id");
 					if (!summarize(plan.file, await readFile(plan.file, "utf8"), path.dirname(plan.file)).lanes.includes(id)) throw new Error(`${id} is not lane-eligible now: it needs an after: line whose steps are done, a [code] phase and no requirements.`);
@@ -1879,6 +1881,9 @@ export default function plan3(pi) {
 				else if (op === "drop") result = await laneDrop(lanes, need("id"));
 				else if (op === "list") result = await laneList(lanes);
 				else throw new Error("lane op must be start, trial, run, scout, pick, land, drop or list.");
+				// D-04: writers run on the coding model and effort; scouts may use a cheaper Scout model.
+				if (op === "start" || op === "trial") result.launch = { agent: "plan3-lane", cwd: result.slot, model: phases.coding.model && `${phases.coding.model}${phases.coding.thinking ? `:${phases.coding.thinking}` : ""}` };
+				if (op === "scout") result.launch = { agent: "plan3-scout", model: phases.scout.model };
 			} else if (args.action === "ideas") {
 				result = await reviewIdeas(ctx, plan, args.ideas, _signal);
 			} else if (args.action === "idea") {
@@ -2267,6 +2272,8 @@ export default function plan3(pi) {
 	const planWrites = new Map<string, () => void>();
 	// shortcut: shell writes and external editors do not take this lock; use Edit/Write for plan prose.
 	pi.on?.("tool_call", (event, ctx) => {
+		const slotBlock = slotGuard(event, ctx.cwd);
+		if (slotBlock) return { block: true, reason: slotBlock };
 		if (executeRun && ["bash", "hypa_shell"].includes(event.toolName) && runsGit(event.input?.command, /^push$/i))
 			return { block: true, reason: "Plan3 execute runs never push: commit locally and continue. The user pushes, or asks for a push after this run ends." };
 		if (!["edit", "write"].includes(event.toolName) || typeof event.input?.path !== "string") return;
