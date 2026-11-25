@@ -39,9 +39,10 @@ export function nightBlockReason(event, cwd = process.cwd()) {
 const git = promisify(execFile);
 const STATS = ":(exclude,glob)**/*.stats.json"; // Plan3 telemetry changes every turn; it is not progress.
 const NEEDS = ":(exclude,glob)**/*.needs.json"; // The user switching requirements is not progress either.
-export async function fingerprint(cwd, file = "") {
+// lanesFile: lane start, land and drop are progress too (D-13), even while the sidecar is untracked.
+export async function fingerprint(cwd, file = "", lanesFile = "") {
 	const out = (args) => git("git", args, { cwd, maxBuffer: 64 * 1024 * 1024 }).then((result) => result.stdout, () => "");
-	const parts = await Promise.all([out(["rev-parse", "HEAD"]), out(["status", "--porcelain", "--", ".", STATS, NEEDS]), out(["diff", "HEAD", "--", ".", STATS, NEEDS]), readFile(file, "utf8").catch(() => "")]);
+	const parts = await Promise.all([out(["rev-parse", "HEAD"]), out(["status", "--porcelain", "--", ".", STATS, NEEDS]), out(["diff", "HEAD", "--", ".", STATS, NEEDS]), readFile(file, "utf8").catch(() => ""), readFile(lanesFile, "utf8").catch(() => "")]);
 	return createHash("sha256").update(parts.join("\0")).digest("hex");
 }
 
@@ -55,7 +56,12 @@ function keepAwake() {
 	return child;
 }
 
-export const stopCheckMessage = (plan) => !plan.wip.length && !plan.next
+// Owned lanes whose helper stopped wait on the main agent to land or drop them (D-19).
+const landable = (plan) => (plan.laneOwned ?? []).filter((id) => !(plan.laneLive ?? []).includes(id));
+const LAND_NOTE = (ids) => `Helper lanes ${ids.join(", ")} have stopped: land each (plan3 lane op pick, its targeted checks, lane op land, mark it done) or drop it (lane op drop) and do the step yourself.`;
+export const stopCheckMessage = (plan) => !plan.wip.length && !plan.next && landable(plan).length
+	? `Plan3: you stopped while "${plan.title}" still has work. ${LAND_NOTE(landable(plan))}`
+	: !plan.wip.length && !plan.next
 	? `Plan3: you stopped while "${plan.title}" has [human] steps (${plan.human.join(", ")}) and the user is here. Ask with ask_user whether to do ${plan.human[0]} now (what you need, how long it takes, your recommendation); on yes mark it wip and do it with the user, on no or later leave it [human]. If the user already declined or asked you to stop, say so in one line and stop.`
 	: `Plan3: you stopped while "${plan.title}" still has runnable work (next: ${plan.wip[0] ?? plan.next}). If there is a real reason (a decision only the user can make, a physical action, a blocker for all remaining runnable work, or the user asked you to stop or asked something else), say it in one line and stop. Otherwise continue with the next step now; a checkpoint or finished step is not a reason to stop.`;
 
@@ -112,7 +118,7 @@ export function createNight(pi, { listPlans, currentPlan, resume, research, exec
 		}
 		const needs = await switchNeeds?.(ctx, plan, "night");
 		research(ctx, false);
-		night = { plan: plan.id, rules, fp: await fingerprint(ctx.cwd, plan.file), stalls: 0 };
+		night = { plan: plan.id, rules, fp: await fingerprint(ctx.cwd, plan.file, plan.lanesFile), stalls: 0 };
 		release();
 		awake = keepAwake();
 		persist();
@@ -153,15 +159,17 @@ export function createNight(pi, { listPlans, currentPlan, resume, research, exec
 	};
 	pi.on?.("agent_start", async (_event, ctx) => {
 		const plan = !night && await runPlan(ctx);
-		baseline = plan ? await fingerprint(ctx.cwd, plan.file) : undefined;
+		baseline = plan ? await fingerprint(ctx.cwd, plan.file, plan.lanesFile) : undefined;
 	});
 	// Outside night mode, a /resume3 run that did work and stops with runnable steps left gets one
 	// "is there a reason?" continue; a stop after no new work (the reason reply, a chat answer) settles.
 	async function stopCheck(event, ctx) {
 		if (baseline === undefined || event.outcome !== "completed" || event.continue || budgetSpent?.(ctx)) return;
 		const plan = await runPlan(ctx);
-		if (!plan || plan.status === "complete" || (!plan.next && !plan.wip.length && !plan.human.length)) return;
-		const fp = await fingerprint(ctx.cwd, plan.file);
+		if (!plan || plan.status === "complete") return;
+		// Quiet while only running helpers (or nothing runnable) remain; stopped lanes still need landing.
+		if (!plan.next && !plan.wip.length && !landable(plan).length && (plan.laneLive?.length || !plan.human.length)) return;
+		const fp = await fingerprint(ctx.cwd, plan.file, plan.lanesFile);
 		if (fp === baseline) return;
 		baseline = fp;
 		return { entries: [{ type: "custom_message", customType: "plan3-stop-check", content: stopCheckMessage(plan), display: true }], continue: true };
@@ -183,12 +191,15 @@ export function createNight(pi, { listPlans, currentPlan, resume, research, exec
 		if (budgetSpent?.(ctx)) return stop(ctx, "run budget reached");
 		const plan = (await listPlans(ctx.cwd)).find((candidate) => candidate.id === night.plan);
 		if (!plan || plan.status === "complete" || (plan.total && plan.done === plan.total)) return stop(ctx, "", true);
-		if (!plan.next && !plan.wip.length) return stop(ctx, "every remaining step is blocked or needs you");
-		const fp = await fingerprint(ctx.cwd, plan.file);
+		const idle = !plan.next && !plan.wip.length, land = landable(plan);
+		// Only running helpers left: settle quietly; their completion wakes the session.
+		if (idle && !land.length && plan.laneLive?.length) return;
+		if (idle && !land.length) return stop(ctx, "every remaining step is blocked or needs you");
+		const fp = await fingerprint(ctx.cwd, plan.file, plan.lanesFile);
 		night.stalls = fp === night.fp ? night.stalls + 1 : 0;
 		night.fp = fp;
 		if (night.stalls >= 2) return stop(ctx, "two continues changed nothing");
-		return { entries: [{ type: "custom_message", customType: ENTRY, content: nightMessage(night.rules), display: true }], continue: true };
+		return { entries: [{ type: "custom_message", customType: ENTRY, content: nightMessage(night.rules) + (idle ? `\n\n${LAND_NOTE(land)}` : ""), display: true }], continue: true };
 	});
 	return {
 		// /reload keeps night mode: restore the banner and keep-awake; continuation resumes at the next settle.

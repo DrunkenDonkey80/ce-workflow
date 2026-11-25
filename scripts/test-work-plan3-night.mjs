@@ -88,6 +88,23 @@ try {
 	assert.equal(await settle(), undefined, "[human] steps are not runnable at night");
 	assert.match(notices.at(-1).message, /every remaining step is blocked or needs you/);
 	plan = { ...plan, human: [] };
+	// Night with only lane-owned steps: running helpers settle quietly (no stop), stopped ones continue with the landing note.
+	const nightLanes = path.join(cwd, "night.lanes.json");
+	await writeFile(nightLanes, "a");
+	plan = { ...plan, lanesFile: nightLanes, laneOwned: ["S3"], laneLive: ["S3"] };
+	await commands.get("night").handler("off", ctx);
+	await commands.get("night").handler("on", ctx);
+	const stopsBefore = notices.length;
+	assert.equal(await settle(), undefined, "running lanes: settle and wait for their wake");
+	assert.equal(notices.length, stopsBefore, "night mode is not stopped while helpers run");
+	plan = { ...plan, laneLive: [] };
+	result = await settle();
+	assert.match(result.entries[0].content, /Helper lanes S3 have stopped/);
+	await writeFile(nightLanes, "b");
+	assert.equal((await settle()).continue, true, "a lane land or drop counts as progress");
+	assert.equal((await settle()).continue, true, "first unchanged continue");
+	assert.equal(await settle(), undefined, "then the stall stop as today");
+	plan = { ...plan, laneOwned: [], laneLive: [], lanesFile: undefined };
 	await commands.get("night").handler("off", ctx);
 	plan = { ...plan, done: 3, next: undefined };
 	await commands.get("night").handler("on", ctx);
@@ -146,7 +163,16 @@ try {
 	plan = { ...plan, human: [] };
 	await writeFile(file, "v4c");
 	assert.equal(await stopAt(), undefined, "nothing runnable");
-	plan = { ...plan, next: "S2" };
+	// D-13/D-19: only lane-owned steps left. A running helper keeps the guard quiet; a stopped one must be landed or dropped.
+	const lanesFile = path.join(cwd, "p1.lanes.json");
+	plan = { ...plan, lanesFile, laneOwned: ["S3"], laneLive: ["S3"], human: ["S55"] };
+	await writeFile(lanesFile, "start");
+	assert.equal(await stopAt(), undefined, "a running lane is waited for, not questioned");
+	plan = { ...plan, laneLive: [], human: [] };
+	await writeFile(lanesFile, "stopped");
+	result = await stopAt();
+	assert.match(result?.entries[0].content ?? "", /Helper lanes S3 have stopped: land each[\s\S]*lane op drop/, "a stopped lane is pushed as today");
+	plan = { ...plan, laneOwned: [], lanesFile: undefined, next: "S2" };
 	executing = undefined;
 	await guardHooks.get("agent_start")({}, ctx);
 	await writeFile(file, "v5");

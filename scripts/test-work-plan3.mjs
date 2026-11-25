@@ -12,7 +12,7 @@ import { existsSync, readFileSync, renameSync } from "node:fs";
 import { access, copyFile, mkdir, mkdtemp, readFile, readdir, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import plan3, { retroModel, listPlans, similarity, optimizeLint, phaseSettings, inlineOptions, questionChoices, finishProblems, needsThinkTags } from "../extensions/plan3.ts";
+import plan3, { executePrompt, retroModel, listPlans, similarity, optimizeLint, phaseSettings, inlineOptions, questionChoices, finishProblems, needsThinkTags } from "../extensions/plan3.ts";
 // Prose "Options:" lists become resolve choices when a question has no "- Option:" lines.
 assert.deepEqual(inlineOptions("- **Q-03** Pick. Options: (a) freeze v1, keep hashes; (b) snapshots; (c) leave it. Picked (a).").map(o => o.label), ["(a) freeze v1, keep hashes", "(b) snapshots", "(c) leave it"]);
 assert.deepEqual(inlineOptions("- **Q-04** Cap? Options: accept as incomplete (current), raise the cap, or send smaller. Any change needs a version.").map(o => o.label), ["accept as incomplete (current)", "raise the cap", "send smaller"]);
@@ -2369,6 +2369,13 @@ try {
 	}
 	const execution = messages.find(entry => entry.message.startsWith("Plan3: execute/resume"))?.message;
 	assert(execution, "missing execution handoff");
+	// Helpers default 2: the rule rides the execute prompt; with 0 the prompt is exactly the one without it.
+	assert.match(execution, /Helpers \(at most 2 at once[\s\S]*lane op drop and do the step yourself on current master from its diff; never resolve conflicts in the slot or relaunch[\s\S]*main checkout changed outside you, drop every lane and continue serially/);
+	{
+		const sample = { file: "p.md", kind: undefined }, off = executePrompt(sample, [], "PACKET", 0), on = executePrompt(sample, [], "PACKET", 2);
+		assert.doesNotMatch(off, /Helpers \(at most/);
+		assert.equal(on.replace(/\nHelpers \(at most 2[^\n]*/, ""), off, "helpers 0 adds nothing to the execute prompt");
+	}
 	assert.match(execution, /For web UI steps, consult frontend-design as needed/);
 	assert.match(execution, /follow settled design decisions and existing tokens\/components without restarting brainstorming or expanding scope/);
 	assert.match(execution, /Check usability and accessibility with available project tools; native\/TUI work follows platform rules/);

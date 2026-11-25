@@ -90,6 +90,8 @@ async function setLanes(o: LaneOpts, change: (lanes: Lane[]) => Lane[], run?: He
 	});
 }
 export const laneOwned = (lanesFile: string) => load(lanesFile, { lanes: [] as Lane[] }).lanes.filter((lane) => lane.kind === "lane").map((lane) => lane.id);
+// Lane-owned steps whose recorded helper run is still going (D-19: an unknown run counts as going, no run as stopped).
+export const laneLive = (lanesFile: string) => load(lanesFile, { lanes: [] as Lane[] }).lanes.filter((lane) => lane.kind === "lane" && !stopped(lane.run)).map((lane) => lane.id);
 
 // ---------- operations ----------
 export async function laneStart(o: LaneOpts, id: string, kind: "lane" | "trial" = "lane") {
