@@ -12,7 +12,7 @@ import { existsSync, readFileSync, renameSync } from "node:fs";
 import { access, copyFile, mkdir, mkdtemp, readFile, readdir, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import plan3, { executePrompt, planningPrompt, writePrompt, retroModel, listPlans, similarity, optimizeLint, phaseSettings, inlineOptions, questionChoices, finishProblems, needsThinkTags } from "../extensions/plan3.ts";
+import plan3, { executePrompt, planningPrompt, writePrompt, retroModel, listPlans, similarity, optimizeLint, phaseSettings, inlineOptions, questionChoices, finishProblems, needsThinkTags, parallelLint, parallelPrompt } from "../extensions/plan3.ts";
 // Prose "Options:" lists become resolve choices when a question has no "- Option:" lines.
 assert.deepEqual(inlineOptions("- **Q-03** Pick. Options: (a) freeze v1, keep hashes; (b) snapshots; (c) leave it. Picked (a).").map(o => o.label), ["(a) freeze v1, keep hashes", "(b) snapshots", "(c) leave it"]);
 assert.deepEqual(inlineOptions("- **Q-04** Cap? Options: accept as incomplete (current), raise the cap, or send smaller. Any change needs a version.").map(o => o.label), ["accept as incomplete (current)", "raise the cap", "send smaller"]);
@@ -603,6 +603,15 @@ try {
 		assert.deepEqual(finishProblems(validPlan("x", "After", "draft", afterSteps(" "))), []);
 		assert.deepEqual(finishProblems(validPlan("x", "After", "draft", afterSteps(" ").replace("after: W-01\n- [ ] **W-03**", "after: W-09\n- [ ] **W-03**").replace("- [ ] **W-04** Browser\n  - after: W-01", "- [ ] **W-04** Browser\n  - after: W-02"))), ["after: names unknown steps (W-02 after W-09)"]);
 		assert.deepEqual(finishProblems(validPlan("x", "After", "draft", afterSteps(" ").replace("Core", "Core\n  - after: W-04"))), ["after: lines form a cycle (W-01)"]);
+		// Parallel pass: every pending [code] step needs an after: or serial: verdict; after: none runs from the start.
+		assert.deepEqual(parallelLint(validPlan("x", "After", "draft", afterSteps(" "))), ["W-01", "W-03"]);
+		assert.deepEqual(parallelLint(validPlan("x", "After", "draft", afterSteps(" ").replace("Core", "Core\n  - after: none").replace("Docs", "Docs\n  - serial: writes the live key"))), []);
+		assert.deepEqual(parallelLint(validPlan("x", "After", "draft", afterSteps(" ").replace("[code]", "[think]"))), [], "only [code] steps get verdicts");
+		assert.deepEqual(finishProblems(validPlan("x", "After", "draft", afterSteps(" ").replace("Core", "Core\n  - after: none"))), [], "after: none is not an unknown step");
+		await writeFile(afterFile, validPlan("8d8d8d8d", "After", "active", afterSteps("x").replace("Docs", "Docs\n  - after: none")));
+		assert.deepEqual((await listPlans(ctx.cwd)).find((plan) => plan.id === "8d8d8d8d").lanes, ["W-02", "W-03", "W-04"], "after: none is lane-eligible");
+		await rm(afterFile);
+		assert.match(parallelPrompt("p.md", ["W-01"]), /W-01[\s\S]*after: none[\s\S]*serial: <reason>[\s\S]*fixed registry key[\s\S]*per-test sessions or redirects[\s\S]*are not a conflict/);
 		assert.doesNotMatch(resumeMessage, /hard limit/);
 		// Execution: defaults instead of questions, acceptance-depth work, local commits, never push.
 		assert.match(resumeMessage, /reversible choice with a sensible default, choose it, record one Decisions line marked assumed/);
@@ -1732,6 +1741,10 @@ try {
 		let finishCallbacks, entered;
 		const compactEntered = new Promise(resolve => { entered = resolve; });
 		tokens = 25_000; webCtx.compact = callbacks => { finishCallbacks = callbacks; entered(); };
+		// Helpers default to 2: a step without an after:/serial: verdict gets the parallel pass instead of finishing.
+		assert.equal((await post("command", { command: "finish" })).status, 200);
+		assert.match(messages.at(-1).message, /^Plan3 parallel pass for .*: B-01\./);
+		await writeFile(bFile, (await readFile(bFile, "utf8")).replace("Implement", "Implement\n  - serial: changes the same API as nothing else"));
 		const finishRequest = post("command", { command: "finish" });
 		await Promise.race([compactEntered, finishRequest.then(result => { throw new Error(`Finish did not enter compaction: ${JSON.stringify(result)}`); })]);
 		assert.equal((await post("command", { command: "finish" })).status, 409);
@@ -2377,9 +2390,8 @@ try {
 		assert.equal(on.replace(/\nHelpers \(at most 2[^\n]*/, ""), off, "helpers 0 adds nothing to the execute prompt");
 		assert.match(on, /Land when your own step is committed[\s\S]*save those edits as a patch outside the repository[\s\S]*if restoring conflicts, stop and tell the user/);
 		// S-06: planning and write prompts carry the after:/scout rule with helpers, nothing at 0.
-		assert.match(planning, /give a step an indented "  - after: <step ids>" line only when it shares no functionality[\s\S]*same file in a different area is fine[\s\S]*When unsure, leave the step serial/);
+		assert.match(planning, /Do not add after: or serial: lines while planning; once the plan could be finished, Plan3 sends one parallel pass/);
 		assert.match(planning, /Cleanup commands in the plan \(process kills, temp or port cleanup\) must match only the current checkout's path/);
-		assert.match(planning, /stays serial when it writes or uses anything outside its own checkout \(the user's real data or settings folders, keys[\s\S]*check every after: step against this and remove the after: line/);
 		assert.match(on, /anything outside its own checkout[^.]*stays yours, even with an after: line/);
 		for (const [zero, two] of [[planningPrompt("p.md", "Draft plan:", true, 0), planningPrompt("p.md", "Draft plan:", true, 2)], [writePrompt("p.md", 0), writePrompt("p.md", 2)]]) {
 			assert.match(two, /lane op scout[\s\S]*prototype tickets may run as trials/);

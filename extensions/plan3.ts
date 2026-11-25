@@ -197,9 +197,17 @@ function stepNeeds(lines, step) {
 	const own = lines.slice(step.index + 1, blockEnd(lines, step)).filter((line) => /^\s+- needs:/i.test(line));
 	return [...phase, ...own].flatMap((line) => line.replace(/^\s*(?:- )?needs:\s*/i, "").split(/[\s,]+/)).filter(Boolean);
 }
-// "  - after: W-01, W-03": the step needs only those steps, so a lane may run it once they are done (D-05).
-const stepAfter = (lines, step) => lines.slice(step.index + 1, blockEnd(lines, step)).filter((line) => /^\s+- after:/i.test(line))
-	.flatMap((line) => line.replace(/^\s*- after:\s*/i, "").split(/[\s,]+/)).filter(Boolean);
+// "  - after: W-01, W-03": the step needs only those steps, so a lane may run it once they are done (D-05); "after: none" may run from the start.
+const afterLines = (lines, step) => lines.slice(step.index + 1, blockEnd(lines, step)).filter((line) => /^\s+- after:/i.test(line));
+const stepAfter = (lines, step) => afterLines(lines, step).flatMap((line) => line.replace(/^\s*- after:\s*/i, "").split(/[\s,]+/)).filter((id) => id && !/^none$/i.test(id));
+// Pending [code] steps without requirements that still lack a parallel verdict (an after: or serial: line).
+export function parallelLint(text) {
+	const { lines } = split(text);
+	if (isMap(lines)) return [];
+	return activeSteps(lines).filter((step) => step.mark === "pending" && !stepNeeds(lines, step).length && /\[code\]/i.test(lines[phaseHeading(lines, step.index)] ?? "")
+		&& !lines.slice(step.index + 1, blockEnd(lines, step)).some((line) => /^\s+- (?:after|serial):/i.test(line))).map((step) => step.id);
+}
+export const parallelPrompt = (file, ids) => `Plan3 parallel pass for ${JSON.stringify(file)}. Planning only: add one line under each of these steps and change nothing else: ${ids.join(", ")}.\nHelpers may run a step in a separate Git worktree of this repository, on this same machine, while the main agent and another helper work. For each step decide one of:\n- "  - after: <step ids>" when it can run beside other steps: list every step whose results it builds on, or "after: none" when it builds on none.\n- "  - serial: <reason>" naming the exact conflict, only for one of these: (1) it changes the same functionality as a step that could run at the same time (the same function, data format, protocol or UI flow; different areas of one file are fine); (2) it writes or uses something outside its own checkout: the user's real data or settings folders, keys, a fixed registry key, a live install, a fixed port, a device, a fixed folder or build directory outside the checkout, killing processes by name; (3) it runs a long full build.\nName the exact function, file, key, port or folder; read the code when the plan does not say. Test tools that isolate each run (temp folders, per-test sessions or redirects, ports picked at random) are not a conflict. A step that cannot name a concrete conflict gets after:.`;
 // The one work selector (summary, packet, phase mode, stats, next): open steps whose requirements are defined and on.
 function workState(lines, avail) {
 	const defs = requirementDefs(lines);
@@ -213,7 +221,7 @@ function workState(lines, avail) {
 	const first = isMap(lines) ? activeSteps(lines).find((step) => step.mark !== "x") : undefined;
 	const next = isMap(lines) ? ready.find((step) => step.mark === "pending" && step.id === first?.id) : ready.find((step) => step.mark === "pending");
 	// Lane-eligible (D-12): ready [code] steps with an after: line and no requirement; the main agent still takes next itself.
-	const lanes = isMap(lines) ? [] : ready.filter((step) => step.mark === "pending" && stepAfter(lines, step).length && !stepNeeds(lines, step).length && /\[code\]/i.test(lines[phaseHeading(lines, step.index)] ?? ""));
+	const lanes = isMap(lines) ? [] : ready.filter((step) => step.mark === "pending" && afterLines(lines, step).length && !stepNeeds(lines, step).length && /\[code\]/i.test(lines[phaseHeading(lines, step.index)] ?? ""));
 	return { defs, missing, first, wip: ready.filter((step) => step.mark === "wip"), next, lanes, owned: [...owned],
 		waiting: open.filter((step) => missing(step).length || unmet(step).length).map((step) => ({ id: step.id, missing: [...missing(step), ...unmet(step)] })) };
 }
@@ -611,7 +619,7 @@ async function newPlanFile(cwd, request, source?: { file: string; text: string }
 	return { id, file };
 }
 // D-06/D-12: only with Helpers > 0, so planning prompts at 0 stay exactly today's.
-const planHelpers = (n) => n ? `\nHelpers (at most ${n} at once): for independent research questions you may fan out read-only scouts (plan3 action lane op scout id <question-id>, then launch its returned launch with subagent async: true and record the run with lane op run id <question-id> run <run id>); you weigh their answers and ask the user yourself. In a [code] phase, give a step an indented "  - after: <step ids>" line only when it shares no functionality with the steps it may run beside (the same file in a different area is fine); such steps may run on helpers in parallel. When unsure, leave the step serial without after:. Helpers run on the same machine: a step stays serial when it writes or uses anything outside its own checkout (the user's real data or settings folders, keys, the registry, a live install, a fixed port, one device, a fixed build or temp folder, killing processes by name) or runs a long full build; before finishing the plan, check every after: step against this and remove the after: line of any that fails. Cleanup commands in the plan (process kills, temp or port cleanup) must match only the current checkout's path. In a map, research tickets may go to scouts and prototype tickets may run as trials (lane op trial) that never land.` : "";
+const planHelpers = (n) => n ? `\nHelpers (at most ${n} at once): for independent research questions you may fan out read-only scouts (plan3 action lane op scout id <question-id>, then launch its returned launch with subagent async: true and record the run with lane op run id <question-id> run <run id>); you weigh their answers and ask the user yourself. Do not add after: or serial: lines while planning; once the plan could be finished, Plan3 sends one parallel pass that decides them step by step. Cleanup commands in the plan (process kills, temp or port cleanup) must match only the current checkout's path. In a map, research tickets may go to scouts and prototype tickets may run as trials (lane op trial) that never land.` : "";
 export const planningPrompt = (file, lead, size = false, helpers = 0) => `Plan3: planning only.\n${boundary}\n\n${lead} ${JSON.stringify(file)}\nRead it and the relevant repository context, then replace placeholders with an implementation-ready plan at this path. Do not implement product code. Set a short one-line title early with the plan3 tool (action title).\nFor new or substantially redesigned web UI, read the frontend-design skill; record its reference, the chosen direction and tokens/components to reuse in the plan, not the skill text. Explicit briefs and project conventions win; native/TUI work follows platform rules.\n${toolUse}\n${clarification}\n${questionFormat}\n${PROJECT_CARE}\n${LOCKED_WRITES_PLAN}\n${PROJECT_LANGUAGE}\nPreserve the original request, every decided requirement, non-goal, acceptance example and source reference. Keep the plan proportional: affected files, the chosen approach, ordered phases with stable step IDs (- [ ] **ID** text) and their checks, global acceptance, resume context. Use existing repository commands; do not invent commands or claim checks ran. ${PLAN_SHAPE} You may set draft or blocked; never set ready yourself — the user runs /plan3 finish. ${HINT_RULE}${size ? `\n${SIZE_RULE}` : ""}${planHelpers(helpers)}`;
 export function writePrompt(file, helpers = 0) {
 	return `Plan3: write the current discussion into a plan.\n${boundary}\n\nDraft plan: ${JSON.stringify(file)}\nContinue from the conversation already in context; do not start from scratch or repeat the investigation. Do not compact before saving the discussion. Do not implement product code.\nFirst read the draft, then promptly write a substantive plan using the discussion so its details are durable before doing any further research. Replace the seed Original request with the actual discussed request(s); the optional topic narrows which discussion to capture. Preserve requirements, settled decisions and their rationale, rejected options, non-goals, examples, source references, findings and any existing check results. Distinguish user decisions from agent proposals and assumptions; do not invent missing details or claim unrun checks passed.\nSet a short one-line title with plan3 title. Keep ordered steps with stable IDs (- [ ] **ID** text), relevant files, known checks, global acceptance and exact resume context. Mark already completed work only with the evidence already available. ${PLAN_SHAPE} ${toolUse}\n${questionFormat}\nAfter saving, leave genuinely unresolved questions for /plan3 resolve; do not ask again about settled decisions or reread sources already understood unless a specific gap or changed fact needs checking. Record unresolved or unavailable evidence in Open questions; leave draft or blocked, never ready — the user runs /plan3 finish. ${HINT_RULE}${planHelpers(helpers)}`;
@@ -1406,7 +1414,7 @@ export default function plan3(pi) {
 		if (finishProblems(text).length) return; // Mid-planning: check once the plan could be finished.
 		const snapshot = await readFile(logFile(plan.file), "utf8").then(lastSnapshot, () => "");
 		const problems = snapshot ? optimizeLint(snapshot, text) : shapeLint(text);
-		if (!problems.length) return;
+		if (!problems.length) return parallelPass(ctx, plan, text);
 		if (shapeRepaired.has(plan.id)) {
 			if (repairTurn === plan.id) ctx.ui.notify(`Plan3 shape check still finds: ${problems.join("; ")}. /plan3 finish still works.`, "warning");
 			return;
@@ -1415,6 +1423,17 @@ export default function plan3(pi) {
 		shapeRepairTurn = plan.id;
 		ctx.ui.notify(`Plan3 shape check found ${problems.length} problem(s); asking the agent to fix them once.`, "info");
 		send(`Plan3: the plan shape check found problems in ${JSON.stringify(plan.file)}. Planning only: fix only these, in place, and keep everything else, including every decision's meaning.${snapshot ? ` Source wording is in ${JSON.stringify(logFile(plan.file))}.` : ""}\n${problems.map((problem) => `- ${problem}`).join("\n")}`);
+		return true;
+	}
+
+	// With helpers on, every pending [code] step gets an after: or serial: verdict in one dedicated turn; finish resends it while any is missing.
+	const parallelSent = new Set();
+	function parallelPass(ctx, plan, text, again = false) {
+		const ids = phaseSettings(ctx.cwd).helpers ? parallelLint(text) : [];
+		if (!ids.length || (!again && parallelSent.has(plan.id))) return false;
+		parallelSent.add(plan.id);
+		ctx.ui.notify(`Plan3: parallel pass for ${ids.join(", ")}.`, "info");
+		send(parallelPrompt(plan.file, ids));
 		return true;
 	}
 
@@ -1463,9 +1482,11 @@ export default function plan3(pi) {
 	async function finish(ctx, selectedPlan?) {
 		const plan = selectedPlan ?? currentPlan(ctx, await listPlans(ctx.cwd));
 		if (!plan) return ctx.ui.notify("Plan3: no open plan to finish.", "info");
-		const problems = finishProblems(await readFile(plan.file, "utf8"));
+		const planText = await readFile(plan.file, "utf8");
+		const problems = finishProblems(planText);
 		if (problems.length) return ctx.ui.notify(`Plan3: ${plan.title} is not ready:\n- ${problems.join("\n- ")}`, "warning");
 		if (!isPlanning(plan) && plan.status !== "ready") return ctx.ui.notify(`Plan3: ${plan.title} is already ${plan.status}; /resume3 continues it.`, "info");
+		if (parallelPass(ctx, plan, planText, true)) return ctx.ui.notify("Plan3: some steps still need an after: or serial: line; the parallel pass was sent. Finish again afterwards.", "warning");
 		// Review before compacting: the agent still holds the planning context to judge and merge findings; finish again afterwards.
 		const reviews = ctx.hasUI ? await reviewItems(ctx, plan) : [];
 		if (reviews.length) {
