@@ -13,7 +13,7 @@ type Owner = { plan: string; id: string; kind: "lane" | "trial"; branch: string;
 type Slot = { n: number; path: string; owner: Owner | null; lastPlan?: string; stale?: string[] };
 type Scout = { plan: string; id: string; run?: string; at: number };
 type Slots = { slots: Slot[]; scouts: Scout[] };
-type Lane = { id: string; kind: "lane" | "trial"; slot: string; branch: string; base: string; run?: string };
+type Lane = { id: string; kind: "lane" | "trial"; slot: string; branch: string; base: string; run?: string; mainBranch?: string; onto?: string };
 export type LaneOpts = { cwd: string; plan: string; lanesFile: string; limit: number };
 
 const exec = promisify(execFile);
@@ -89,6 +89,7 @@ export async function laneStart(o: LaneOpts, id: string, kind: "lane" | "trial" 
 	checkId(id);
 	const repo = await repoRoot(o.cwd), file = slotsFile(repo), root = slotRoot(repo);
 	const base = await git(repo, "rev-parse", "HEAD");
+	const mainBranch = await git(repo, "branch", "--show-current");
 	const branch = `plan3/${o.plan}/${id}`;
 	const slot = await locked(file, () => {
 		const state = load<Slots>(file, { slots: [], scouts: [] });
@@ -126,7 +127,7 @@ export async function laneStart(o: LaneOpts, id: string, kind: "lane" | "trial" 
 		const state = load<Slots>(file, { slots: [], scouts: [] }), mine = state.slots.find((item) => item.n === slot.n);
 		if (mine) { delete mine.stale; save(file, state); }
 	});
-	await setLanes(o, (lanes) => [...lanes.filter((lane) => lane.id !== id), { id, kind, slot: slot.path, branch, base }]);
+	await setLanes(o, (lanes) => [...lanes.filter((lane) => lane.id !== id), { id, kind, slot: slot.path, branch, base, mainBranch }]);
 	return { id, kind, slot: slot.path, branch, base };
 }
 
@@ -193,17 +194,84 @@ export async function laneDrop(o: LaneOpts, id: string) {
 			fs.mkdirSync(path.dirname(patch), { recursive: true });
 			fs.writeFileSync(patch, `${diff}\n`);
 		}
-		await git(slot.path, "checkout", "-f", "--detach", owner.base);
-		await git(slot.path, "clean", "-fd");
-		await git(repo, "branch", "-D", owner.branch).catch(() => {});
-		await locked(file, () => {
-			const state = load<Slots>(file, { slots: [], scouts: [] }), mine = state.slots.find((item) => item.n === slot.n);
-			if (mine?.owner?.plan === o.plan && mine.owner.id === id) { mine.owner = null; save(file, state); }
-		});
+		await release(o, repo, slot, id);
 		result = { id, dropped: owner.kind, ...patch && { patch } };
 	}
 	await setLanes(o, (lanes) => lanes.filter((lane) => lane.id !== id));
 	return result;
+}
+
+// Resets a stopped helper's slot to its base, deletes the lane branch and frees the slot.
+async function release(o: LaneOpts, repo: string, slot: Slot, id: string) {
+	const file = slotsFile(repo);
+	await git(slot.path, "checkout", "-f", "--detach", slot.owner.base);
+	await git(slot.path, "clean", "-fd");
+	await git(repo, "branch", "-D", slot.owner.branch).catch(() => {});
+	await locked(file, () => {
+		const state = load<Slots>(file, { slots: [], scouts: [] }), mine = state.slots.find((item) => item.n === slot.n);
+		if (mine?.owner?.plan === o.plan && mine.owner.id === id) { mine.owner = null; save(file, state); }
+	});
+}
+
+// ---------- landing (D-08, D-14, D-17) ----------
+// A stopped helper's lane in its own slot, with the main checkout still where the lane started it.
+async function landable(o: LaneOpts, id: string) {
+	checkId(id);
+	const repo = await repoRoot(o.cwd);
+	const lane = load(o.lanesFile, { lanes: [] as Lane[] }).lanes.find((item) => item.id === id && item.kind === "lane");
+	const slot = load<Slots>(slotsFile(repo), { slots: [], scouts: [] }).slots.find((item) => item.owner?.plan === o.plan && item.owner.id === id && !item.owner.orphan);
+	if (!lane || !slot || key(slot.path) !== key(lane.slot)) throw new Error(`${id} has no helper lane to land.`);
+	if (!stopped(slot.owner.run)) throw new Error(`${id}'s helper is still running; wait for it or drop the lane.`);
+	await assertSlot(repo, slot.path);
+	// D-17 watch: the main checkout must still be on the lane's branch with history only added to since the lane started.
+	// shortcut: commits added to the main checkout by someone else look like the main agent's; a reflog audit would catch them.
+	const branch = await git(repo, "branch", "--show-current");
+	const kept = await git(repo, "merge-base", "--is-ancestor", lane.base, "HEAD").then(() => true, () => false);
+	if (!branch || branch !== lane.mainBranch || !kept) throw new Error(`Main checkout changed outside the main agent since ${id}'s lane started (branch ${branch || "detached"}, expected ${lane.mainBranch} descending from ${lane.base.slice(0, 8)}). Stop all helpers (drop their lanes) and continue serially.`);
+	if (await git(slot.path, "status", "--porcelain")) throw new Error(`${id}'s slot has uncommitted changes; commit them in ${slot.path} or drop the lane.`);
+	return { repo, lane, slot };
+}
+const planFiles = async (cwd: string, from: string, to: string) => (await git(cwd, "log", "--name-only", "--format=", `${from}..${to}`, "--", "docs/plans/")).split(/\r?\n/).filter(Boolean);
+
+// Picks the lane's commits onto the main checkout's current HEAD inside the slot; master does not move.
+export async function lanePick(o: LaneOpts, id: string) {
+	const { repo, lane, slot } = await landable(o, id);
+	// The pinned range: the lane branch on the first pick, the picked result (plus any fixes made in the slot) after that.
+	const from = lane.onto ?? lane.base, to = await git(slot.path, "rev-parse", "HEAD");
+	const range = (await git(slot.path, "rev-list", "--reverse", `${from}..${to}`)).split(/\r?\n/).filter(Boolean);
+	if (!range.length) throw new Error(`${id}'s lane has no commits to land.`);
+	const plans = await planFiles(slot.path, from, to);
+	if (plans.length) throw new Error(`${id}'s lane changes plan files (${[...new Set(plans)].join(", ")}); only the main agent edits docs/plans/. Drop the lane and redo the step serially.`);
+	const onto = await git(repo, "rev-parse", "HEAD");
+	await git(slot.path, "checkout", "-f", "--detach", onto);
+	try {
+		await git(slot.path, "cherry-pick", "--allow-empty", ...range);
+	} catch (error) {
+		const files = await git(slot.path, "diff", "--name-only", "--diff-filter=U").catch(() => "");
+		await git(slot.path, "cherry-pick", "--abort").catch(() => {});
+		await git(slot.path, "checkout", "-f", to);
+		throw new Error(`${id} conflicts with current ${lane.mainBranch} in ${files.split(/\r?\n/).filter(Boolean).join(", ") || String(error.message).split("\n")[0]}; nothing landed. Drop the lane and redo the step yourself on current ${lane.mainBranch}, using its diff only as a reference.`);
+	}
+	await setLanes(o, (lanes) => lanes.map((item) => item.id === id ? { ...item, onto } : item));
+	return { id, slot: slot.path, onto, picked: range.length, next: `Run the step's targeted checks in ${slot.path}, then lane land.` };
+}
+
+// Fast-forwards the main checkout to the checked pick; if HEAD moved since the pick, picks again instead.
+export async function laneLand(o: LaneOpts, id: string) {
+	const { repo, lane, slot } = await landable(o, id);
+	if (!lane.onto) throw new Error(`Pick ${id} first (lane pick), then run its checks in the slot.`);
+	if (await git(repo, "rev-parse", "HEAD") !== lane.onto) return { ...await lanePick(o, id), repicked: true };
+	const tip = await git(slot.path, "rev-parse", "HEAD");
+	const plans = await planFiles(slot.path, lane.onto, tip);
+	if (plans.length) throw new Error(`${id}'s slot changes plan files (${[...new Set(plans)].join(", ")}); nothing landed.`);
+	try {
+		await git(repo, "merge", "--ff-only", tip);
+	} catch (error) {
+		throw new Error(`${lane.mainBranch} did not move: ${String(error.stderr || error.message).trim()}`);
+	}
+	await release(o, repo, slot, id);
+	await setLanes(o, (lanes) => lanes.filter((item) => item.id !== id));
+	return { id, landed: tip, next: `Mark ${id} done; run full gates per project rules.` };
 }
 
 export async function laneList(o: LaneOpts) {

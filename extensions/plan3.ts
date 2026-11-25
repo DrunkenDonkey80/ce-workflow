@@ -25,7 +25,7 @@ import { releaseSessionLock, takeSessionLock } from "./session-lock.ts";
 import { childWorkItems, listWorkItems, loadStore } from "./work-store.ts";
 import { docCandidates, slug as docSlug, writeDocs } from "./plan3-docs.ts";
 import { lockedWritesNote } from "./locked-writes.ts";
-import { laneDrop, laneList, laneOwned, laneRun, laneScout, laneStart, removePlanSlots } from "./plan3-lanes.ts";
+import { laneDrop, laneLand, laneList, lanePick, laneOwned, laneRun, laneScout, laneStart, removePlanSlots } from "./plan3-lanes.ts";
 import { registerTestSensitivity, TEST_SENSITIVITY } from "./test-sensitivity.ts";
 import { SELF_VERIFY } from "./self-verify.ts";
 import { runsGit } from "./command-guard.ts";
@@ -1830,7 +1830,7 @@ export default function plan3(pi) {
 			required: ["action"],
 			properties: {
 				action: { type: "string", enum: ["create", "get", "title", "status", "step", "next", "section", "checkpoint", "add", "ideas", "idea", "requirement", "needs", "size", "lane"] },
-				op: { type: "string", enum: ["start", "trial", "run", "scout", "drop", "list"], description: "lane: start = give step id to a helper in its own worktree slot; trial = throwaway slot that never lands; scout = admit a read-only research helper (id names it); run = record the helper's subagent run id; drop = take the step back (stopped helpers' changes are saved as a patch); list = slots and helpers" },
+				op: { type: "string", enum: ["start", "trial", "run", "scout", "pick", "land", "drop", "list"], description: "lane: start = give step id to a helper in its own worktree slot; pick = put the stopped helper's commits onto current HEAD inside its slot (then run the step's targeted checks there); land = fast-forward the main checkout to the checked pick (picks again if HEAD moved); trial = throwaway slot that never lands; scout = admit a read-only research helper (id names it); run = record the helper's subagent run id; drop = take the step back (stopped helpers' changes are saved as a patch); list = slots and helpers" },
 				run: { type: "string", description: "lane run: the helper's subagent run id" },
 				mode: { type: "string", enum: ["tiny", "plan", "map"], description: "size: your recommended mode for a new /plan3 request, or map to turn a planning draft into a map; the user confirms" },
 				view: { type: "string", enum: ["resume", "step", "section", "requirements"], description: "get: resume = compact current-state packet; step = one step's full block (id); section = one section body (name); requirements = what is on/off and which steps wait" },
@@ -1871,9 +1871,11 @@ export default function plan3(pi) {
 				} else if (op === "trial") result = await laneStart(lanes, need("id"), "trial");
 				else if (op === "run") result = await laneRun(lanes, need("id"), need("run"));
 				else if (op === "scout") result = await laneScout(lanes, need("id"));
+				else if (op === "pick") result = await lanePick(lanes, need("id"));
+				else if (op === "land") result = await laneLand(lanes, need("id"));
 				else if (op === "drop") result = await laneDrop(lanes, need("id"));
 				else if (op === "list") result = await laneList(lanes);
-				else throw new Error("lane op must be start, trial, run, scout, drop or list.");
+				else throw new Error("lane op must be start, trial, run, scout, pick, land, drop or list.");
 			} else if (args.action === "ideas") {
 				result = await reviewIdeas(ctx, plan, args.ideas, _signal);
 			} else if (args.action === "idea") {

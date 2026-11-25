@@ -9,7 +9,7 @@ import path from "node:path";
 const temp = mkdtempSync(path.join(os.tmpdir(), "plan3-lanes-"));
 process.env.PI_CODING_AGENT_DIR = path.join(temp, "agent");
 Object.assign(process.env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" });
-const { assertSlot, laneDrop, laneList, laneOwned, laneRun, laneScout, laneStart, removePlanSlots, setRunState, slotRoot } = await import("../extensions/plan3-lanes.ts");
+const { assertSlot, laneDrop, laneLand, laneList, lanePick, laneOwned, laneRun, laneScout, laneStart, removePlanSlots, setRunState, slotRoot } = await import("../extensions/plan3-lanes.ts");
 
 const repo = path.join(temp, "repo");
 mkdirSync(repo);
@@ -95,6 +95,75 @@ try {
 	assert.equal((await laneList(two)).slots.length, 1, "plan B's slot stays");
 	assert.deepEqual([readFileSync(path.join(repo, "a.txt"), "utf8"), readFileSync(path.join(repo, "new.txt"), "utf8"), git(repo, "branch", "--show-current")], ["main edit\n", "main untracked\n", "master"]);
 	assert.deepEqual(readdirSync(slotRoot(repo)).sort(), ["patches", "slot-2", "slots.json"]);
+
+	// Landing (D-08): pick onto current HEAD inside the slot, check there, fast-forward the main checkout.
+	const C = opts("cccc3333", 2);
+	const commit = (cwd, file, text) => { mkdirSync(path.dirname(path.join(cwd, file)), { recursive: true }); writeFileSync(path.join(cwd, file), text); git(cwd, "add", file); git(cwd, "commit", "-qm", `edit ${file}`); };
+	const mainHead = () => git(repo, "rev-parse", "HEAD");
+	const userDirt = () => [readFileSync(path.join(repo, "a.txt"), "utf8"), readFileSync(path.join(repo, "new.txt"), "utf8")];
+
+	let lane = await laneStart(C, "L-01");
+	commit(lane.slot, "b.txt", "1\n");
+	commit(lane.slot, "c.txt", "2\n");
+	await laneRun(C, "L-01", "run-3");
+	states.set("run-3", "running");
+	await assert.rejects(laneLand(C, "L-01"), /still running/, "the range is pinned only once the helper stopped");
+	states.set("run-3", "complete");
+	await assert.rejects(laneLand(C, "L-01"), /Pick L-01 first/);
+	let before = mainHead();
+	assert.equal((await lanePick(C, "L-01")).picked, 2);
+	assert.equal(mainHead(), before, "a pick (and a failing check after it) leaves master untouched");
+	assert.equal((await laneLand(C, "L-01")).landed, mainHead());
+	assert.deepEqual(git(repo, "log", "--format=%s", "-2").split("\n"), ["edit c.txt", "edit b.txt"], "two lane commits land in order");
+	assert.deepEqual(userDirt(), ["main edit\n", "main untracked\n"]);
+	assert.deepEqual(laneOwned(C.lanesFile), []);
+	assert(!git(repo, "branch", "--list", "plan3/cccc3333/L-01"));
+
+	lane = await laneStart(C, "L-02");
+	commit(lane.slot, "docs/plans/x.md", "plan\n");
+	await assert.rejects(lanePick(C, "L-02"), /changes plan files \(docs\/plans\/x.md\)/);
+	await laneDrop(C, "L-02");
+
+	// A conflict on the second commit aborts the whole pick and names the file.
+	lane = await laneStart(C, "L-03");
+	commit(lane.slot, "d.txt", "lane\n");
+	commit(lane.slot, "b.txt", "lane b\n");
+	commit(repo, "b.txt", "main b\n");
+	before = mainHead();
+	const laneTip = git(lane.slot, "rev-parse", lane.branch);
+	await assert.rejects(lanePick(C, "L-03"), /conflicts with current master in b.txt; nothing landed/);
+	assert.deepEqual([mainHead(), git(lane.slot, "rev-parse", lane.branch), git(lane.slot, "rev-parse", "HEAD"), git(lane.slot, "status", "--porcelain")], [before, laneTip, laneTip, ""]);
+	assert.deepEqual(userDirt(), ["main edit\n", "main untracked\n"]);
+	await laneDrop(C, "L-03");
+
+	// HEAD moved after the pick: land picks again instead of moving master.
+	lane = await laneStart(C, "L-04");
+	commit(lane.slot, "e.txt", "lane e\n");
+	await lanePick(C, "L-04");
+	commit(repo, "g.txt", "main g\n");
+	const again = await laneLand(C, "L-04");
+	assert.deepEqual([again.repicked, again.onto], [true, mainHead()]);
+	await laneLand(C, "L-04");
+	assert.equal(readFileSync(path.join(repo, "e.txt"), "utf8"), "lane e\n");
+
+	// The user's dirty file in a landed path makes the fast-forward refuse without loss.
+	lane = await laneStart(C, "L-05");
+	commit(lane.slot, "a.txt", "lane a\n");
+	await lanePick(C, "L-05");
+	before = mainHead();
+	await assert.rejects(laneLand(C, "L-05"), /master did not move/);
+	assert.deepEqual([mainHead(), ...userDirt()], [before, "main edit\n", "main untracked\n"]);
+	await laneDrop(C, "L-05");
+
+	// D-17 watch: the main checkout switched branch behind the main agent's back.
+	lane = await laneStart(C, "L-06");
+	commit(lane.slot, "h.txt", "lane h\n");
+	git(repo, "checkout", "-q", "-b", "elsewhere");
+	await assert.rejects(lanePick(C, "L-06"), /Main checkout changed outside the main agent/);
+	git(repo, "checkout", "-q", "master");
+	git(repo, "reset", "-q", "--keep", "HEAD~1");
+	await assert.rejects(lanePick(C, "L-06"), /Main checkout changed outside the main agent/, "rewritten history is caught too");
+	await laneDrop(C, "L-06");
 	console.log("plan3 lanes ok");
 } finally {
 	rmSync(temp, { recursive: true, force: true, maxRetries: 5 });
