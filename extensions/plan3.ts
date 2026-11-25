@@ -196,17 +196,24 @@ function stepNeeds(lines, step) {
 	const own = lines.slice(step.index + 1, blockEnd(lines, step)).filter((line) => /^\s+- needs:/i.test(line));
 	return [...phase, ...own].flatMap((line) => line.replace(/^\s*(?:- )?needs:\s*/i, "").split(/[\s,]+/)).filter(Boolean);
 }
+// "  - after: W-01, W-03": the step needs only those steps, so a lane may run it once they are done (D-05).
+const stepAfter = (lines, step) => lines.slice(step.index + 1, blockEnd(lines, step)).filter((line) => /^\s+- after:/i.test(line))
+	.flatMap((line) => line.replace(/^\s*- after:\s*/i, "").split(/[\s,]+/)).filter(Boolean);
 // The one work selector (summary, packet, phase mode, stats, next): open steps whose requirements are defined and on.
 function workState(lines, avail) {
 	const defs = requirementDefs(lines);
 	const missing = (step) => stepNeeds(lines, step).filter((id) => !defs.has(id) || !isOn(avail, id));
+	const done = new Set(activeSteps(lines).filter((step) => step.mark === "x").map((step) => step.id));
+	const unmet = (step) => step.mark === "pending" ? stepAfter(lines, step).filter((id) => !done.has(id)) : [];
 	const open = activeSteps(lines).filter((step) => step.mark === "wip" || step.mark === "pending");
-	const ready = open.filter((step) => !missing(step).length);
+	const ready = open.filter((step) => !missing(step).length && !unmet(step).length);
 	// Map tickets run strictly in order: only the first ticket not done may start, and only when it is pending.
 	const first = isMap(lines) ? activeSteps(lines).find((step) => step.mark !== "x") : undefined;
 	const next = isMap(lines) ? ready.find((step) => step.mark === "pending" && step.id === first?.id) : ready.find((step) => step.mark === "pending");
-	return { defs, missing, first, wip: ready.filter((step) => step.mark === "wip"), next,
-		waiting: open.filter((step) => missing(step).length).map((step) => ({ id: step.id, missing: missing(step) })) };
+	// Lane-eligible (D-12): ready [code] steps with an after: line and no requirement; the main agent still takes next itself.
+	const lanes = isMap(lines) ? [] : ready.filter((step) => step.mark === "pending" && stepAfter(lines, step).length && !stepNeeds(lines, step).length && /\[code\]/i.test(lines[phaseHeading(lines, step.index)] ?? ""));
+	return { defs, missing, first, wip: ready.filter((step) => step.mark === "wip"), next, lanes,
+		waiting: open.filter((step) => missing(step).length || unmet(step).length).map((step) => ({ id: step.id, missing: [...missing(step), ...unmet(step)] })) };
 }
 const isMap = (lines) => lines[0] === "---" && getMeta(lines, "kind") === "map";
 const availOf = (file) => readAvail(needsFile(logFile(file)));
@@ -296,6 +303,7 @@ function summarize(file, text, folder) {
 		done: all.filter((step) => step.mark === "x").length, total: all.length,
 		wip: work.wip.map((step) => step.id),
 		next: work.next?.id,
+		lanes: work.lanes.map((step) => step.id),
 		waiting: work.waiting,
 		human: all.filter((step) => step.mark === "human").map((step) => step.id),
 		// Steps left by phase mode, so the list shows how much will run on the planning model.
@@ -487,6 +495,7 @@ function resumePacket(text, avail: any = {}) {
 		else parts.push(`## ${name}\n\n${body}`);
 	}
 	parts.push(`## Steps (${all.filter((step) => step.mark === "x").length}/${all.length} done; full text only for the current step)\n\n${all.map((step) => focus.some((item) => item.id === step.id) ? lines.slice(step.index, blockEnd(lines, step)).join("\n") : clipLine(lines[step.index])).join("\n")}`);
+	if (work.lanes.length) parts.push(`Lane-eligible now (after: done): ${work.lanes.map((step) => step.id).join(", ")}.`);
 	if (work.defs.size > 1 || work.waiting.length) parts.push(`## Requirements now\n\n${availLine(avail, work.defs)}${work.waiting.length ? ` Waiting (not runnable): ${work.waiting.map((step) => `${step.id} needs ${step.missing.join(", ")}`).join("; ")}.` : ""}`);
 	parts.push(`Omitted \u2014 fetch with plan3 get view "section" (name) or "step" (id) only when needed: ${omitted.join(", ") || "nothing"}; other steps' details.`);
 	const bytes = Buffer.byteLength(parts.join("\n\n"));
@@ -638,6 +647,15 @@ function advisorPrompt(kind, plan, advisors, focus) {
 export const webPlan = (plan, bias, text) => ({ id: plan.id, file: plan.file, title: plan.title, status: plan.status, done: plan.done, total: plan.total, open: plan.open, focus: plan.wip[0] ?? plan.next, bias,
 	planning: isPlanning(plan), finishable: isPlanning(plan) && !plan.open && !finishProblems(text).length });
 
+// after: ids must name active steps and form no cycle, or the dependents would wait forever.
+function afterProblems(lines) {
+	const graph = new Map<string, string[]>(activeSteps(lines).map((step) => [step.id, stepAfter(lines, step)]));
+	const unknown = [...graph].flatMap(([id, after]) => after.filter((dep) => !graph.has(dep)).map((dep) => `${id} after ${dep}`));
+	const state = new Map(), cyclic = new Set();
+	const visit = (id) => { if (state.get(id) === 1) return cyclic.add(id); if (state.has(id)) return; state.set(id, 1); for (const dep of graph.get(id) ?? []) visit(dep); state.set(id, 2); };
+	for (const id of graph.keys()) visit(id);
+	return [unknown.length && `after: names unknown steps (${unknown.join(", ")})`, cyclic.size && `after: lines form a cycle (${[...cyclic].join(", ")})`].filter(Boolean);
+}
 // R24: code-only readiness check.
 export function finishProblems(text) {
 	const { lines } = split(text);
@@ -650,6 +668,7 @@ export function finishProblems(text) {
 	for (const placeholder of ["Pending investigation", "Not assessed yet", "# Plan3 draft", "# Plan3 map draft"]) if (currentText.includes(placeholder)) problems.push(`placeholder "${placeholder}" remains`);
 	if (!/^none\b/i.test(subsection(lines, "Blocking"))) problems.push("Open questions → Blocking is not None");
 	if (!steps(lines).length) problems.push("no steps");
+	problems.push(...afterProblems(lines));
 	const ideas = section(lines, "Ideas");
 	if (ideas && storedIdeas(lines.slice(ideas.start + 1, ideas.end).join("\n").trim()).some(idea => !["accepted", "rejected"].includes(idea.status))) problems.push("Ideas still need acceptance or rejection; use /plan3 ideas select (comments need reconciliation)");
 	return problems;

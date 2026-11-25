@@ -575,6 +575,24 @@ try {
 		ctx.hasUI = true;
 		ctx.hasUI = false;
 		await rm(needFile);
+		// after: lines (D-05): lane-eligible once their steps are done; the main selection is unchanged and waits on unmet ids.
+		const afterFile = path.join(directory, "2026-10-08-after-8d8d8d8d-plan3.md");
+		const afterSteps = (first) => `### P1 Build [code]\n\n- [${first}] **W-01** Core\n- [ ] **W-02** Web\n  - after: W-01\n- [ ] **W-03** Docs\n- [ ] **W-04** Browser\n  - after: W-01`;
+		await writeFile(afterFile, validPlan("8d8d8d8d", "After", "active", afterSteps(" ")));
+		let afterPlan = (await listPlans(ctx.cwd)).find((plan) => plan.id === "8d8d8d8d");
+		assert.deepEqual([afterPlan.next, afterPlan.lanes, afterPlan.waiting.map((step) => step.missing.join())], ["W-01", [], ["W-01", "W-01"]]);
+		await assert.rejects(tool({ action: "status", plan: "8d8d8d8d", value: "complete" }), /W-01, W-02, W-04/, "a pending dependent blocks completion");
+		await writeFile(afterFile, validPlan("8d8d8d8d", "After", "active", afterSteps("x")));
+		afterPlan = (await listPlans(ctx.cwd)).find((plan) => plan.id === "8d8d8d8d");
+		assert.deepEqual([afterPlan.next, afterPlan.lanes, afterPlan.waiting], ["W-02", ["W-02", "W-04"], []]);
+		assert.match((await tool({ action: "get", plan: "8d8d8d8d", view: "resume" })).view, /Lane-eligible now \(after: done\): W-02, W-04\./);
+		await writeFile(afterFile, validPlan("8d8d8d8d", "After", "active", afterSteps("x").replace("[code]", "[think]")));
+		assert.deepEqual((await listPlans(ctx.cwd)).find((plan) => plan.id === "8d8d8d8d").lanes, [], "lanes run only [code] steps");
+		assert.doesNotMatch((await tool({ action: "get", plan: "8d8d8d8d", view: "resume" })).view, /Lane-eligible/);
+		await rm(afterFile);
+		assert.deepEqual(finishProblems(validPlan("x", "After", "draft", afterSteps(" "))), []);
+		assert.deepEqual(finishProblems(validPlan("x", "After", "draft", afterSteps(" ").replace("after: W-01\n- [ ] **W-03**", "after: W-09\n- [ ] **W-03**").replace("- [ ] **W-04** Browser\n  - after: W-01", "- [ ] **W-04** Browser\n  - after: W-02"))), ["after: names unknown steps (W-02 after W-09)"]);
+		assert.deepEqual(finishProblems(validPlan("x", "After", "draft", afterSteps(" ").replace("Core", "Core\n  - after: W-04"))), ["after: lines form a cycle (W-01)"]);
 		assert.doesNotMatch(resumeMessage, /hard limit/);
 		// Execution: defaults instead of questions, acceptance-depth work, local commits, never push.
 		assert.match(resumeMessage, /reversible choice with a sensible default, choose it, record one Decisions line marked assumed/);
