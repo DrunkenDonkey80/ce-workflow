@@ -2375,6 +2375,7 @@ try {
 		const sample = { file: "p.md", kind: undefined }, off = executePrompt(sample, [], "PACKET", 0), on = executePrompt(sample, [], "PACKET", 2);
 		assert.doesNotMatch(off, /Helpers \(at most/);
 		assert.equal(on.replace(/\nHelpers \(at most 2[^\n]*/, ""), off, "helpers 0 adds nothing to the execute prompt");
+		assert.match(on, /Land when your own step is committed[\s\S]*save those edits as a patch outside the repository[\s\S]*if restoring conflicts, stop and tell the user/);
 		// S-06: planning and write prompts carry the after:/scout rule with helpers, nothing at 0.
 		assert.match(planning, /give a step an indented "  - after: <step ids>" line only when it shares no functionality[\s\S]*same file in a different area is fine[\s\S]*When unsure, leave the step serial/);
 		assert.match(planning, /cleanup commands in the plan \(process kills, temp or port cleanup\) must match only the current checkout's path/);
