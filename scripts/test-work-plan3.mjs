@@ -2377,6 +2377,7 @@ try {
 		assert.equal(on.replace(/\nHelpers \(at most 2[^\n]*/, ""), off, "helpers 0 adds nothing to the execute prompt");
 		// S-06: planning and write prompts carry the after:/scout rule with helpers, nothing at 0.
 		assert.match(planning, /give a step an indented "  - after: <step ids>" line only when it shares no functionality[\s\S]*same file in a different area is fine[\s\S]*When unsure, leave the step serial/);
+		assert.match(planning, /cleanup commands in the plan \(process kills, temp or port cleanup\) must match only the current checkout's path/);
 		for (const [zero, two] of [[planningPrompt("p.md", "Draft plan:", true, 0), planningPrompt("p.md", "Draft plan:", true, 2)], [writePrompt("p.md", 0), writePrompt("p.md", 2)]]) {
 			assert.match(two, /lane op scout[\s\S]*prototype tickets may run as trials/);
 			assert.equal(two.replace(/\nHelpers \(at most 2[^\n]*/, ""), zero, "helpers 0 leaves planning prompts unchanged");
