@@ -25,6 +25,7 @@ import { releaseSessionLock, takeSessionLock } from "./session-lock.ts";
 import { childWorkItems, listWorkItems, loadStore } from "./work-store.ts";
 import { docCandidates, slug as docSlug, writeDocs } from "./plan3-docs.ts";
 import { lockedWritesNote } from "./locked-writes.ts";
+import { laneDrop, laneList, laneOwned, laneRun, laneScout, laneStart, removePlanSlots } from "./plan3-lanes.ts";
 import { registerTestSensitivity, TEST_SENSITIVITY } from "./test-sensitivity.ts";
 import { SELF_VERIFY } from "./self-verify.ts";
 import { runsGit } from "./command-guard.ts";
@@ -205,18 +206,22 @@ function workState(lines, avail) {
 	const missing = (step) => stepNeeds(lines, step).filter((id) => !defs.has(id) || !isOn(avail, id));
 	const done = new Set(activeSteps(lines).filter((step) => step.mark === "x").map((step) => step.id));
 	const unmet = (step) => step.mark === "pending" ? stepAfter(lines, step).filter((id) => !done.has(id)) : [];
-	const open = activeSteps(lines).filter((step) => step.mark === "wip" || step.mark === "pending");
+	const owned = new Set<string>(avail?.laneOwned ?? []);
+	const open = activeSteps(lines).filter((step) => (step.mark === "wip" || step.mark === "pending") && !owned.has(step.id));
 	const ready = open.filter((step) => !missing(step).length && !unmet(step).length);
 	// Map tickets run strictly in order: only the first ticket not done may start, and only when it is pending.
 	const first = isMap(lines) ? activeSteps(lines).find((step) => step.mark !== "x") : undefined;
 	const next = isMap(lines) ? ready.find((step) => step.mark === "pending" && step.id === first?.id) : ready.find((step) => step.mark === "pending");
 	// Lane-eligible (D-12): ready [code] steps with an after: line and no requirement; the main agent still takes next itself.
 	const lanes = isMap(lines) ? [] : ready.filter((step) => step.mark === "pending" && stepAfter(lines, step).length && !stepNeeds(lines, step).length && /\[code\]/i.test(lines[phaseHeading(lines, step.index)] ?? ""));
-	return { defs, missing, first, wip: ready.filter((step) => step.mark === "wip"), next, lanes,
+	return { defs, missing, first, wip: ready.filter((step) => step.mark === "wip"), next, lanes, owned: [...owned],
 		waiting: open.filter((step) => missing(step).length || unmet(step).length).map((step) => ({ id: step.id, missing: [...missing(step), ...unmet(step)] })) };
 }
 const isMap = (lines) => lines[0] === "---" && getMeta(lines, "kind") === "map";
-const availOf = (file) => readAvail(needsFile(logFile(file)));
+// Requirement switches plus the steps lanes own (D-18), so every workState caller leaves those out of next and wip.
+const availOf = (file) => ({ ...readAvail(needsFile(logFile(file))), laneOwned: laneOwned(lanesFileOf(file)) });
+const HELPERS = 2; // Helper places per repository (D-20).
+const lanesFileOf = (file) => logFile(file).replace(/\.md$/, ".lanes.json");
 function appendToSection(lines, name, text, create = false) {
 	let found = section(lines, name);
 	if (!found && !create) throw new Error(`Unknown section "${name}". Sections: ${sectionNames(lines).join(", ")}`);
@@ -304,6 +309,7 @@ function summarize(file, text, folder) {
 		wip: work.wip.map((step) => step.id),
 		next: work.next?.id,
 		lanes: work.lanes.map((step) => step.id),
+		laneOwned: work.owned,
 		waiting: work.waiting,
 		human: all.filter((step) => step.mark === "human").map((step) => step.id),
 		// Steps left by phase mode, so the list shows how much will run on the planning model.
@@ -1823,7 +1829,9 @@ export default function plan3(pi) {
 			additionalProperties: false,
 			required: ["action"],
 			properties: {
-				action: { type: "string", enum: ["create", "get", "title", "status", "step", "next", "section", "checkpoint", "add", "ideas", "idea", "requirement", "needs", "size"] },
+				action: { type: "string", enum: ["create", "get", "title", "status", "step", "next", "section", "checkpoint", "add", "ideas", "idea", "requirement", "needs", "size", "lane"] },
+				op: { type: "string", enum: ["start", "trial", "run", "scout", "drop", "list"], description: "lane: start = give step id to a helper in its own worktree slot; trial = throwaway slot that never lands; scout = admit a read-only research helper (id names it); run = record the helper's subagent run id; drop = take the step back (stopped helpers' changes are saved as a patch); list = slots and helpers" },
+				run: { type: "string", description: "lane run: the helper's subagent run id" },
 				mode: { type: "string", enum: ["tiny", "plan", "map"], description: "size: your recommended mode for a new /plan3 request, or map to turn a planning draft into a map; the user confirms" },
 				view: { type: "string", enum: ["resume", "step", "section", "requirements"], description: "get: resume = compact current-state packet; step = one step's full block (id); section = one section body (name); requirements = what is on/off and which steps wait" },
 				requirement: { type: "string", description: "requirement: R-<short-name> of an external thing a step needs (reboot, physical device, a printout the user must look at); new ones need text and ask the user once; marks step/phase id, default the current wip step" },
@@ -1854,6 +1862,18 @@ export default function plan3(pi) {
 			if (args.action === "size") {
 				result = await byPlanId(plan.id, () => size(ctx, plan, need("mode"), need("text").split(/\r?\n/)[0].trim()));
 				if (result.tiny) { await refresh(ctx); return { content: [{ type: "text", text: JSON.stringify(result) }], details: result }; } // The draft is gone: skip the summary tail.
+			} else if (args.action === "lane") {
+				const op = need("op"), lanes = { cwd: ctx.cwd, plan: plan.id, lanesFile: lanesFileOf(plan.file), limit: HELPERS };
+				if (op === "start") {
+					const id = need("id");
+					if (!summarize(plan.file, await readFile(plan.file, "utf8"), path.dirname(plan.file)).lanes.includes(id)) throw new Error(`${id} is not lane-eligible now: it needs an after: line whose steps are done, a [code] phase and no requirements.`);
+					result = await laneStart(lanes, id);
+				} else if (op === "trial") result = await laneStart(lanes, need("id"), "trial");
+				else if (op === "run") result = await laneRun(lanes, need("id"), need("run"));
+				else if (op === "scout") result = await laneScout(lanes, need("id"));
+				else if (op === "drop") result = await laneDrop(lanes, need("id"));
+				else if (op === "list") result = await laneList(lanes);
+				else throw new Error("lane op must be start, trial, run, scout, drop or list.");
 			} else if (args.action === "ideas") {
 				result = await reviewIdeas(ctx, plan, args.ideas, _signal);
 			} else if (args.action === "idea") {
@@ -1883,7 +1903,7 @@ export default function plan3(pi) {
 				if (["ready", "active", "complete"].includes(value)) {
 				}
 				if (value === "complete" && await ensureArchitectureStep(ctx, plan) && !architectureDone(split(await readFile(plan.file, "utf8")).lines)) throw new Error(`Finish ${ARCHITECTURE_STEP} first, or mark it done with no architecture change.`);
-				const open = [...plan.wip, plan.next, ...plan.waiting.map((step) => step.id)].filter(Boolean);
+				const open = [...plan.wip, plan.next, ...plan.waiting.map((step) => step.id), ...plan.laneOwned].filter(Boolean);
 				if (value === "complete" && open.length) throw new Error(`Steps are still open (${open.join(", ")}…); finish or mark them first.`);
 				if (value === "complete" && plan.kind === "map") {
 					const lines = split(await readFile(plan.file, "utf8")).lines, fog = section(lines, "Not yet specified");
@@ -1898,6 +1918,7 @@ export default function plan3(pi) {
 					setMeta(lines, "status", value);
 				});
 				if (value === "complete") {
+					await removePlanSlots(ctx.cwd, plan.id);
 					const accepted = ideaItems(split(await readFile(plan.file, "utf8")).lines).filter((idea) => idea.status === "accepted");
 					result = { file: await archive(ctx.cwd, plan) };
 					retroAfterArchive(ctx, plan, result.file);
@@ -1912,6 +1933,7 @@ export default function plan3(pi) {
 				await mutate(plan, (lines) => {
 					const step = mark === "wip" && activeSteps(lines).find((candidate) => candidate.id === args.id);
 					const work = workState(lines, avail), missing = step ? work.missing(step) : [];
+					if (mark === "wip" && work.owned.includes(args.id)) throw new Error(`${args.id} belongs to a helper lane; drop the lane before taking it yourself.`);
 					if (mark === "wip" && isMap(lines) && work.first && args.id !== work.first.id) throw new Error(`map tickets run in order: ${work.first.id} first.`);
 					if (missing.length) throw new Error(`${args.id} needs ${missing.join(", ")}, which is off or undefined; continue with runnable work (the user switches requirements with Alt+A).`);
 					return markStep(lines, need("id"), mark, args);

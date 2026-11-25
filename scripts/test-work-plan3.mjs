@@ -586,6 +586,16 @@ try {
 		afterPlan = (await listPlans(ctx.cwd)).find((plan) => plan.id === "8d8d8d8d");
 		assert.deepEqual([afterPlan.next, afterPlan.lanes, afterPlan.waiting], ["W-02", ["W-02", "W-04"], []]);
 		assert.match((await tool({ action: "get", plan: "8d8d8d8d", view: "resume" })).view, /Lane-eligible now \(after: done\): W-02, W-04\./);
+		// D-18: a lane-owned step stays [ ] in the plan but is neither the main agent's next nor wip, and still blocks completion.
+		const lanesFile = path.join(directory, "logs", "8d8d8d8d.lanes.json");
+		await writeFile(lanesFile, JSON.stringify({ lanes: [{ id: "W-02", kind: "lane" }] }));
+		afterPlan = (await listPlans(ctx.cwd)).find((plan) => plan.id === "8d8d8d8d");
+		assert.deepEqual([afterPlan.next, afterPlan.lanes, afterPlan.laneOwned], ["W-03", ["W-04"], ["W-02"]]);
+		await assert.rejects(tool({ action: "step", plan: "8d8d8d8d", id: "W-02", mark: "wip" }), /belongs to a helper lane/);
+		await tool({ action: "step", plan: "8d8d8d8d", id: "W-03", mark: "done", summary: "Docs" });
+		await tool({ action: "step", plan: "8d8d8d8d", id: "W-04", mark: "done", summary: "Browser" });
+		await assert.rejects(tool({ action: "status", plan: "8d8d8d8d", value: "complete" }), /W-02/, "a lane-owned step blocks completion");
+		await rm(lanesFile);
 		await writeFile(afterFile, validPlan("8d8d8d8d", "After", "active", afterSteps("x").replace("[code]", "[think]")));
 		assert.deepEqual((await listPlans(ctx.cwd)).find((plan) => plan.id === "8d8d8d8d").lanes, [], "lanes run only [code] steps");
 		assert.doesNotMatch((await tool({ action: "get", plan: "8d8d8d8d", view: "resume" })).view, /Lane-eligible/);

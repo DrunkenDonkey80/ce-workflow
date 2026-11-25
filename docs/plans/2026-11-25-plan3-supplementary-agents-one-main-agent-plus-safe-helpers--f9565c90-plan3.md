@@ -2,10 +2,11 @@
 plan3: true
 status: ready
 created: 2026-11-25
-updated: 2026-11-25T11:07:36.682Z
+updated: 2026-11-25T11:16:03.038Z
 size: plan
 reviewed: 2026-11-25
 tagsChecked: a8b7e57e
+started: 2026-11-25T11:09:04.023Z
 ---
 
 # Plan3 supplementary agents: one main agent plus safe helpers for parallel work
@@ -127,12 +128,8 @@ Locked writes: `slots.json` changes only under the repository lock and `lanes.js
 ### Phase 1: Foundations with no behaviour change [code]
 
 - [x] **S-01** after: lines in workState (unmet ids wait, lane-eligible [code] steps listed in summary and resume packet), finish lint for unknown and cyclic ids
-- [ ] **S-02** `extensions/plan3-lanes.ts` slots and tool action `lane` start, drop, list: repository lock, owners, run ids, sidecar ownership (D-07, D-18 to D-20)
-  - Acceptance in a temporary git repo: start works while the main checkout is dirty (untracked and modified files); a slot reused for a second lane keeps an ignored `target/` file and loses tracked and untracked changes; reset, removal and reuse are refused while the recorded run is not confirmed stopped (fake run status); drop deletes the branch and frees the slot; destructive commands refuse a path outside the slot root.
-  - Selection: a lane-owned step is not the main agent's `next` and not `wip`; finishing the main step picks the next main step and stats attribute it to that step (D-18).
-  - Locked writes as in Relevant files.
-  - D-15: setting the plan complete removes that plan's slots and branches only; removal refuses a slot with an unlanded lane; trial patches saved by `drop` stay under the slot root's `patches/` folder.
-  - Check: new `node scripts/test-work-plan3-lanes.mjs` and `node scripts/test-work-plan3.mjs`; prove the cross-plan slot race with one targeted mutation (`test_sensitivity`).
+  - note: Design (assumed, from code reading): slot root = <PI_CODING_AGENT_DIR or ~/.pi/agent>/worktrees/<repo basename>-<sha8 of lowercased git toplevel>; slots.json there {limit, slots:[{n,path,owner|null,lastPlan}], scouts:[{plan,run}]} under withPlanLock(slots.json); per-plan docs/plans/logs/<id>.lanes.json {lanes:[{id,kind,slot,branch,base,run}]} under withPlanLock(lanes.json), lock order always repo then plan. Ops on tool action lane (param op): start (step|trial), run (record run id), scout (admit run id, no slot), drop, list; land is S-08. Run stopped = status.json state in complete/failed/partial/stopped/rejected/paused found at <PI_SUBAGENTS_TEMP_ROOT or tmpdir/pi-subagents-*>/async-subagent-runs/<run>/status.json; missing/queued/running = not stopped; status reader injectable for tests. workState gets lane-owned ids from lanes.json via summarize/resume (excluded from next/wip, still counted open for status complete). Complete: refuse while plan owns a lane; remove slots whose lastPlan is this plan and owner null.
+- [x] **S-02** plan3-lanes.ts slots (repo-wide admission cap shared with scouts, run-status guard, orphan slots, drop patches, completion cleanup) + plan3 action lane start|trial|run|scout|drop|list; lane-owned steps leave next/wip but block completion
 - [ ] **S-08** Tool action `lane land` per D-08: pin range, pick onto current HEAD in the slot, check there, fast-forward master only if HEAD unchanged
   - Acceptance in a temporary repo: two lane commits land in order; a commit touching `docs/plans/` is refused; a conflict on the second commit aborts with master, the slot branch and the user's unrelated dirty files unchanged and names the files; a clean pick whose check fails leaves master untouched; HEAD moved after the pick repeats the pick; the user's dirty file in a landed path makes the fast-forward refuse without loss; the D-17 watch reports a main-checkout change made outside the main agent.
   - Check: `node scripts/test-work-plan3-lanes.mjs`; prove the conflict abort and the `docs/plans/` refusal with one targeted mutation each (`test_sensitivity`).
