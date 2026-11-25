@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-25
-updated: 2026-11-25T11:40:37.954Z
+updated: 2026-11-25T11:47:08.927Z
 size: plan
 reviewed: 2026-11-25
 tagsChecked: a8b7e57e
@@ -136,15 +136,8 @@ Locked writes: `slots.json` changes only under the repository lock and `lanes.js
 ### Phase 2: Helpers in planning and execution [think]
 
 - [x] **S-04** Helpers 0..2 (project>global, unset 2, 0 refuses start/trial/scout, other values throw) and Scout model (unset = coding model) in phaseSettings + /work-settings rows; lane start/trial/scout return launch {agent, cwd, model}; agents plan3-lane (read,bash,edit,write) and plan3-scout (read,grep,find,ls); slotGuard child tool_call guard in plan3-lanes.ts wired into plan3.ts; verify-package list updated
-- [ ] **S-05** Execute prompt and boundary with helper rules (lanes, trials, scouts, landing, serial fallback); stop check and night stall aware of in-flight lanes
-  - Prompt text only when helpers > 0; with 0 the prompts are byte-identical to today's (test compares).
-  - Conflict fallback per D-14: the prompt says drop the lane and redo the step serially, never resolve or relaunch.
-  - Night mode per D-13: lane start, land or drop changes the fingerprint; the stop check stays quiet while only lane-owned steps with a live recorded run remain, and pushes as today when the run is gone (D-19).
-  - Watch (D-17): the main checkout's HEAD, master ref or tracked files changing outside the main agent's own commits stops helpers and the prompt says continue serially.
-  - Check: `node scripts/test-work-plan3.mjs` and `node scripts/test-work-plan3-night.mjs`.
-- [ ] **S-06** Planning, write and map prompts: write `after:` only for truly independent steps (never the same functionality), fan out scouts, run prototype tickets as trials
-  - Planning rule: a step gets `after:` only when it shares no functionality with steps it may run beside; same file in a different area is fine; when unsure, leave it serial.
-  - Check: `node scripts/test-work-plan3.mjs` (prompt contains the rules when helpers > 0, unchanged at 0); README and CHANGELOG updated.
+- [x] **S-05** Execute prompt gets helperRule(n) only when Helpers > 0 (lanes/trials/scouts, pick-check-land, D-14 drop-and-redo, D-17 changed-checkout serial fallback); plan summary carries laneLive/lanesFile; night fingerprint includes the lanes sidecar; day stop check and night settle stay quiet with only running lanes and push a land-or-drop note for stopped ones
+- [x] **S-06** planHelpers(n) appended to planning and write prompts only when Helpers > 0: after: only for steps sharing no functionality (same file other area fine, unsure = serial), scouts for research, map prototype tickets as trials; README Helpers bullet and CHANGELOG Unreleased entries
 
 ### Phase 3: Pilot [think]
 

@@ -12,7 +12,7 @@ import { existsSync, readFileSync, renameSync } from "node:fs";
 import { access, copyFile, mkdir, mkdtemp, readFile, readdir, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import plan3, { executePrompt, retroModel, listPlans, similarity, optimizeLint, phaseSettings, inlineOptions, questionChoices, finishProblems, needsThinkTags } from "../extensions/plan3.ts";
+import plan3, { executePrompt, planningPrompt, writePrompt, retroModel, listPlans, similarity, optimizeLint, phaseSettings, inlineOptions, questionChoices, finishProblems, needsThinkTags } from "../extensions/plan3.ts";
 // Prose "Options:" lists become resolve choices when a question has no "- Option:" lines.
 assert.deepEqual(inlineOptions("- **Q-03** Pick. Options: (a) freeze v1, keep hashes; (b) snapshots; (c) leave it. Picked (a).").map(o => o.label), ["(a) freeze v1, keep hashes", "(b) snapshots", "(c) leave it"]);
 assert.deepEqual(inlineOptions("- **Q-04** Cap? Options: accept as incomplete (current), raise the cap, or send smaller. Any change needs a version.").map(o => o.label), ["accept as incomplete (current)", "raise the cap", "send smaller"]);
@@ -2375,6 +2375,12 @@ try {
 		const sample = { file: "p.md", kind: undefined }, off = executePrompt(sample, [], "PACKET", 0), on = executePrompt(sample, [], "PACKET", 2);
 		assert.doesNotMatch(off, /Helpers \(at most/);
 		assert.equal(on.replace(/\nHelpers \(at most 2[^\n]*/, ""), off, "helpers 0 adds nothing to the execute prompt");
+		// S-06: planning and write prompts carry the after:/scout rule with helpers, nothing at 0.
+		assert.match(planning, /give a step an indented "  - after: <step ids>" line only when it shares no functionality[\s\S]*same file in a different area is fine[\s\S]*When unsure, leave the step serial/);
+		for (const [zero, two] of [[planningPrompt("p.md", "Draft plan:", true, 0), planningPrompt("p.md", "Draft plan:", true, 2)], [writePrompt("p.md", 0), writePrompt("p.md", 2)]]) {
+			assert.match(two, /lane op scout[\s\S]*prototype tickets may run as trials/);
+			assert.equal(two.replace(/\nHelpers \(at most 2[^\n]*/, ""), zero, "helpers 0 leaves planning prompts unchanged");
+		}
 	}
 	assert.match(execution, /For web UI steps, consult frontend-design as needed/);
 	assert.match(execution, /follow settled design decisions and existing tokens\/components without restarting brainstorming or expanding scope/);

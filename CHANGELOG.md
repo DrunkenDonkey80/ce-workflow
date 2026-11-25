@@ -2,6 +2,13 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Added
+
+- Plan3 helpers: while a plan runs, the main agent can hand steps the plan marks as independent to up to 2 helper agents, each in its own worktree outside the repository. Their work lands on master only after the main agent checks it; a conflict or failure gives the step back to the main agent. Scouts answer research questions while planning. **/wo → Settings → Plan3 → Helpers** (0 turns it off) and **Scout model**.
+- Plan stats show helper time, tokens and cost per step.
+
 ## 1.1.7 — 2026-11-25
 
 ### Changed
