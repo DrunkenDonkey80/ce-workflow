@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 
 process.env.PI_CODING_AGENT_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "wo-hub-")); // the CLI child inherits it: no real hub
-const { handleDesignLibraryCommand, hubCli, hubMenu, joinedSession, scheduleTool, liveTarget, dialogReason, longSleepWait, undeclaredBackground } = await import("../extensions/hub-command.ts");
+const { cancelNeedsId, handleDesignLibraryCommand, hubCli, hubMenu, joinedSession, scheduleTool, liveTarget, dialogReason, longSleepWait, undeclaredBackground } = await import("../extensions/hub-command.ts");
 // Long sleep-waits are blocked (the ainews session polled a finished run for an hour); short waits and real work are not.
 for (const [command, timeout, blocked] of [
 	["sleep 900; cat log", 960, true], ["sleep 5m", undefined, true], ["powershell Start-Sleep -Seconds 600", undefined, true],
@@ -87,6 +87,14 @@ delete process.env.PI_HUB_SESSION;
 await assert.rejects(scheduleTool.execute("t", { action: "list" }), /started by pi-control-hub/);
 process.env.PI_HUB_SESSION = "00000000-0000-0000-0000-000000000000";
 await assert.rejects(scheduleTool.execute("t", { action: "add" }), /needs kind/);
+// Cancel without an id lists the pending ids and cancels nothing (D-05); a failed list keeps the plain message.
+await assert.rejects(scheduleTool.execute("t", { action: "cancel" }), /^Error: cancel needs id\.$/);
+const asked = [];
+const fakeCli = (timers) => async (args) => { asked.push(args); return { ok: true, text: JSON.stringify(timers) }; };
+assert.equal(await cancelNeedsId(fakeCli([{ id: "0123456789abcdef" }, { id: "fedcba9876543210" }])), "cancel needs id. Pending: 01234567 fedcba98");
+assert.equal(await cancelNeedsId(fakeCli([])), "cancel needs id. No timers are pending.");
+assert.equal(await cancelNeedsId(async () => ({ ok: false, text: "hub is not running" })), "cancel needs id.");
+assert.deepEqual(asked, [["schedule", "list"], ["schedule", "list"]]);
 await assert.rejects(scheduleTool.execute("t", { action: "add", kind: "script", command: "exit 0", everyMinutes: 5 }), /hub is not running/);
 delete process.env.PI_HUB_SESSION;
 fs.rmSync(process.env.PI_CODING_AGENT_DIR, { recursive: true, force: true });

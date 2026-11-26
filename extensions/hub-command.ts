@@ -268,6 +268,13 @@ export const BACKGROUND_REASON = "Blocked: this starts a background process that
 
 // S-04: the agent's timers, through `pi-hub schedule`. Registered only in hub-started Pi (PI_HUB_SESSION), which the hub can wake.
 const nullable = (schema) => ({ anyOf: [schema, { type: "null" }] });
+// The pending ids make the retry one call; cancelling a lone timer itself could drop one the agent keeps.
+export async function cancelNeedsId(cli = hubCli): Promise<string> {
+	const listed = await cli(["schedule", "list"], 30_000);
+	let ids: string[] | null = null;
+	try { if (listed.ok) ids = (JSON.parse(listed.text) as { id: string }[]).map(t => t.id.slice(0, 8)); } catch { ids = null; }
+	return !ids ? "cancel needs id." : ids.length ? `cancel needs id. Pending: ${ids.join(" ")}` : "cancel needs id. No timers are pending.";
+}
 export const scheduleTool = {
 	name: "schedule",
 	label: "Schedule",
@@ -290,7 +297,7 @@ export const scheduleTool = {
 	async execute(_id, args) {
 		if (!process.env.PI_HUB_SESSION) throw new Error("Timers need a session started by pi-control-hub; this Pi was not.");
 		const cli = ["schedule", args.action];
-		if (args.action === "cancel") { if (!args.id) throw new Error("cancel needs id."); cli.push(args.id); }
+		if (args.action === "cancel") { if (!args.id) throw new Error(await cancelNeedsId()); cli.push(args.id); }
 		if (args.action === "add") {
 			if (!args.kind) throw new Error("add needs kind (script or message).");
 			cli.push(args.kind, args.kind === "script" ? "--command" : "--text", String((args.kind === "script" ? args.command : args.text) ?? ""));

@@ -32,6 +32,7 @@ try {
 	assert(!Object.keys(tools).some(name => name.startsWith("work_")));
 	assert(!Object.keys(commands).some(name => name.startsWith("__orchestrator")));
 	assert(tools.knowledge && tools.compaction_note && tools.research_note);
+	assert.match(tools.knowledge.parameters.properties.claim.description ?? "", /at most 280 characters; split longer facts into separate claims/);
 	const names = commands.wo.getArgumentCompletions("").map(item => item.value);
 	for (const name of ["goal", "pause", "monitor", "resume-work", "redesign", "telemetry", "usage", "share"]) assert(!names.includes(name), name);
 	for (const name of ["plan", "plans", "resume", "settings", "compact", "fact", "design"]) assert(names.includes(name), name);

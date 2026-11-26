@@ -10,6 +10,12 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - Plan stats show helper time, tokens and cost per step.
 - Plan3 parallel pass: with helpers on, once a plan could be finished, the agent gets one turn to decide, step by step, which steps may run on a helper (`after:`) and which stay with the main agent (`serial:` with the exact reason, such as your real data folder, a fixed port or a long build). `/plan3 finish` sends the pass again while any step is undecided.
 
+### Changed
+
+- `schedule` cancel without an id lists the pending timer ids (or says none are pending) and cancels nothing.
+- `plan3` step without a mark names the allowed marks and the call shape.
+- The `knowledge` tool's claim parameter states its 280-character limit.
+
 ## 1.1.7 — 2026-11-25
 
 ### Changed

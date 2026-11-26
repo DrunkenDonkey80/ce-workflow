@@ -1964,7 +1964,8 @@ export default function plan3(pi) {
 					pi.events?.emit?.("plan3:completed", { ctx, plan });
 				}
 			} else if (args.action === "step") {
-				const mark = need("mark");
+				if (!args.mark) throw new Error(`step needs mark: one of ${Object.keys(MARKS).join(", ")}, as {action: "step", id, mark}.`);
+				const mark = args.mark;
 				if (!MARKS[mark]) throw new Error(`Unknown mark. Use ${Object.keys(MARKS).join(", ")}.`);
 				const avail = availOf(plan.file);
 				await mutate(plan, (lines) => {

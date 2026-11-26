@@ -3723,7 +3723,7 @@ export default function workModelsExtension(pi) {
 						type: "string",
 						enum: ["record", "search", "show", "correct", "reject"],
 					},
-					claim: { type: "string" },
+					claim: { type: "string", description: "The fact: at most 280 characters; split longer facts into separate claims." },
 					query: { type: "string" },
 					id: { type: "string" },
 					reason: { type: "string" },

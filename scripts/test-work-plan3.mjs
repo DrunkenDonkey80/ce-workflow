@@ -400,6 +400,7 @@ try {
 	const beforeSummary = await readFile(csvFile, "utf8");
 	await assert.rejects(tool({ action: "next", check: "node --test parser.test.mjs: 4 passed" }), /CSV-01 done needs summary/);
 	await assert.rejects(tool({ action: "step", id: "CSV-01", mark: "done", summary: " " }), /needs summary/);
+	await assert.rejects(tool({ action: "step", id: "CSV-01" }), /step needs mark: one of pending, wip, done, failed, blocked, human, as \{action: "step", id, mark\}/);
 	assert.equal(await readFile(csvFile, "utf8"), beforeSummary, "a rejected done changes nothing");
 	state = await tool({ action: "next", summary: "Parser", check: "node --test parser.test.mjs: 4 passed" });
 	assert.deepEqual([state.completed, state.started, state.done], ["CSV-01", "CSV-02", 1]);
