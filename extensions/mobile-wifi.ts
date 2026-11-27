@@ -84,6 +84,7 @@ export async function wifiCall(exec: Exec, ip: string, args: string[], signal?: 
 		case "apps launch": case "apps terminate": return call(`device.apps.${sub}`, { bundleId: arg });
 		case "io tap": { const [x, y] = nums(arg); return call("device.io.tap", { x, y }); }
 		case "io longpress": { const [x, y] = nums(arg); return call("device.io.longpress", { x, y, duration: Number(opt("--duration") ?? 1000) / 1000 }); }
+		// shortcut: --duration is dropped (the helper's unit for it is unverified), so scroll can fling over Wi-Fi; pass it once tested on a Wi-Fi phone.
 		case "io swipe": { const [x1, y1, x2, y2] = nums(arg); return call("device.io.swipe", { x1, y1, x2, y2 }); }
 		case "io text": return call("device.io.text", { text: arg });
 		case "io fill": await key("clear"); return arg ? call("device.io.text", { text: arg }) : {}; // HID clear empties the focused field, as mobilecli's fill

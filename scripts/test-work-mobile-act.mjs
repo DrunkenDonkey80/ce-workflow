@@ -7,7 +7,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { readdir } from "node:fs/promises";
 import { endStaleHelpers } from "../extensions/mobile-wifi.ts";
-import { alertText, assignRefs, gridDiff, gridOf, findProfile, flatten, line, matches, short, mobileAct, mobileActTool, MOBILECLI, cameraShot, newer, resetSession, resolveDevice, swipePoints, visiblePoint, keyboard } from "../extensions/mobile-act.ts";
+import { alertText, assignRefs, gridDiff, gridOf, findProfile, flatten, line, matches, short, mobileAct, mobileActTool, MOBILECLI, cameraShot, newer, resetSession, resolveDevice, scrollBand, swipePoints, visiblePoint, keyboard } from "../extensions/mobile-act.ts";
 
 const run = promisify(execFile);
 const SIM = { id: "SIM-1", name: "iPhone 17", platform: "ios", type: "simulator", state: "online", version: "26.0" };
@@ -258,6 +258,34 @@ const opts = (extra = {}) => ({ sleep: async () => {}, ...extra });
 	assert.equal(stops, 1);
 }
 
+// scroll: slow drags toward the middle band, never a fling; ends with an error at the list's end or on a fixed element.
+{
+	const rows = (y0) => Array.from({ length: 4 }, (_, i) => btn(`Row ${i}`, `r${i}`, y0 + i * 60));
+	assert.deepEqual(scrollBand({ x: 0, y: 0, width: 100, height: 1000 }, true), [120, 880]);
+	resetSession();
+	let f = fake({ screens: [[...rows(100), btn("Target", "t", 800)], [...rows(-130), btn("Target", "t", 570)]] });
+	assert.match(await mobileAct(f.exec, { action: "scroll", query: "Target" }, opts()), /^"Target" is in view after 1 drag:\nUNTRUSTED[^\n]*\n\[e\d+\] Button "Target" #t @\(16,570 370x48\)$/);
+	// center 824 is below the band (105..769): the content moves up by at most 0.26 screen heights, centered on the band's middle, over 800 ms
+	assert.deepEqual(f.acts(), ["io swipe 201,551,201,323 --duration 800 --device SIM-1"]);
+	resetSession();
+	f = fake({ screens: [[...rows(100), btn("Target", "t", 300)]] });
+	assert.match(await mobileAct(f.exec, { action: "scroll", query: "Target" }, opts()), /in view after 0 drags/);
+	assert.deepEqual(f.acts(), [], "already in view: no drag");
+	resetSession();
+	f = fake({ screens: [rows(100)] });
+	await assert.rejects(mobileAct(f.exec, { action: "scroll", query: "Target", direction: "up" }, opts()), /"Target" is not in this list: the screen stopped changing after 1 drags up/);
+	assert.deepEqual(f.acts(), ["io swipe 201,323,201,551 --duration 800 --device SIM-1"], "up pages the other way");
+	resetSession();
+	f = fake({ screens: [[...rows(100), btn("Footer", "foot", 820)]] });
+	await assert.rejects(mobileAct(f.exec, { action: "scroll", query: "Footer" }, opts()), /"Footer" does not move when dragged/);
+	await assert.rejects(mobileAct(f.exec, { action: "scroll" }, opts()), /scroll needs query/);
+	// snapshot stableMs: reads until two reads match, then lists the screen.
+	resetSession();
+	f = fake({ screens: [rows(100), rows(90), rows(90)] });
+	assert.match(await mobileAct(f.exec, { action: "snapshot", stableMs: 1 }, { sleep: ms => new Promise(res => setTimeout(res, ms)) }), /Button "Row 0" #r0 @\(16,90 /);
+	assert.ok(f.calls.filter(c => c[1] === "dump").length >= 3, "waited for the screen to settle");
+}
+
 // Test loops (Viktor torture run): guarded waits, checkpoints, crash watch, breaker.
 {
 	const dir = await mkdtemp(path.join(os.tmpdir(), "mobile-act-cp-")), reports = path.join(dir, "reports");
@@ -297,6 +325,10 @@ const opts = (extra = {}) => ({ sleep: async () => {}, ...extra });
 	resetSession();
 	await assert.rejects(mobileAct(f.exec, { action: "wait", query: "#nope", timeoutMs: 0 }, o()), /Timed out after 0 ms waiting for "#nope" to appear\.$/);
 	assert.match(await mobileAct(f.exec, { action: "tap", ref: "e1", settleMs: 0 }, o()), /^Done\.$/, "no breaker after an unguarded wait");
+	// breaker: false turns a guarded failure into a plain error (a watcher that only reports must not lock the phone).
+	resetSession();
+	await assert.rejects(mobileAct(f.exec, { action: "wait", query: "#nope", timeoutMs: 0, expectApp: "com.apple.springboard", breaker: false }, o()), e => !/STOPPED/.test(e.message) && /Timed out after 0 ms/.test(e.message));
+	assert.match(await mobileAct(f.exec, { action: "tap", ref: "e1", settleMs: 0 }, o()), /^Done\.$/, "no breaker after a breaker: false wait");
 
 	// stableMs: a match that flickers away starts over.
 	resetSession();

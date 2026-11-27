@@ -2,6 +2,14 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Added
+
+- `mobile_act scroll {query, direction?, ref?}` brings a row into view in one call. It drags slowly toward the element and stops with it in the middle of the screen (or of the `ref` scroll container). A plain `swipe` flings past rows, and a short one landed as a tap and opened the wrong row. It fails clearly when the list ends without the element, or when the element is a fixed header or footer. Measured on iOS: drags under 500 ms fling, and drags of 1 s or more sometimes overshoot, so it drags at most a quarter of the screen over 800 ms.
+- `mobile_act wait {breaker: false}`: a failed guarded wait (failOn, failOnAlert, expectApp or a timeout) is a plain error and leaves input on. Watch loops that only report no longer lock the phone until `resume`.
+- `mobile_act snapshot {stableMs}` waits until the screen stops changing before it reads. A read during an animation once showed the app switcher instead of an alert that was opening.
+
 ## 1.1.7 — 2026-11-25
 
 ### Changed
