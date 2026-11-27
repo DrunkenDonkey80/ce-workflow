@@ -1,5 +1,6 @@
 // app_act: read and operate a macOS app through Accessibility (Windows: UI Automation, app-act-win.ts), like mobile_act does for phones.
 // A small signed helper app (Pi App Helper) does the Accessibility calls, so macOS asks the permission for it, not for node.
+import { readFileSync, writeFileSync } from "node:fs";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -10,8 +11,9 @@ import { macHelper, SCREEN_LOCKED } from "./screen-read.ts";
 import { runWinHelper, winKeys } from "./app-act-win.ts";
 
 type Exec = (command: string, args: string[], options: { timeout: number; signal?: AbortSignal }) => Promise<{ code?: number; killed?: boolean; stdout?: string; stderr?: string }>;
-// lasting: label of a third choice that allows such actions for the rest of the session; picking it returns "lasting".
-type Confirm = (title: string, message: string, lasting?: string) => Promise<boolean | "lasting">;
+// lasting: label of a choice that allows such actions for the rest of the session; always: one that remembers them on this
+// machine (app-act.json). Picking one returns its name.
+type Confirm = (title: string, message: string, lasting?: string, always?: string) => Promise<boolean | "lasting" | "always">;
 export type AppActArgs = {
 	action: "apps" | "snapshot" | "find" | "wait" | "press" | "type" | "menus" | "menu" | "key";
 	app?: string; window?: string; ref?: string; query?: string; text?: string; submit?: boolean; path?: string; keys?: string; settleMs?: number;
@@ -305,6 +307,15 @@ const allowed = new Set<string>(); // lowercase names of the apps the user let t
 const granted = new Map<string, string>(); // each text the agent named an allowed app with → the app's lowercase name (the grant key)
 const riskAllowed = new Set<string>(); // apps whose upload/delete/… buttons the user allowed for the rest of the session
 export function resetSession() { snapshots.clear(); allowed.clear(); granted.clear(); riskAllowed.clear(); }
+// "Always" grants: lowercase app names in `{apps, risky}`, kept across sessions.
+const alwaysFile = () => path.join(process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent"), "app-act.json");
+const readAlways = (): { apps?: string[]; risky?: string[] } => { try { return JSON.parse(readFileSync(alwaysFile(), "utf8")) ?? {}; } catch { return {}; } };
+const always = (list: "apps" | "risky", key: string) => { const l = readAlways()[list]; return Array.isArray(l) && l.includes(key); };
+// shortcut: no lock, two sessions saving at the same moment can drop one grant (it asks again then); add one if that shows up.
+function remember(list: "apps" | "risky", key: string) {
+	const value = readAlways(), l = Array.isArray(value[list]) ? value[list] : [];
+	if (!l.includes(key)) writeFileSync(alwaysFile(), JSON.stringify({ ...value, [list]: [...l, key] }, null, 2));
+}
 const show = (e: AppElement) => line(e) + (e.disabled ? " disabled" : "");
 const LIMIT = 400;
 
@@ -360,18 +371,21 @@ export async function appAct(exec: Exec, args: AppActArgs, o: Options = {}): Pro
 		// shortcut: a Windows app's secondary pid is not in the apps list, so it fails here; the error lists the app's name to use instead.
 		if (found.length !== 1) throw new Error(`${found.length ? "several apps match" : "no app with a window matches"} "${app}"\nRunning apps:\n${(found.length ? found : apps).map(appLine).join("\n")}`);
 		const name = found[0].name; key = name.toLowerCase();
-		if (!allowed.has(key)) {
+		if (!allowed.has(key) && !always("apps", key)) {
 			if (!o.confirm) throw new Error(`app_act needs the user to allow controlling ${name}, and this session has no dialog to ask.`);
-			if (!await o.confirm(`Let the agent read and operate ${name}?`, `For this session it can read ${name}'s windows and menus, press buttons and menu items, type and send keys. Upload, submit, delete and similar buttons still ask (you can then allow them for the rest of the session)${win ? "; every key press asks too (it brings the window to the front)" : ""}.`)) throw new Error(`The user did not allow controlling ${name}.`);
+			const ok = await o.confirm(`Let the agent read and operate ${name}?`, `It can read ${name}'s windows and menus, press buttons and menu items, type and send keys. Upload, submit, delete and similar buttons still ask (you can then allow them for the rest of the session)${win ? "; every key press asks too (it brings the window to the front)" : ""}.`, undefined, `Always allow ${name}`);
+			if (!ok) throw new Error(`The user did not allow controlling ${name}.`);
+			if (ok === "always") remember("apps", key);
 			allowed.add(key);
 		}
 		granted.set(app, key);
 	}
 	const scope = args.window ?? "", act = { settleMs, scope };
 	const riskOk = async (title: string, message: string) => {
-		if (riskAllowed.has(key)) return true;
-		const ok = await o.confirm?.(title, message, `Allow upload, submit, delete and similar actions in ${app} for this session`);
-		if (ok === "lasting") riskAllowed.add(key);
+		if (riskAllowed.has(key) || always("risky", key)) return true;
+		const ok = await o.confirm?.(title, message, `Allow upload, submit, delete and similar actions in ${app} for this session`, `Always allow upload, submit, delete and similar actions in ${app}`);
+		if (ok === "always") remember("risky", key);
+		if (ok === "lasting" || ok === "always") riskAllowed.add(key);
 		return !!ok;
 	};
 	/** The element from ref, or the one snapshot element matching query. */
@@ -462,14 +476,14 @@ export const appActTool = (exec: Exec) => ({
 		"Known multi-step flows: run them in one codemode script with tools.app_act calls (press/type by query, settleMs 0 between steps) and return only what you need to check, instead of one model turn per action.",
 	],
 	description: [
-		"Operate a running macOS app through Accessibility (a signed Pi App Helper; the first use asks the user for Accessibility permission) or a Windows app through UI Automation. The user allows each app once per session. Works with the app in the background; the mouse is never moved.",
+		"Operate a running macOS app through Accessibility (a signed Pi App Helper; the first use asks the user for Accessibility permission) or a Windows app through UI Automation. The user allows each app once per session or always. Works with the app in the background; the mouse is never moved.",
 		"Windows: menus lists only classic menu bars (others show as MenuItem elements in snapshot); type needs ref; key and type submit bring the window to the front briefly, and key asks the user each time.",
 		"Actions: apps (running apps); menus {app, query?} (every menu item as path  [hotkey]  ✓ checked  (disabled) = not available now; query filters); menu {app, path: \"Product > Archive\"} (runs the item);",
 		"snapshot {app, window?, ref?} (window's elements as [ref] Role \"label\" = value #id @(x,y wxh) disabled; window = title or part of it, default the focused one; ref reads only that element's part); find {app, query} (searches the last snapshot); wait {app, query, gone?, timeoutMs? (10000), failOn? [texts]} (reads the window until query shows or goes; a failOn text, e.g. an error dialog, or the timeout fails it);",
 		"press {app, ref or query} (buttons, checkboxes, popups, rows); type {app, text, ref?, submit?} (ref sets that field's text; without ref the text goes as key presses to the focused control; submit presses Return; password fields are refused);",
 		"key {app, keys: \"cmd+shift+k\" | \"return\" | \"escape\" | \"tab\" | \"down\"} (sent to the app; the same form menus prints).",
 		"After press, type, menu and key it waits settleMs (default 500) and returns + added, - removed, ~ changed elements of the focused (or given) window, or the whole window when most of it changed; settleMs 0 skips that.",
-		"Upload, distribute, submit, send, delete and similar presses ask the user (who can allow them for the rest of the session). Views drawn without Accessibility (canvases, previews) do not show: look at them with screen_read target=window.",
+		"Upload, distribute, submit, send, delete and similar presses ask the user (who can allow them for the rest of the session or always). Views drawn without Accessibility (canvases, previews) do not show: look at them with screen_read target=window.",
 	].join("\n"),
 	parameters: {
 		type: "object", additionalProperties: false, required: ["action"],
@@ -490,13 +504,14 @@ export const appActTool = (exec: Exec) => ({
 		},
 	},
 	async execute(_id: string, args: AppActArgs, signal?: AbortSignal, _update?: unknown, ctx?: any) {
-		const confirm: Confirm | undefined = !ctx?.hasUI ? undefined : async (title, message, lasting) => {
-			if (!lasting) return askConfirm(ctx, title, message, { signal });
+		const confirm: Confirm | undefined = !ctx?.hasUI ? undefined : async (title, message, lasting, always) => {
+			if (!lasting && !always) return askConfirm(ctx, title, message, { signal });
 			const picked = await showListDialog(ctx, {
 				title, purpose: message, filter: false, cursorKey: `app-act-risk-${randomUUID()}`, signal, compact: true,
-				items: [{ value: "no", label: "Deny" }, { value: "yes", label: "Allow this once" }, { value: "lasting", label: lasting, preserveCase: true }],
+				items: [{ value: "no", label: "Deny" }, { value: "yes", label: lasting ? "Allow this once" : "Allow for this session" },
+					...lasting ? [{ value: "lasting", label: lasting, preserveCase: true }] : [], ...always ? [{ value: "always", label: always, preserveCase: true }] : []],
 			});
-			return picked?.value === "lasting" ? "lasting" : picked?.value === "yes";
+			return picked?.value === "lasting" || picked?.value === "always" ? picked.value : picked?.value === "yes";
 		};
 		return { content: [{ type: "text", text: await appAct(exec, args, { signal, confirm }) }], details: {} };
 	},

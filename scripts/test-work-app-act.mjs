@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { winKeys } from "../extensions/app-act-win.ts";
 import { appAct, appActTool, hotkey, parseKeys, resetSession, risky, toElements } from "../extensions/app-act.ts";
+
+// "Always" grants go to <agent dir>/app-act.json: a scratch one, never the user's.
+const agentDir = mkdtempSync(path.join(os.tmpdir(), "app-act-test-"));
+process.env.PI_CODING_AGENT_DIR = agentDir;
 
 const frame = (y, w = 100) => ({ x: 10, y, width: w, height: 20 });
 const node = (role, extra, path, y) => ({ role, subrole: "", title: "", desc: "", value: "", id: "", frame: frame(y), path, ...extra });
@@ -127,4 +134,16 @@ await assert.rejects(appAct(null, { action: "snapshot", app: "48172" }, wh), /no
 await assert.rejects(appAct(null, { action: "snapshot", app: "releases" }, wh), /several apps match "releases"[\s\S]*OneCommander/);
 for (const app of ["releases-app", "26596", "Releases-App"]) await appAct(null, { action: "snapshot", app }, wh);
 assert.deepEqual(once, ["Let the agent read and operate releases-app?"], "one prompt per app, none for names that match nothing or several");
+
+// "Always" on either prompt is remembered for later sessions; another app still asks.
+resetSession();
+await appAct(null, { action: "snapshot", app: "Xcode" }, { ...o, confirm: async (_t, _m, lasting, always) => (assert.equal([lasting, always].join(), ",Always allow Xcode"), "always") });
+await appAct(null, { action: "press", app: "Xcode", ref: "e2" }, { ...o, confirm: async (_t, _m, _l, always) => (assert.match(always, /^Always allow upload/), "always") });
+resetSession();
+const never = { ...o, confirm: async () => assert.fail("asked again") };
+await appAct(null, { action: "snapshot", app: "Xcode" }, never);
+await appAct(null, { action: "press", app: "Xcode", ref: "e2" }, never);
+assert.deepEqual(JSON.parse(readFileSync(path.join(agentDir, "app-act.json"), "utf8")), { apps: ["xcode"], risky: ["xcode"] });
+await assert.rejects(appAct(null, { action: "snapshot", app: "releases-app" }, { ...wh, confirm: async () => false }), /did not allow/);
+rmSync(agentDir, { recursive: true, force: true });
 console.log("app-act ok");
