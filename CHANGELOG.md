@@ -9,6 +9,9 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - Plan3 helpers: while a plan runs, the main agent can hand steps the plan marks as independent to up to 2 helper agents, each in its own worktree outside the repository. Their work lands on master only after the main agent checks it; a conflict or failure gives the step back to the main agent. Scouts answer research questions while planning. **/wo → Settings → Plan3 → Helpers** (0 turns it off) and **Scout model**.
 - Plan stats show helper time, tokens and cost per step.
 - Plan3 parallel pass: with helpers on, once a plan could be finished, the agent gets one turn to decide, step by step, which steps may run on a helper (`after:`) and which stay with the main agent (`serial:` with the exact reason, such as your real data folder, a fixed port or a long build). `/plan3 finish` sends the pass again while any step is undecided.
+- `mobile_act scroll {query, direction?, ref?}` brings a row into view in one call. It drags slowly toward the element and stops with it in the middle of the screen (or of the `ref` scroll container). A plain `swipe` flings past rows, and a short one landed as a tap and opened the wrong row. It fails clearly when the list ends without the element, or when the element is a fixed header or footer. Measured on iOS: drags under 500 ms fling, and drags of 1 s or more sometimes overshoot, so it drags at most a quarter of the screen over 800 ms.
+- `mobile_act wait {breaker: false}`: a failed guarded wait (failOn, failOnAlert, expectApp or a timeout) is a plain error and leaves input on. Watch loops that only report no longer lock the phone until `resume`.
+- `mobile_act snapshot {stableMs}` waits until the screen stops changing before it reads. A read during an animation once showed the app switcher instead of an alert that was opening.
 
 ### Changed
 

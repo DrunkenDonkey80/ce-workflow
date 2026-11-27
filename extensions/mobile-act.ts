@@ -11,8 +11,8 @@ import { tunnel, wifi, wifiAgent, wifiCall, wifiConnect, wifiDevices, wired } fr
 type Exec = (command: string, args: string[], options: { timeout: number; signal?: AbortSignal }) => Promise<{ code?: number; killed?: boolean; stdout?: string; stderr?: string }>;
 type Confirm = (title: string, message: string) => Promise<boolean>;
 export type MobileActArgs = {
-	action: "list" | "boot" | "launch" | "relaunch" | "snapshot" | "find" | "ocr" | "wait" | "tap" | "longpress" | "type" | "swipe" | "button" | "checkpoint" | "resume";
-	failOn?: string[]; failOnAlert?: boolean; expectApp?: string; stableMs?: number; name?: string; save?: boolean; ignore?: string[]; visual?: boolean;
+	action: "list" | "boot" | "launch" | "relaunch" | "snapshot" | "find" | "ocr" | "wait" | "tap" | "longpress" | "type" | "swipe" | "scroll" | "button" | "checkpoint" | "resume";
+	failOn?: string[]; failOnAlert?: boolean; expectApp?: string; stableMs?: number; breaker?: boolean; name?: string; save?: boolean; ignore?: string[]; visual?: boolean;
 	device?: string; appId?: string; gone?: boolean; timeoutMs?: number; ref?: string; x?: number; y?: number; text?: string; submit?: boolean; durationMs?: number;
 	direction?: "up" | "down" | "left" | "right"; button?: "home" | "back" | "power" | "volume_up" | "volume_down"; query?: string; settleMs?: number;
 };
@@ -270,7 +270,7 @@ const breakers = new Map<string, string>(); // device -> why it stopped; input w
 const crashSeen = new Map<string, Set<string>>(); // "device app" -> crash reports already known
 const exeNames = new Map<string, string>(); // "device app" -> executable name (iOS crash report file names start with it)
 const headers = new Map<string, string>(); // simulator crash report -> its first line, which names the app
-const MUTATING = new Set(["launch", "relaunch", "tap", "longpress", "type", "swipe", "button"]);
+const MUTATING = new Set(["launch", "relaunch", "tap", "longpress", "type", "swipe", "scroll", "button"]);
 const GRID = 16;
 // Device ids become file names: a Wi-Fi adb id like 192.168.1.189:34141 has a ':' Windows paths refuse.
 const safeId = (dev: Device) => dev.id.replace(/[^\w.-]/g, "-");
@@ -380,7 +380,7 @@ async function waitFor(exec: Exec, dev: Device, args: MobileActArgs, o: Options,
 	const q = args.query ?? "", start = Date.now(), timeout = args.timeoutMs ?? 10_000, stable = args.stableMs ?? (q ? 0 : 1000);
 	let last: string | undefined;
 	// A guarded wait stops the run (breaker, saved screen) on a failure condition or a timeout.
-	const guarded = !!(args.failOn?.length || args.failOnAlert || args.expectApp);
+	const guarded = !!(args.failOn?.length || args.failOnAlert || args.expectApp) && args.breaker !== false;
 	const fail = async (why: string) => { throw guarded ? await stop(exec, dev, `wait for "${q}": ${why}`, o) : new Error(why); };
 	let since: number | undefined;
 	for (;;) {
@@ -589,6 +589,46 @@ export function swipePoints(direction: string, f: Frame) {
 	return m;
 }
 
+/** The middle 76% of a frame along the scroll axis: an element there is clear of nav bars, toolbars and the screen edges. */
+export function scrollBand(f: Frame, vertical: boolean) {
+	const [a, len] = vertical ? [f.y, f.height] : [f.x, f.width];
+	return [a + len * 0.12, a + len * 0.88];
+}
+// Measured on iOS 27: a drag of up to ~0.26 screen heights over 800 ms moves the content by its length minus ~10 points of touch slop;
+// under 500 ms it flings, and at 1000 ms or more it sometimes overshoots by 100-200 points.
+const DRAG_MS = 800, DRAG_MAX = 0.26, SCROLL_MAX = 25;
+
+/** scroll: slow drags (no fling, never short enough to count as a tap) until query sits in the middle band of the screen or ref's frame. */
+async function scrollTo(exec: Exec, dev: Device, args: MobileActArgs, o: Options) {
+	const q = args.query, dir = args.direction ?? "down", vertical = dir === "up" || dir === "down";
+	if (!q) throw new Error("scroll needs query: the element to bring into view.");
+	const s = await screen(exec, dev, o.signal), box = args.ref ? element(dev, args.ref).frame : s;
+	if (!box.width) throw new Error("Screen size unknown: snapshot first or pass ref.");
+	const pos = (e: Element) => center(e.frame)[vertical ? 1 : 0];
+	let drags = 0, lastScreen = "", lastPos: number | undefined;
+	for (;;) {
+		const els = (await read(exec, dev, o.signal)).snap.elements, kb = args.ref ? undefined : keyboard(els, s.height || Infinity);
+		const f = kb && kb.top > box.y ? { ...box, height: kb.top - box.y } : box, [lo, hi] = scrollBand(f, vertical), mid = (lo + hi) / 2;
+		// Only matches across the scroll axis from the box: a match in a side column or another pager page is not this list's.
+		const hits = matches(els, q).filter(e => { const [cx, cy] = center(e.frame); return vertical ? cx >= f.x && cx <= f.x + f.width : cy >= f.y && cy <= f.y + f.height; });
+		const shown = hits.filter(e => pos(e) >= lo && pos(e) <= hi);
+		if (shown.length) return `"${q}" is in view after ${drags} drag${drags === 1 ? "" : "s"}:\n${UNTRUSTED}\n${shown.slice(0, 12).map(e => line(e, s)).join("\n")}`;
+		const t = hits.sort((a, b) => Math.abs(pos(a) - mid) - Math.abs(pos(b) - mid))[0], shownNow = els.map(e => line(e)).join("\n");
+		if (t && pos(t) === lastPos) throw new Error(`"${q}" does not move when dragged (a fixed header or footer, or the list's end): ${line(t, s)}`);
+		if (!t && shownNow === lastScreen) throw new Error(`"${q}" is not in this list: the screen stopped changing after ${drags} drags ${dir} (its end; try the other direction).`);
+		if (drags >= SCROLL_MAX) throw new Error(`"${q}" is not in view after ${SCROLL_MAX} drags.${t ? ` Last seen: ${line(t, s)}` : ""}`);
+		lastScreen = shownNow; lastPos = t && pos(t);
+		// The content follows the finger: move the target toward the middle, or page on in direction when it is not on screen yet.
+		const cap = Math.min(hi - lo, DRAG_MAX * (vertical ? s.height : s.width)), forward = dir === "down" || dir === "right";
+		// Centered on the band's middle: a drag that starts on a nav bar or toolbar does not scroll the list.
+		const move = t ? Math.max(-cap, Math.min(cap, mid - pos(t))) : forward ? -cap : cap, from = mid - move / 2, across = center(f)[vertical ? 0 : 1];
+		const pts = vertical ? [across, from, across, from + move] : [from, across, from + move, across];
+		await run(exec, ["io", "swipe", pts.map(num).join(","), "--duration", String(DRAG_MS), "--device", dev.id], o.signal);
+		drags++;
+		await pause(o, 400);
+	}
+}
+
 export async function mobileAct(exec: Exec, args: MobileActArgs, o: Options = {}): Promise<string> {
 	const { signal } = o;
 	if (args.action === "list") {
@@ -761,6 +801,8 @@ async function act(exec: Exec, dev: Device, args: MobileActArgs, o: Options) {
 	if (args.query && !args.ref && /^(tap|longpress|type|swipe)$/.test(args.action)) args = { ...args, ref: await resolveQuery(exec, dev, args.query, o) };
 	switch (args.action) {
 		case "snapshot": {
+			// stableMs: wait out an animation first (a frame mid-transition showed the app switcher instead of an alert)
+			if (args.stableMs) await waitFor(exec, dev, { action: "wait", stableMs: args.stableMs, timeoutMs: args.timeoutMs ?? 5000 }, o, signal);
 			const els = (await read(exec, dev, signal)).snap.elements, { app, head } = await warnings(exec, dev, els, signal);
 			return head + await full(exec, dev, els, signal, app);
 		}
@@ -798,13 +840,14 @@ async function act(exec: Exec, dev: Device, args: MobileActArgs, o: Options) {
 			await run(exec, ["io", "swipe", swipePoints(args.direction ?? "down", f).map(num).join(","), ...d], signal);
 			return changes(exec, dev, settle, o);
 		}
+		case "scroll": return scrollTo(exec, dev, args, o);
 		case "button": {
 			if (!args.button) throw new Error("button needs button: home, back (Android), power, volume_up or volume_down.");
 			await run(exec, ["io", "button", args.button.toUpperCase(), ...d], signal);
 			return changes(exec, dev, settle, o);
 		}
 	}
-	throw new Error("action must be list, boot, launch, relaunch, snapshot, find, ocr, wait, tap, longpress, type, swipe, button, checkpoint or resume.");
+	throw new Error("action must be list, boot, launch, relaunch, snapshot, find, ocr, wait, tap, longpress, type, swipe, scroll, button, checkpoint or resume.");
 }
 
 export const mobileActTool = (exec: Exec) => ({
@@ -818,11 +861,11 @@ export const mobileActTool = (exec: Exec) => ({
 	],
 	description: [
 		"Operate an iOS Simulator, a real iPhone or an Android emulator/phone through mobilecli (simulators boot headless, no window). iPhones and iPads paired with Xcode over Wi-Fi work too (list marks them Wi-Fi; boot connects one that is offline).",
-		"Actions: list (devices, online first); boot {device}; launch {appId}; relaunch {appId} (terminate + launch: escapes system sheets such as Game Center); both fail when the app did not close or come to the front, and return its first screen (settleMs, default 1000); snapshot (accessibility elements as [ref] Type \"label\" = value #id @(x,y wxh));",
-		"find {query} (searches the last snapshot); ocr (on-screen text via Apple Vision as [tN] refs, for controls the accessibility tree misses; macOS); wait {query?, gone?, timeoutMs? (10000), (no query: until the screen stops changing for stableMs, default 1000, never fails on timeout; use instead of sleeping), stableMs? (the match must hold this long), failOn? [queries], failOnAlert?, expectApp?}: failOn text, an alert or another app in front fail it before success is checked;",
+		"Actions: list (devices, online first); boot {device}; launch {appId}; relaunch {appId} (terminate + launch: escapes system sheets such as Game Center); both fail when the app did not close or come to the front, and return its first screen (settleMs, default 1000); snapshot {stableMs?} (accessibility elements as [ref] Type \"label\" = value #id @(x,y wxh); stableMs first waits until the screen stops changing, so an animation is not read half-drawn);",
+		"find {query} (searches the last snapshot); ocr (on-screen text via Apple Vision as [tN] refs, for controls the accessibility tree misses; macOS); wait {query?, gone?, timeoutMs? (10000), (no query: until the screen stops changing for stableMs, default 1000, never fails on timeout; use instead of sleeping), stableMs? (the match must hold this long), failOn? [queries], failOnAlert?, expectApp?}: failOn text, an alert or another app in front fail it before success is checked; breaker: false makes such a failure a plain error that does not stop the device;",
 		"tap, longpress, type and swipe take ref, or query (\"#id\" exact, else label/value/id text; read fresh, then OCR text if the tree has none) to find and act in one call; overlapped elements (fanned cards) are touched at their visible part.",
 		"tap {ref} or {x, y}; longpress {ref or x, y, durationMs? (1000)}; type {text, ref?, submit?} (ref taps the field and replaces its text; without ref the text is typed into the focused field; submit presses Enter);",
-		"swipe {direction, ref?} (direction = which side's content to reveal: down shows content below, left the page to the left; ref scrolls inside that element); button {button: home|back|power|volume_up|volume_down} (back is Android only).",
+		"swipe {direction, ref?} (direction = which side's content to reveal: down shows content below, left the page to the left; ref scrolls inside that element; a swipe flings, so use scroll to reach a row); scroll {query, direction? (down), ref?} drags slowly until the element is in the middle band of the screen (or of ref, a scroll container) and returns its line; it fails when the list ends without it (try the other direction); button {button: home|back|power|volume_up|volume_down} (back is Android only).",
 		"After each action it waits settleMs (default 500) and returns + added, - removed and ~ changed elements, or the full screen when most of it changed; settleMs 0 skips the re-read for fast sequences.",
 		"Results name the app in front; an APP CHANGED line (another app is in front: yours closed or crashed) and an ALERT line (an open alert with its texts and buttons) head the result, so a script can stop on them.",
 		"Test loops: checkpoint {name, save?, ignore? [queries], visual?, appId?} saves the screen as the good state on first use (types, labels, ids and the app in front; visual adds a 16x16 color grid without the status bar) and compares later calls with that name against it;",
@@ -835,28 +878,29 @@ export const mobileActTool = (exec: Exec) => ({
 	parameters: {
 		type: "object", additionalProperties: false, required: ["action"],
 		properties: {
-			action: { type: "string", enum: ["list", "boot", "launch", "relaunch", "snapshot", "find", "ocr", "wait", "tap", "longpress", "type", "swipe", "button", "checkpoint", "resume"] },
+			action: { type: "string", enum: ["list", "boot", "launch", "relaunch", "snapshot", "find", "ocr", "wait", "tap", "longpress", "type", "swipe", "scroll", "button", "checkpoint", "resume"] },
 			failOn: { type: "array", items: { type: "string" }, description: "wait: queries that fail the wait at once when on screen, e.g. [\"Connection Error\"]" },
 			failOnAlert: { type: "boolean", description: "wait: fail when an alert is open" },
 			expectApp: { type: "string", description: "wait: fail when another app is in front (bundle id or package)" },
-			stableMs: { type: "number", description: "wait: the match must hold this long (default 0)" },
+			stableMs: { type: "number", description: "wait: the match must hold this long (default 0); snapshot: first wait until the screen holds still this long" },
+			breaker: { type: "boolean", description: "wait: false = a failed guarded wait (failOn, failOnAlert, expectApp, timeout) is a plain error and leaves input on" },
 			name: { type: "string", description: "checkpoint: name of the good state (letters, digits, . _ -)" },
 			save: { type: "boolean", description: "checkpoint: save the current screen as the good state, replacing a saved one" },
 			ignore: { type: "array", items: { type: "string" }, description: "checkpoint: queries for elements left out of the comparison (clocks, counters); saved with the good state" },
 			visual: { type: "boolean", description: "checkpoint: also compare a 16x16 color grid of the screenshot (default: when the good state has one)" },
 			device: { type: "string", description: "Device id or name (default: the only online device)" },
 			appId: { type: "string", description: "launch/relaunch: iOS bundle id or Android package; checkpoint: the app whose crash reports to watch (default: the app in front of the good state)" },
-			ref: { type: "string", description: "Element ref from the last snapshot or change list, e.g. e12" },
+			ref: { type: "string", description: "Element ref from the last snapshot or change list, e.g. e12; scroll: the scroll container" },
 			x: { type: "number", description: "tap/longpress: x (points on iOS, pixels on Android)" },
 			y: { type: "number", description: "tap/longpress: y" },
 			durationMs: { type: "number", description: "longpress: hold time in ms (default 1000)" },
 			text: { type: "string", description: "type: text to enter" },
 			submit: { type: "boolean", description: "type: press Enter afterwards" },
-			direction: { type: "string", enum: ["up", "down", "left", "right"], description: "swipe: which side's content to reveal (down = content below, left = page to the left)" },
+			direction: { type: "string", enum: ["up", "down", "left", "right"], description: "swipe/scroll: which side's content to reveal (down = content below, left = page to the left)" },
 			button: { type: "string", enum: ["home", "back", "power", "volume_up", "volume_down"] },
-			query: { type: "string", description: "find: text to search; wait/tap/longpress/type/swipe: \"#id\" or label text to find on the current screen" },
+			query: { type: "string", description: "find: text to search; wait/tap/longpress/type/swipe: \"#id\" or label text to find on the current screen; scroll: the element to bring into view" },
 			gone: { type: "boolean", description: "wait: wait until query disappears" },
-			timeoutMs: { type: "number", description: "wait: give up after this many ms (default 10000)" },
+			timeoutMs: { type: "number", description: "wait: give up after this many ms (default 10000); snapshot with stableMs: at most this long (default 5000)" },
 			settleMs: { type: "number", description: "Wait before reading the change list (default 500; 0 = no re-read)" },
 		},
 	},
